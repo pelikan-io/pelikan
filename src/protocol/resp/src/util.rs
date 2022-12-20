@@ -38,15 +38,19 @@ pub fn string(input: &[u8]) -> IResult<&[u8], &[u8]> {
 }
 
 #[allow(clippy::redundant_allocation)]
-pub fn take_bulk_string(array: &mut Vec<Message>) -> Result<Arc<Box<[u8]>>, Error> {
-    if let Message::BulkString(s) = array.remove(1) {
+pub fn take_bulk_string(array: &mut Vec<Message>) -> Result<Option<Arc<Box<[u8]>>>, Error> {
+    if array.len() == 0 {
+        return Ok(None);
+    }
+
+    if let Message::BulkString(s) = array.remove(0) {
         if s.inner.is_none() {
             return Err(Error::new(ErrorKind::Other, "bulk string is null"));
         }
 
         let s = s.inner.unwrap();
 
-        Ok(s)
+        Ok(Some(s))
     } else {
         Err(Error::new(
             ErrorKind::Other,
@@ -55,10 +59,28 @@ pub fn take_bulk_string(array: &mut Vec<Message>) -> Result<Arc<Box<[u8]>>, Erro
     }
 }
 
-pub fn take_bulk_string_as_u64(array: &mut Vec<Message>) -> Result<u64, Error> {
+pub fn take_bulk_string_as_utf8(array: &mut Vec<Message>) -> Result<Option<String>, Error> {
     let s = take_bulk_string(array)?;
-    std::str::from_utf8(&s)
+
+    if s.is_none() {
+        return Ok(None);
+    }
+
+    std::str::from_utf8(&s.unwrap())
+        .map_err(|_| Error::new(ErrorKind::Other, "bulk string not valid utf8"))
+        .map(|s| Some(s.to_owned()))
+}
+
+pub fn take_bulk_string_as_u64(array: &mut Vec<Message>) -> Result<Option<u64>, Error> {
+    let s = take_bulk_string(array)?;
+
+    if s.is_none() {
+        return Ok(None);
+    }
+
+    std::str::from_utf8(&s.unwrap())
         .map_err(|_| Error::new(ErrorKind::Other, "bulk string not valid utf8"))?
         .parse::<u64>()
         .map_err(|_| Error::new(ErrorKind::Other, "bulk string is not a u64"))
+        .map(|v| Some(v))
 }

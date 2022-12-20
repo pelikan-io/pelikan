@@ -60,95 +60,97 @@ impl TryFrom<Message> for SetRequest {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
-            let key = take_bulk_string(&mut array)?;
+            let _command = take_bulk_string(&mut array)?;
+
+            let key = take_bulk_string(&mut array)?
+                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+
             if key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
-            let value = take_bulk_string(&mut array)?;
+            let value = take_bulk_string(&mut array)?
+                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
 
             let mut expire_time = None;
             let mut mode = SetMode::Set;
             let mut get_old = false;
 
-            let mut i = 1;
+            // let mut i = 1;
 
-            while i < array.len() {
-                if let Message::BulkString(field) = &array[i] {
-                    if field.inner.is_none() {
-                        return Err(Error::new(ErrorKind::Other, "malformed command"));
-                    }
-                    let field = field.inner.as_ref().unwrap();
-
-                    match field.as_ref().as_ref() {
-                        b"EX" => {
-                            if expire_time.is_some() || array.len() < i + 2 {
-                                return Err(Error::new(ErrorKind::Other, "malformed command"));
-                            }
-                            let s = take_bulk_string_as_u64(&mut array)?;
-                            expire_time = Some(ExpireTime::Seconds(s));
-                            i += 1;
-                        }
-                        b"PX" => {
-                            if expire_time.is_some() || array.len() < i + 2 {
-                                return Err(Error::new(ErrorKind::Other, "malformed command"));
-                            }
-                            let ms = take_bulk_string_as_u64(&mut array)?;
-                            expire_time = Some(ExpireTime::Milliseconds(ms));
-                            i += 1;
-                        }
-                        b"EXAT" => {
-                            if expire_time.is_some() || array.len() < i + 2 {
-                                return Err(Error::new(ErrorKind::Other, "malformed command"));
-                            }
-                            let s = take_bulk_string_as_u64(&mut array)?;
-                            expire_time = Some(ExpireTime::UnixSeconds(s));
-                            i += 1;
-                        }
-                        b"PXAT" => {
-                            if expire_time.is_some() || array.len() < i + 2 {
-                                return Err(Error::new(ErrorKind::Other, "malformed command"));
-                            }
-                            let ms = take_bulk_string_as_u64(&mut array)?;
-                            expire_time = Some(ExpireTime::UnixMilliseconds(ms));
-                            i += 1;
-                        }
-                        b"KEEPTTL" => {
-                            if expire_time.is_some() {
-                                return Err(Error::new(ErrorKind::Other, "malformed command"));
-                            }
-                            expire_time = Some(ExpireTime::KeepTtl);
-                        }
-                        b"NX" => {
-                            if mode != SetMode::Set {
-                                return Err(Error::new(ErrorKind::Other, "malformed command"));
-                            }
-
-                            mode = SetMode::Add;
-                        }
-                        b"XX" => {
-                            if mode != SetMode::Set {
-                                return Err(Error::new(ErrorKind::Other, "malformed command"));
-                            }
-
-                            mode = SetMode::Replace;
-                        }
-                        b"GET" => {
-                            if get_old {
-                                return Err(Error::new(ErrorKind::Other, "malformed command"));
-                            }
-
-                            get_old = true;
-                        }
-                        _ => {
+            while let Some(token) = take_bulk_string_as_utf8(&mut array)? {
+                match token.as_str() {
+                    "EX" => {
+                        if expire_time.is_some() {
                             return Err(Error::new(ErrorKind::Other, "malformed command"));
                         }
-                    }
-                } else {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
 
-                i += 1;
+                        let s = take_bulk_string_as_u64(&mut array)?
+                            .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+
+                        expire_time = Some(ExpireTime::Seconds(s));
+                    }
+                    "PX" => {
+                        if expire_time.is_some() {
+                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                        }
+
+                        let ms = take_bulk_string_as_u64(&mut array)?
+                            .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+
+                        expire_time = Some(ExpireTime::Milliseconds(ms));
+                    }
+                    "EXAT" => {
+                        if expire_time.is_some() {
+                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                        }
+
+                        let s = take_bulk_string_as_u64(&mut array)?
+                            .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+
+                        expire_time = Some(ExpireTime::UnixSeconds(s));
+                    }
+                    "PXAT" => {
+                        if expire_time.is_some() {
+                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                        }
+
+                        let ms = take_bulk_string_as_u64(&mut array)?
+                            .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+
+                        expire_time = Some(ExpireTime::UnixMilliseconds(ms));
+                    }
+                    "KEEPTTL" => {
+                        if expire_time.is_some() {
+                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                        }
+                        expire_time = Some(ExpireTime::KeepTtl);
+                    }
+                    "NX" => {
+                        if mode != SetMode::Set {
+                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                        }
+
+                        mode = SetMode::Add;
+                    }
+                    "XX" => {
+                        if mode != SetMode::Set {
+                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                        }
+
+                        mode = SetMode::Replace;
+                    }
+                    "GET" => {
+                        if get_old {
+                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                        }
+
+                        get_old = true;
+                    }
+                    _ => {
+                        return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    }
+                }
             }
 
             Ok(Self {
@@ -230,6 +232,30 @@ mod tests {
         if let Request::Set(request) = parser.parse(b"set 0 1\r\n").unwrap().into_inner() {
             assert_eq!(request.key(), b"0");
             assert_eq!(request.value(), b"1");
+        } else {
+            panic!("invalid parse result");
+        }
+
+        if let Request::Set(request) = parser
+            .parse(b"SET key value NX EX 1000\r\n")
+            .unwrap()
+            .into_inner()
+        {
+            assert_eq!(request.key(), b"key");
+            assert_eq!(request.value(), b"value");
+            assert_eq!(request.expire_time(), Some(ExpireTime::Seconds(1000)))
+        } else {
+            panic!("invalid parse result");
+        }
+
+        if let Request::Set(request) = parser
+            .parse(b"SET key value EX 1000 NX\r\n")
+            .unwrap()
+            .into_inner()
+        {
+            assert_eq!(request.key(), b"key");
+            assert_eq!(request.value(), b"value");
+            assert_eq!(request.expire_time(), Some(ExpireTime::Seconds(1000)));
         } else {
             panic!("invalid parse result");
         }
