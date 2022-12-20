@@ -76,8 +76,6 @@ impl TryFrom<Message> for SetRequest {
             let mut mode = SetMode::Set;
             let mut get_old = false;
 
-            // let mut i = 1;
-
             while let Some(token) = take_bulk_string_as_utf8(&mut array)? {
                 match token.as_str() {
                     "EX" => {
