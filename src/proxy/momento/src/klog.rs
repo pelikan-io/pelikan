@@ -10,6 +10,14 @@ pub(crate) fn klog_get(key: &str, response_len: usize) {
     }
 }
 
+pub(crate) fn klog_hget(key: &str, field: &str, response_len: usize) {
+    if response_len == 0 {
+        klog!("\"hget {} {}\" 0 {}", key, field, response_len);
+    } else {
+        klog!("\"hget {} {}\" 4 {}", key, field, response_len);
+    }
+}
+
 pub fn klog_set(
     key: &str,
     flags: u32,

@@ -12,4 +12,11 @@ pub(crate) use util::*;
 pub use request::*;
 pub use response::*;
 
+use rustcommon_metrics::*;
+
+counter!(HGET);
+counter!(HGET_EX);
+counter!(HGET_HIT);
+counter!(HGET_MISS);
+
 common::metrics::test_no_duplicates!();
