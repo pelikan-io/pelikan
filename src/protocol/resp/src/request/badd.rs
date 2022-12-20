@@ -51,20 +51,41 @@ impl TryFrom<Message> for BAddRequest {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
+            let _command = take_bulk_string(&mut array)?;
+
             let outer_key = take_bulk_string(&mut array)?;
+
+            if outer_key.is_none() {
+                return Err(Error::new(ErrorKind::Other, "malformed command"));
+            }
+
+            let outer_key = outer_key.unwrap();
+
             if outer_key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
             //loop as long as we have at least 2 arguments after the command
             let mut pairs = Vec::with_capacity(array.len() / 2);
-            while array.len() >= 3 {
+            while array.len() >= 2 {
                 let inner_key = take_bulk_string(&mut array)?;
+                if inner_key.is_none() {
+                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                }
+                let inner_key = inner_key.unwrap();
+
                 if inner_key.is_empty() {
                     return Err(Error::new(ErrorKind::Other, "malformed command"));
                 }
 
                 let value = take_bulk_string(&mut array)?;
+
+                if value.is_none() {
+                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                }
+
+                let value = value.unwrap();
+
                 if value.is_empty() {
                     return Err(Error::new(ErrorKind::Other, "malformed command"));
                 }
