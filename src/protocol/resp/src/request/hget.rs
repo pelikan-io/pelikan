@@ -28,37 +28,21 @@ impl TryFrom<Message> for HGetRequest {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
-            let key = if let Message::BulkString(key) = array.remove(1) {
-                if key.inner.is_none() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
+            let _command = take_bulk_string(&mut array)?;
 
-                let key = key.inner.unwrap();
+            let key = take_bulk_string(&mut array)?
+                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
 
-                if key.len() == 0 {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
-
-                key
-            } else {
+            if key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
-            };
+            }
 
-            let field = if let Message::BulkString(field) = array.remove(1) {
-                if field.inner.is_none() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
+            let field = take_bulk_string(&mut array)?
+                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
 
-                let field = field.inner.unwrap();
-
-                if field.len() == 0 {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
-
-                field
-            } else {
+            if field.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
-            };
+            }
 
             Ok(Self { key, field })
         } else {
