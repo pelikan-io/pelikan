@@ -9,7 +9,7 @@ use std::sync::Arc;
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
 pub struct GetRequest {
-    key: Arc<Box<[u8]>>,
+    key: ArcByteSlice,
 }
 
 impl TryFrom<Message> for GetRequest {

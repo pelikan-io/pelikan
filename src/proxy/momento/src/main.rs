@@ -15,6 +15,8 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use core::time::Duration;
 use logger::configure_logging;
 use logger::Drain;
+use momento::response::cache_dictionary_get_response::*;
+use momento::response::cache_dictionary_set_response::*;
 use momento::response::cache_get_response::*;
 use momento::response::cache_set_response::*;
 use momento::response::error::*;
@@ -250,7 +252,7 @@ async fn spawn(
     }
     let auth_token =
         std::env::var("MOMENTO_AUTHENTICATION").expect("MOMENTO_AUTHENTICATION must be set");
-    let client_builder = match SimpleCacheClientBuilder::new(auth_token, DEFAULT_TTL_SECONDS).await
+    let client_builder = match SimpleCacheClientBuilder::new(auth_token, DEFAULT_TTL_SECONDS)
     {
         Ok(c) => c,
         Err(e) => {

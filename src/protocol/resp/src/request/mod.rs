@@ -13,12 +13,20 @@ use std::sync::Arc;
 mod badd;
 mod get;
 mod hget;
+mod hmget;
+mod hset;
 mod set;
 
 pub use badd::BAddRequest;
 pub use get::GetRequest;
-pub use hget::HGetRequest;
+pub use hget::HashGetRequest;
+pub use hmget::HashMultiGetRequest;
+pub use hset::HashSetRequest;
 pub use set::SetRequest;
+
+type ArcByteSlice = Arc<Box<[u8]>>;
+type ArcKeyValuePair = (ArcByteSlice, ArcByteSlice);
+type ArcFieldValuePair = (ArcByteSlice, ArcByteSlice);
 
 #[derive(Default)]
 pub struct RequestParser {
@@ -98,7 +106,13 @@ impl Parse<Request> for RequestParser {
                             GetRequest::try_from(message).map(Request::from)
                         }
                         Some(b"hget") | Some(b"HGET") => {
-                            HGetRequest::try_from(message).map(Request::from)
+                            HashGetRequest::try_from(message).map(Request::from)
+                        }
+                        Some(b"hmget") | Some(b"HMGET") => {
+                            HashMultiGetRequest::try_from(message).map(Request::from)
+                        }
+                        Some(b"hset") | Some(b"HSET") => {
+                            HashSetRequest::try_from(message).map(Request::from)
                         }
                         Some(b"set") | Some(b"SET") => {
                             SetRequest::try_from(message).map(Request::from)
@@ -125,7 +139,9 @@ impl Compose for Request {
         match self {
             Self::BAdd(r) => r.compose(buf),
             Self::Get(r) => r.compose(buf),
-            Self::HGet(r) => r.compose(buf),
+            Self::HashGet(r) => r.compose(buf),
+            Self::HashMultiGet(r) => r.compose(buf),
+            Self::HashSet(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
         }
     }
@@ -135,7 +151,9 @@ impl Compose for Request {
 pub enum Request {
     BAdd(BAddRequest),
     Get(GetRequest),
-    HGet(HGetRequest),
+    HashGet(HashGetRequest),
+    HashMultiGet(HashMultiGetRequest),
+    HashSet(HashSetRequest),
     Set(SetRequest),
 }
 
@@ -151,9 +169,21 @@ impl From<GetRequest> for Request {
     }
 }
 
-impl From<HGetRequest> for Request {
-    fn from(other: HGetRequest) -> Self {
-        Self::HGet(other)
+impl From<HashGetRequest> for Request {
+    fn from(other: HashGetRequest) -> Self {
+        Self::HashGet(other)
+    }
+}
+
+impl From<HashMultiGetRequest> for Request {
+    fn from(other: HashMultiGetRequest) -> Self {
+        Self::HashMultiGet(other)
+    }
+}
+
+impl From<HashSetRequest> for Request {
+    fn from(other: HashSetRequest) -> Self {
+        Self::HashSet(other)
     }
 }
 
@@ -167,7 +197,9 @@ impl From<SetRequest> for Request {
 pub enum Command {
     BAdd,
     Get,
-    HGet,
+    HashGet,
+    HashMultiGet,
+    HashSet,
     Set,
 }
 
@@ -178,7 +210,9 @@ impl TryFrom<&[u8]> for Command {
         match other {
             b"badd" | b"BADD" => Ok(Command::BAdd),
             b"get" | b"GET" => Ok(Command::Get),
-            b"hget" | b"HGET" => Ok(Command::HGet),
+            b"hget" | b"HGET" => Ok(Command::HashGet),
+            b"hmget" | b"HMGET" => Ok(Command::HashMultiGet),
+            b"hset" | b"HSET" => Ok(Command::HashSet),
             b"set" | b"SET" => Ok(Command::Set),
             _ => Err(()),
         }

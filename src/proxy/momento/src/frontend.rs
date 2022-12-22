@@ -94,6 +94,30 @@ pub(crate) async fn handle_resp_client(
                             break;
                         }
                     }
+                    resp::Request::HashGet(r) => {
+                        if resp::hget(&mut client, &cache_name, &mut socket, r.key(), r.field())
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    resp::Request::HashMultiGet(r) => {
+                        if resp::hmget(&mut client, &cache_name, &mut socket, r.key(), r.fields())
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
+                    resp::Request::HashSet(r) => {
+                        if resp::hset(&mut client, &cache_name, &mut socket, r.key(), r.data())
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
                     resp::Request::Set(r) => {
                         if resp::set(&mut client, &cache_name, &mut socket, &r)
                             .await

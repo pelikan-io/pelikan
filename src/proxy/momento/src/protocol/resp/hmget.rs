@@ -2,17 +2,18 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use std::sync::Arc;
 use crate::klog::*;
 use crate::{Error, *};
 use ::net::*;
 use protocol_resp::*;
 
-pub async fn hget(
+pub async fn hmget(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     socket: &mut tokio::net::TcpStream,
     key: &[u8],
-    field: &[u8],
+    fields: &[Arc<Box<[u8]>>],
 ) -> Result<(), Error> {
     HGET.increment();
 
@@ -25,13 +26,16 @@ pub async fn hget(
         return Err(Error::from(ErrorKind::InvalidInput));
     }
 
-    // check if the field is valid
-    if std::str::from_utf8(field).is_err() {
-        HGET_EX.increment();
+    // check if the fields are valied
+    // sending the request to the backend
+    for field in fields.iter() {
+        if std::str::from_utf8(field).is_err() {
+            // GET_EX.increment();
 
-        // invalid field
-        let _ = socket.write_all(b"-ERR invalid field\r\n").await;
-        return Err(Error::from(ErrorKind::InvalidInput));
+            // invalid field
+            let _ = socket.write_all(b"ERROR\r\n").await;
+            return Err(Error::from(ErrorKind::InvalidInput));
+        }
     }
 
     let mut response_buf = Vec::new();
@@ -40,10 +44,11 @@ pub async fn hget(
 
     // already checked the key and field, so we know these unwraps are safe
     let key = std::str::from_utf8(key).unwrap().to_owned();
-    let field = std::str::from_utf8(field).unwrap().to_owned();
 
-    match timeout(Duration::from_millis(200), client.dictionary_get(cache_name, &key, vec![field.clone()])).await {
-        Ok(Ok(response)) => {
+    let mut fields: Vec<String> = fields.iter().map(|f| std::str::from_utf8(f).unwrap().to_owned()).collect();
+
+    match timeout(Duration::from_millis(200), client.dictionary_get(cache_name, &key, fields.clone())).await {
+        Ok(Ok(mut response)) => {
             match response.result {
                 MomentoDictionaryGetStatus::ERROR => {
                     // we got some error from
@@ -58,37 +63,40 @@ pub async fn hget(
                 }
                 MomentoDictionaryGetStatus::FOUND => {
                     if response.dictionary.is_none() {
-                        error!("error for hget: dictionary found but not set in response");
+                        error!("error for hmget: dictionary found but not provided in response");
                         BACKEND_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     }
 
-                    if let Some(value) = response.dictionary.unwrap().get(&field.clone().into_bytes()) {
-                        HGET_HIT.increment();
+                    let dictionary = response.dictionary.as_mut().unwrap();
 
-                        let item_header = format!("${}\r\n", value.len());
-                        let response_len = 2 + item_header.len() + value.len();
+                    response_buf.extend_from_slice(format!("*{}\r\n", fields.len()).as_bytes());
 
-                        klog_hget(&key, &field, response_len);
+                    for field in fields {
+                        println!("field: {}", field);
+                        if let Some(value) = dictionary.get(field.as_bytes()) {
+                            let item_header = format!("${}\r\n", value.len());
+                            let response_len = 2 + item_header.len() + value.len();
 
-                        response_buf.extend_from_slice(item_header.as_bytes());
-                        response_buf.extend_from_slice(&value);
-                        response_buf.extend_from_slice(b"\r\n");
-                    } else {
-                        HGET_MISS.increment();
+                            klog_hget(&key, &field, response_len);
 
-                        response_buf.extend_from_slice(b"$-1\r\n");
-
-                        klog_hget(&key, &field, 0);
+                            response_buf.extend_from_slice(item_header.as_bytes());
+                            response_buf.extend_from_slice(&value);
+                            response_buf.extend_from_slice(b"\r\n");
+                        } else {
+                            response_buf.extend_from_slice(b"$-1\r\n");
+                        }
                     }
-                    
                 }
                 MomentoDictionaryGetStatus::MISSING => {
-                    HGET_MISS.increment();
+                    // treat every requested field as a miss
+                    response_buf.extend_from_slice(format!("*{}\r\n", fields.len()).as_bytes());
 
-                    response_buf.extend_from_slice(b"$-1\r\n");
-
-                    klog_hget(&key, &field, 0);
+                    for field in fields {
+                        HGET_MISS.increment();
+                        response_buf.extend_from_slice(b"$-1\r\n");
+                        klog_hget(&key, &field, 0);
+                    }
                 }
             }
         }
@@ -103,7 +111,15 @@ pub async fn hget(
             // as a miss
             error!("error for hget: {}", e);
             BACKEND_EX.increment();
-            response_buf.extend_from_slice(b"$-1\r\n");
+
+            // treat every requested field as a miss
+            response_buf.extend_from_slice(format!("*{}\r\n", fields.len()).as_bytes());
+
+            while let Some(field) = fields.drain(..).next() {
+                HGET_MISS.increment();
+                response_buf.extend_from_slice(b"$-1\r\n");
+                klog_hget(&key, &field, 0);
+            }
         }
         Err(_) => {
             // we had a timeout, incr stats and move on
