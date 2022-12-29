@@ -5,7 +5,9 @@
 pub use protocol_resp::{Request, RequestParser};
 
 mod get;
+mod ping;
 mod set;
 
 pub use get::*;
+pub use ping::*;
 pub use set::*;
