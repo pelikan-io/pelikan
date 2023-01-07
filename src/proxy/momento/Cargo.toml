@@ -16,7 +16,7 @@ common = { path = "../../common" }
 config = { path = "../../config" }
 libc = { workspace = true }
 logger = { path = "../../logger" }
-momento = "0.3.1"
+momento = "0.8.3"
 net = { path = "../../net" }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-memcache = { path = "../../protocol/memcache" }
