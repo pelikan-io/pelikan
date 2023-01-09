@@ -5,6 +5,7 @@
 pub use protocol_resp::{Request, RequestParser};
 
 mod get;
+mod hexists;
 mod hget;
 mod hgetall;
 mod hmget;
@@ -12,6 +13,7 @@ mod hset;
 mod set;
 
 pub use get::*;
+pub use hexists::*;
 pub use hget::*;
 pub use hgetall::*;
 pub use hmget::*;

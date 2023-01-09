@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 mod badd;
 mod get;
+mod hexists;
 mod hget;
 mod hgetall;
 mod hmget;
@@ -20,6 +21,7 @@ mod set;
 
 pub use badd::*;
 pub use get::*;
+pub use hexists::*;
 pub use hget::*;
 pub use hgetall::*;
 pub use hmget::*;
@@ -107,6 +109,9 @@ impl Parse<Request> for RequestParser {
                         Some(b"get") | Some(b"GET") => {
                             GetRequest::try_from(message).map(Request::from)
                         }
+                        Some(b"hexists") | Some(b"HEXISTS") => {
+                            HashExistsRequest::try_from(message).map(Request::from)
+                        }
                         Some(b"hget") | Some(b"HGET") => {
                             HashGetRequest::try_from(message).map(Request::from)
                         }
@@ -144,6 +149,7 @@ impl Compose for Request {
         match self {
             Self::BAdd(r) => r.compose(buf),
             Self::Get(r) => r.compose(buf),
+            Self::HashExists(r) => r.compose(buf),
             Self::HashGet(r) => r.compose(buf),
             Self::HashGetAll(r) => r.compose(buf),
             Self::HashMultiGet(r) => r.compose(buf),
@@ -157,6 +163,7 @@ impl Compose for Request {
 pub enum Request {
     BAdd(BAddRequest),
     Get(GetRequest),
+    HashExists(HashExistsRequest),
     HashGet(HashGetRequest),
     HashGetAll(HashGetAllRequest),
     HashMultiGet(HashMultiGetRequest),
@@ -173,6 +180,12 @@ impl From<BAddRequest> for Request {
 impl From<GetRequest> for Request {
     fn from(other: GetRequest) -> Self {
         Self::Get(other)
+    }
+}
+
+impl From<HashExistsRequest> for Request {
+    fn from(other: HashExistsRequest) -> Self {
+        Self::HashExists(other)
     }
 }
 
