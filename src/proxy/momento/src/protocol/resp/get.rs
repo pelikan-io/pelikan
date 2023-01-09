@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use crate::klog::klog_get;
+use crate::klog::{klog_1, Status};
 use crate::{Error, *};
 use ::net::*;
 use protocol_memcache::*;
@@ -45,24 +45,20 @@ pub async fn get(
                 MomentoGetStatus::HIT => {
                     GET_KEY_HIT.increment();
 
-                    let length = response.value.len();
-
-                    let item_header = format!("${}\r\n", length);
-
-                    let response_len = 2 + item_header.len() + response.value.len();
-
-                    klog_get(key, response_len);
+                    let item_header = format!("${}\r\n", response.value.len());
 
                     response_buf.extend_from_slice(item_header.as_bytes());
                     response_buf.extend_from_slice(&response.value);
                     response_buf.extend_from_slice(b"\r\n");
+
+                    klog_1(&"get", key, Status::Hit, response.value.len());
                 }
                 MomentoGetStatus::MISS => {
                     GET_KEY_MISS.increment();
 
                     response_buf.extend_from_slice(b"$-1\r\n");
 
-                    klog_get(key, 0);
+                    klog_1(&"get", key, Status::Miss, 0);
                 }
             }
         }

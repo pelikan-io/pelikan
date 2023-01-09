@@ -8,8 +8,9 @@ use std::sync::Arc;
 
 counter!(HMGET);
 counter!(HMGET_EX);
-counter!(HMGET_HIT);
-counter!(HMGET_MISS);
+counter!(HMGET_KEY);
+counter!(HMGET_KEY_HIT);
+counter!(HMGET_KEY_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
@@ -36,7 +37,7 @@ impl TryFrom<Message> for HashMultiGetRequest {
             let _command = take_bulk_string(&mut array)?;
 
             let key = take_bulk_string(&mut array)?
-                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
             if key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));

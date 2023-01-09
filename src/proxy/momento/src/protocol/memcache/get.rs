@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use crate::klog::klog_get;
+use crate::klog::{klog_1, Status};
 use crate::{Error, *};
 use ::net::*;
 use protocol_memcache::*;
@@ -52,7 +52,7 @@ pub async fn get(
 
                         let item_header = format!("VALUE {} 0 {}\r\n", key, length);
 
-                        klog_get(key, response.value.len());
+                        klog_1(&"get", key, Status::Hit, length);
 
                         response_buf.extend_from_slice(item_header.as_bytes());
                         response_buf.extend_from_slice(&response.value);
@@ -63,7 +63,7 @@ pub async fn get(
 
                         // we don't write anything for a miss
 
-                        klog_get(key, 0);
+                        klog_1(&"get", key, Status::Miss, 0);
                     }
                 }
             }

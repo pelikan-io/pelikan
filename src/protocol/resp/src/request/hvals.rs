@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 counter!(HKEYS);
 counter!(HKEYS_EX);
-counter!(HKEYS_FOUND);
-counter!(HKEYS_NOT_FOUND);
+counter!(HKEYS_HIT);
+counter!(HKEYS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
@@ -35,7 +35,7 @@ impl TryFrom<Message> for HashValuesRequest {
             let _command = take_bulk_string(&mut array)?;
 
             let key = take_bulk_string(&mut array)?
-                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
             if key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));

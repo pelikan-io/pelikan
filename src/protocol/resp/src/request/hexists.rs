@@ -36,14 +36,14 @@ impl TryFrom<Message> for HashExistsRequest {
             let _command = take_bulk_string(&mut array)?;
 
             let key = take_bulk_string(&mut array)?
-                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
             if key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
             let field = take_bulk_string(&mut array)?
-                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
             if field.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));

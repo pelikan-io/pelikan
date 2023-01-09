@@ -66,15 +66,17 @@ pub async fn hexists(
                         .unwrap()
                         .get(&field.clone().into_bytes())
                     {
-                        HEXISTS_HIT.increment();
+                        HEXISTS_EXISTS.increment();
 
                         response_buf.extend_from_slice(b":1\r\n");
+
+                        klog_2(&"hexists", &key, &field, Status::Exists, 1);
                     } else {
-                        HEXISTS_MISS.increment();
+                        HEXISTS_NOT_FOUND.increment();
 
                         response_buf.extend_from_slice(b":0\r\n");
 
-                        klog_hmget(&key, &field, 0);
+                        klog_2(&"hexists", &key, &field, Status::NotFound, 0);
                     }
                 }
                 MomentoDictionaryGetStatus::MISSING => {

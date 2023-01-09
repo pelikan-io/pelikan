@@ -8,8 +8,8 @@ use std::sync::Arc;
 
 counter!(HGETALL);
 counter!(HGETALL_EX);
-counter!(HGETALL_FOUND);
-counter!(HGETALL_NOT_FOUND);
+counter!(HGETALL_HIT);
+counter!(HGETALL_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
@@ -35,7 +35,7 @@ impl TryFrom<Message> for HashGetAllRequest {
             let _command = take_bulk_string(&mut array)?;
 
             let key = take_bulk_string(&mut array)?
-                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
             if key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));

@@ -2,12 +2,33 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-pub(crate) fn klog_get(key: &str, response_len: usize) {
-    if response_len == 0 {
-        klog!("\"get {}\" 0 {}", key, response_len);
-    } else {
-        klog!("\"get {}\" 4 {}", key, response_len);
-    }
+use core::fmt::Display;
+
+pub enum Status {
+    Miss = 0,
+    Hit = 4,
+    Stored = 5,
+    Exists = 6,
+    Deleted = 7,
+    NotFound = 8,
+    NotStored = 9,
+}
+
+// response codes for klog
+const MISS: u8 = 0;
+const HIT: u8 = 4;
+const STORED: u8 = 5;
+const EXISTS: u8 = 6;
+const DELETED: u8 = 7;
+const NOT_FOUND: u8 = 8;
+const NOT_STORED: u8 = 9;
+
+pub(crate) fn klog_1(command: &dyn Display, key: &str, status: Status, response_len: usize) {
+    klog!("\"{} {}\" {} {}", command, key, status as u8, response_len);
+}
+
+pub(crate) fn klog_2(command: &dyn Display, key: &str, field: &str, status: Status, response_len: usize) {
+    klog!("\"{} {} {}\" {} {}", command, key, field, status as u8, response_len);
 }
 
 pub(crate) fn klog_hget(key: &str, field: &str, response_len: usize) {

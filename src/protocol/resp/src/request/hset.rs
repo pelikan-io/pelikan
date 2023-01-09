@@ -8,6 +8,8 @@ use std::sync::Arc;
 
 counter!(HSET);
 counter!(HSET_EX);
+counter!(HSET_STORED);
+counter!(HSET_NOT_STORED);
 
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
@@ -38,7 +40,7 @@ impl TryFrom<Message> for HashSetRequest {
             let _command = take_bulk_string(&mut array)?;
 
             let key = take_bulk_string(&mut array)?
-                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
             if key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
@@ -49,14 +51,14 @@ impl TryFrom<Message> for HashSetRequest {
 
             while array.len() >= 2 {
                 let field = take_bulk_string(&mut array)?
-                    .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                    .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
                 if field.is_empty() {
                     return Err(Error::new(ErrorKind::Other, "malformed command"));
                 }
 
                 let value = take_bulk_string(&mut array)?
-                    .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                    .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
                 if value.is_empty() {
                     return Err(Error::new(ErrorKind::Other, "malformed command"));

@@ -148,8 +148,8 @@ pub async fn set(
                 SESSION_SEND_BYTE.add(12);
                 TCP_SEND_BYTE.add(12);
 
-                // let client know this wasn't stored
-                if let Err(e) = socket.write_all(b"-ERR backend error\r\n").await {
+                // let client know the request timed out
+                if let Err(e) = socket.write_all(b"-ERR backend timeout\r\n").await {
                     SESSION_SEND_EX.increment();
                     // hangup if we can't send a response back
                     return Err(e);

@@ -57,26 +57,21 @@ pub async fn hvals(
                         response_buf
                             .extend_from_slice(format!("*{}\r\n", dictionary.len()).as_bytes());
 
-                        let mut response_len = 0;
-
                         for value in dictionary.values() {
                             let value_header = format!("${}\r\n", value.len());
 
-                            response_len +=
-                                2 + value_header.len() + value.len();
-
                             response_buf.extend_from_slice(value_header.as_bytes());
-                            response_buf.extend_from_slice(&value);
+                            response_buf.extend_from_slice(value);
                             response_buf.extend_from_slice(b"\r\n");
                         }
 
-                        klog_hgetall(&key, response_len);
+                        klog_1(&"kvals", &key, Status::Hit, response_buf.len());
                     }
                 }
                 MomentoDictionaryFetchStatus::MISSING => {
                     // per command reference, return an empty list
                     response_buf.extend_from_slice(b"*0\r\n");
-                    klog_hgetall(&key, 0);
+                    klog_1(&"kvals", &key, Status::Miss, response_buf.len());
                 }
             }
         }

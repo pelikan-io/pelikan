@@ -56,14 +56,14 @@ pub async fn hlen(
                         response_buf
                             .extend_from_slice(&response);
 
-                        klog_hlen(&key, response.len());
+                        klog_1(&"hlen", &key, Status::Hit, response_buf.len());
                     }
                 }
                 MomentoDictionaryFetchStatus::MISSING => {
                     // NOTE: per the command reference, zero is returned when
                     // the hash does not exist
                     response_buf.extend_from_slice(b":0\r\n");
-                    klog_hlen(&key, 0);
+                    klog_1(&"hlen", &key, Status::Miss, response_buf.len());
                 }
             }
         }

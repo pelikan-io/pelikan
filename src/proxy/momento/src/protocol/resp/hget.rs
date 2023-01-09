@@ -69,19 +69,18 @@ pub async fn hget(
                         HMGET_HIT.increment();
 
                         let item_header = format!("${}\r\n", value.len());
-                        let response_len = 2 + item_header.len() + value.len();
-
-                        klog_hget(&key, &field, response_len);
 
                         response_buf.extend_from_slice(item_header.as_bytes());
                         response_buf.extend_from_slice(value);
                         response_buf.extend_from_slice(b"\r\n");
+
+                        klog_2(&"hget", &key, &field, Status::Hit, value.len());
                     } else {
                         HMGET_MISS.increment();
 
                         response_buf.extend_from_slice(b"$-1\r\n");
 
-                        klog_hmget(&key, &field, 0);
+                        klog_2(&"hget", &key, &field, Status::Miss, 0);
                     }
                 }
                 MomentoDictionaryGetStatus::MISSING => {

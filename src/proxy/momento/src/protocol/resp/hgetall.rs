@@ -56,29 +56,24 @@ pub async fn hgetall(
                         response_buf
                             .extend_from_slice(format!("*{}\r\n", dictionary.len() * 2).as_bytes());
 
-                        let mut response_len = 0;
-
                         for (field, value) in dictionary {
                             let field_header = format!("${}\r\n", field.len());
                             let value_header = format!("${}\r\n", value.len());
 
-                            response_len +=
-                                4 + field_header.len() + field.len() + value_header.len() + value.len();
-
                             response_buf.extend_from_slice(field_header.as_bytes());
-                            response_buf.extend_from_slice(&field);
+                            response_buf.extend_from_slice(field);
                             response_buf.extend_from_slice(b"\r\n");
                             response_buf.extend_from_slice(value_header.as_bytes());
-                            response_buf.extend_from_slice(&value);
+                            response_buf.extend_from_slice(value);
                             response_buf.extend_from_slice(b"\r\n");
                         }
 
-                        klog_hgetall(&key, response_len);
+                        klog_1(&"hgetall", &key, Status::Hit, response_buf.len());
                     }
                 }
                 MomentoDictionaryFetchStatus::MISSING => {
                     response_buf.extend_from_slice(b"*0\r\n");
-                    klog_hgetall(&key, 0);
+                    klog_1(&"hgetall", &key, Status::Miss, response_buf.len());
                 }
             }
         }
