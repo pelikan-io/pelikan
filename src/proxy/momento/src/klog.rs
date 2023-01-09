@@ -18,6 +18,22 @@ pub(crate) fn klog_hget(key: &str, field: &str, response_len: usize) {
     }
 }
 
+pub(crate) fn klog_hgetall(key: &str, response_len: usize) {
+    if response_len == 0 {
+        klog!("\"hgetall {}\" 0 {}", key, response_len);
+    } else {
+        klog!("\"hgetall {}\" 4 {}", key, response_len);
+    }
+}
+
+pub(crate) fn klog_hmget(key: &str, field: &str, response_len: usize) {
+    if response_len == 0 {
+        klog!("\"hmget {} {}\" 0 {}", key, field, response_len);
+    } else {
+        klog!("\"hmget {} {}\" 4 {}", key, field, response_len);
+    }
+}
+
 pub fn klog_set(
     key: &str,
     flags: u32,

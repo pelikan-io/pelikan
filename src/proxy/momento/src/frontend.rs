@@ -102,6 +102,14 @@ pub(crate) async fn handle_resp_client(
                             break;
                         }
                     }
+                    resp::Request::HashGetAll(r) => {
+                        if resp::hgetall(&mut client, &cache_name, &mut socket, r.key())
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
                     resp::Request::HashMultiGet(r) => {
                         if resp::hmget(&mut client, &cache_name, &mut socket, r.key(), r.fields())
                             .await

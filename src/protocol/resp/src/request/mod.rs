@@ -13,16 +13,18 @@ use std::sync::Arc;
 mod badd;
 mod get;
 mod hget;
+mod hgetall;
 mod hmget;
 mod hset;
 mod set;
 
-pub use badd::BAddRequest;
-pub use get::GetRequest;
-pub use hget::HashGetRequest;
-pub use hmget::HashMultiGetRequest;
-pub use hset::HashSetRequest;
-pub use set::SetRequest;
+pub use badd::*;
+pub use get::*;
+pub use hget::*;
+pub use hgetall::*;
+pub use hmget::*;
+pub use hset::*;
+pub use set::*;
 
 type ArcByteSlice = Arc<Box<[u8]>>;
 type ArcKeyValuePair = (ArcByteSlice, ArcByteSlice);
@@ -108,6 +110,9 @@ impl Parse<Request> for RequestParser {
                         Some(b"hget") | Some(b"HGET") => {
                             HashGetRequest::try_from(message).map(Request::from)
                         }
+                        Some(b"hgetall") | Some(b"HGETALL") => {
+                            HashGetAllRequest::try_from(message).map(Request::from)
+                        }
                         Some(b"hmget") | Some(b"HMGET") => {
                             HashMultiGetRequest::try_from(message).map(Request::from)
                         }
@@ -140,6 +145,7 @@ impl Compose for Request {
             Self::BAdd(r) => r.compose(buf),
             Self::Get(r) => r.compose(buf),
             Self::HashGet(r) => r.compose(buf),
+            Self::HashGetAll(r) => r.compose(buf),
             Self::HashMultiGet(r) => r.compose(buf),
             Self::HashSet(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
@@ -152,6 +158,7 @@ pub enum Request {
     BAdd(BAddRequest),
     Get(GetRequest),
     HashGet(HashGetRequest),
+    HashGetAll(HashGetAllRequest),
     HashMultiGet(HashMultiGetRequest),
     HashSet(HashSetRequest),
     Set(SetRequest),
@@ -172,6 +179,12 @@ impl From<GetRequest> for Request {
 impl From<HashGetRequest> for Request {
     fn from(other: HashGetRequest) -> Self {
         Self::HashGet(other)
+    }
+}
+
+impl From<HashGetAllRequest> for Request {
+    fn from(other: HashGetAllRequest) -> Self {
+        Self::HashGetAll(other)
     }
 }
 
@@ -198,6 +211,7 @@ pub enum Command {
     BAdd,
     Get,
     HashGet,
+    HashGetAll,
     HashMultiGet,
     HashSet,
     Set,
@@ -211,6 +225,7 @@ impl TryFrom<&[u8]> for Command {
             b"badd" | b"BADD" => Ok(Command::BAdd),
             b"get" | b"GET" => Ok(Command::Get),
             b"hget" | b"HGET" => Ok(Command::HashGet),
+            b"hgetall" | b"HGETALL" => Ok(Command::HashGetAll),
             b"hmget" | b"HMGET" => Ok(Command::HashMultiGet),
             b"hset" | b"HSET" => Ok(Command::HashSet),
             b"set" | b"SET" => Ok(Command::Set),

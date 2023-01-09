@@ -6,6 +6,11 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
+counter!(HGET);
+counter!(HGET_EX);
+counter!(HGET_HIT);
+counter!(HGET_MISS);
+
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
 pub struct HashGetRequest {

@@ -2,11 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::sync::Arc;
 use crate::klog::*;
 use crate::{Error, *};
 use ::net::*;
 use protocol_resp::*;
+use std::sync::Arc;
 
 pub async fn hset(
     client: &mut SimpleCacheClient,
@@ -15,7 +15,7 @@ pub async fn hset(
     key: &[u8],
     data: &[(Arc<Box<[u8]>>, Arc<Box<[u8]>>)],
 ) -> Result<(), Error> {
-    // HGET.increment();
+    HSET.increment();
 
     // check if the key is valid
     if std::str::from_utf8(key).is_err() {
@@ -60,10 +60,18 @@ pub async fn hset(
 
     let mut map = std::collections::HashMap::new();
     for (field, value) in data.iter() {
-        map.insert(std::str::from_utf8(field).unwrap().to_owned(), std::str::from_utf8(value).unwrap().to_owned());
+        map.insert(
+            std::str::from_utf8(field).unwrap().to_owned(),
+            std::str::from_utf8(value).unwrap().to_owned(),
+        );
     }
 
-    match timeout(Duration::from_millis(200), client.dictionary_set(cache_name, &key, map, None, false)).await {
+    match timeout(
+        Duration::from_millis(200),
+        client.dictionary_set(cache_name, &key, map, None, false),
+    )
+    .await
+    {
         Ok(Ok(response)) => {
             match response.result {
                 MomentoDictionarySetStatus::ERROR => {
@@ -79,8 +87,6 @@ pub async fn hset(
                 }
                 MomentoDictionarySetStatus::OK => {
                     response_buf.extend_from_slice(format!(":{}\r\n", data.len()).as_bytes());
-
-                    
                 }
             }
         }

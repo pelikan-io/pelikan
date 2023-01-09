@@ -18,7 +18,7 @@ pub async fn hget(
 
     // check if the key is valid
     if std::str::from_utf8(key).is_err() {
-        HGET_EX.increment();
+        HMGET_EX.increment();
 
         // invalid key
         let _ = socket.write_all(b"-ERR invalid key\r\n").await;
@@ -27,7 +27,7 @@ pub async fn hget(
 
     // check if the field is valid
     if std::str::from_utf8(field).is_err() {
-        HGET_EX.increment();
+        HMGET_EX.increment();
 
         // invalid field
         let _ = socket.write_all(b"-ERR invalid field\r\n").await;
@@ -42,7 +42,12 @@ pub async fn hget(
     let key = std::str::from_utf8(key).unwrap().to_owned();
     let field = std::str::from_utf8(field).unwrap().to_owned();
 
-    match timeout(Duration::from_millis(200), client.dictionary_get(cache_name, &key, vec![field.clone()])).await {
+    match timeout(
+        Duration::from_millis(200),
+        client.dictionary_get(cache_name, &key, vec![field.clone()]),
+    )
+    .await
+    {
         Ok(Ok(response)) => {
             match response.result {
                 MomentoDictionaryGetStatus::ERROR => {
@@ -63,8 +68,12 @@ pub async fn hget(
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     }
 
-                    if let Some(value) = response.dictionary.unwrap().get(&field.clone().into_bytes()) {
-                        HGET_HIT.increment();
+                    if let Some(value) = response
+                        .dictionary
+                        .unwrap()
+                        .get(&field.clone().into_bytes())
+                    {
+                        HMGET_HIT.increment();
 
                         let item_header = format!("${}\r\n", value.len());
                         let response_len = 2 + item_header.len() + value.len();
@@ -75,13 +84,12 @@ pub async fn hget(
                         response_buf.extend_from_slice(&value);
                         response_buf.extend_from_slice(b"\r\n");
                     } else {
-                        HGET_MISS.increment();
+                        HMGET_MISS.increment();
 
                         response_buf.extend_from_slice(b"$-1\r\n");
 
-                        klog_hget(&key, &field, 0);
+                        klog_hmget(&key, &field, 0);
                     }
-                    
                 }
                 MomentoDictionaryGetStatus::MISSING => {
                     HGET_MISS.increment();

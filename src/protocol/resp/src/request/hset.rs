@@ -6,6 +6,9 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
+counter!(HSET);
+counter!(HSET_EX);
+
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
 pub struct HashSetRequest {
@@ -101,7 +104,7 @@ impl HashSetRequest {
 impl From<&HashSetRequest> for Message {
     fn from(other: &HashSetRequest) -> Message {
         let mut data = vec![
-            Message::BulkString(BulkString::new(b"HGET")),
+            Message::BulkString(BulkString::new(b"HSET")),
             Message::BulkString(BulkString::from(other.key.clone()))];
 
         for (field, value) in other.data.iter() {

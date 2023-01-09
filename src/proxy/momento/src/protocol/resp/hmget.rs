@@ -2,11 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::sync::Arc;
 use crate::klog::*;
 use crate::{Error, *};
 use ::net::*;
 use protocol_resp::*;
+use std::sync::Arc;
 
 pub async fn hmget(
     client: &mut SimpleCacheClient,
@@ -15,7 +15,7 @@ pub async fn hmget(
     key: &[u8],
     fields: &[Arc<Box<[u8]>>],
 ) -> Result<(), Error> {
-    HGET.increment();
+    HMGET.increment();
 
     // check if the key is valid
     if std::str::from_utf8(key).is_err() {
@@ -26,14 +26,14 @@ pub async fn hmget(
         return Err(Error::from(ErrorKind::InvalidInput));
     }
 
-    // check if the fields are valied
+    // check if the fields are valid before
     // sending the request to the backend
     for field in fields.iter() {
         if std::str::from_utf8(field).is_err() {
-            // GET_EX.increment();
+            HMGET_EX.increment();
 
             // invalid field
-            let _ = socket.write_all(b"ERROR\r\n").await;
+            let _ = socket.write_all(b"-ERR invalid field\r\n").await;
             return Err(Error::from(ErrorKind::InvalidInput));
         }
     }
@@ -45,9 +45,17 @@ pub async fn hmget(
     // already checked the key and field, so we know these unwraps are safe
     let key = std::str::from_utf8(key).unwrap().to_owned();
 
-    let mut fields: Vec<String> = fields.iter().map(|f| std::str::from_utf8(f).unwrap().to_owned()).collect();
+    let mut fields: Vec<String> = fields
+        .iter()
+        .map(|f| std::str::from_utf8(f).unwrap().to_owned())
+        .collect();
 
-    match timeout(Duration::from_millis(200), client.dictionary_get(cache_name, &key, fields.clone())).await {
+    match timeout(
+        Duration::from_millis(200),
+        client.dictionary_get(cache_name, &key, fields.clone()),
+    )
+    .await
+    {
         Ok(Ok(mut response)) => {
             match response.result {
                 MomentoDictionaryGetStatus::ERROR => {
@@ -73,7 +81,6 @@ pub async fn hmget(
                     response_buf.extend_from_slice(format!("*{}\r\n", fields.len()).as_bytes());
 
                     for field in fields {
-                        println!("field: {}", field);
                         if let Some(value) = dictionary.get(field.as_bytes()) {
                             let item_header = format!("${}\r\n", value.len());
                             let response_len = 2 + item_header.len() + value.len();
