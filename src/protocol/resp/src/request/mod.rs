@@ -15,8 +15,11 @@ mod get;
 mod hexists;
 mod hget;
 mod hgetall;
+mod hkeys;
+mod hlen;
 mod hmget;
 mod hset;
+mod hvals;
 mod set;
 
 pub use badd::*;
@@ -24,8 +27,11 @@ pub use get::*;
 pub use hexists::*;
 pub use hget::*;
 pub use hgetall::*;
+pub use hkeys::*;
+pub use hlen::*;
 pub use hmget::*;
 pub use hset::*;
+pub use hvals::*;
 pub use set::*;
 
 type ArcByteSlice = Arc<Box<[u8]>>;
@@ -118,11 +124,20 @@ impl Parse<Request> for RequestParser {
                         Some(b"hgetall") | Some(b"HGETALL") => {
                             HashGetAllRequest::try_from(message).map(Request::from)
                         }
+                        Some(b"hkeys") | Some(b"HKEYS") => {
+                            HashKeysRequest::try_from(message).map(Request::from)
+                        }
+                        Some(b"hlen") | Some(b"HLEN") => {
+                            HashLengthRequest::try_from(message).map(Request::from)
+                        }
                         Some(b"hmget") | Some(b"HMGET") => {
                             HashMultiGetRequest::try_from(message).map(Request::from)
                         }
                         Some(b"hset") | Some(b"HSET") => {
                             HashSetRequest::try_from(message).map(Request::from)
+                        }
+                        Some(b"hvals") | Some(b"HVALS") => {
+                            HashValuesRequest::try_from(message).map(Request::from)
                         }
                         Some(b"set") | Some(b"SET") => {
                             SetRequest::try_from(message).map(Request::from)
@@ -152,8 +167,11 @@ impl Compose for Request {
             Self::HashExists(r) => r.compose(buf),
             Self::HashGet(r) => r.compose(buf),
             Self::HashGetAll(r) => r.compose(buf),
+            Self::HashKeys(r) => r.compose(buf),
+            Self::HashLength(r) => r.compose(buf),
             Self::HashMultiGet(r) => r.compose(buf),
             Self::HashSet(r) => r.compose(buf),
+            Self::HashValues(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
         }
     }
@@ -166,8 +184,11 @@ pub enum Request {
     HashExists(HashExistsRequest),
     HashGet(HashGetRequest),
     HashGetAll(HashGetAllRequest),
+    HashKeys(HashKeysRequest),
+    HashLength(HashLengthRequest),
     HashMultiGet(HashMultiGetRequest),
     HashSet(HashSetRequest),
+    HashValues(HashValuesRequest),
     Set(SetRequest),
 }
 
@@ -201,6 +222,18 @@ impl From<HashGetAllRequest> for Request {
     }
 }
 
+impl From<HashKeysRequest> for Request {
+    fn from(other: HashKeysRequest) -> Self {
+        Self::HashKeys(other)
+    }
+}
+
+impl From<HashLengthRequest> for Request {
+    fn from(other: HashLengthRequest) -> Self {
+        Self::HashLength(other)
+    }
+}
+
 impl From<HashMultiGetRequest> for Request {
     fn from(other: HashMultiGetRequest) -> Self {
         Self::HashMultiGet(other)
@@ -210,6 +243,12 @@ impl From<HashMultiGetRequest> for Request {
 impl From<HashSetRequest> for Request {
     fn from(other: HashSetRequest) -> Self {
         Self::HashSet(other)
+    }
+}
+
+impl From<HashValuesRequest> for Request {
+    fn from(other: HashValuesRequest) -> Self {
+        Self::HashValues(other)
     }
 }
 
@@ -225,8 +264,11 @@ pub enum Command {
     Get,
     HashGet,
     HashGetAll,
+    HashKeys,
+    HashLength,
     HashMultiGet,
     HashSet,
+    HashValues,
     Set,
 }
 
@@ -239,8 +281,11 @@ impl TryFrom<&[u8]> for Command {
             b"get" | b"GET" => Ok(Command::Get),
             b"hget" | b"HGET" => Ok(Command::HashGet),
             b"hgetall" | b"HGETALL" => Ok(Command::HashGetAll),
+            b"hkeys" | b"HKEYS" => Ok(Command::HashKeys),
+            b"hlen" | b"HLEN" => Ok(Command::HashLength),
             b"hmget" | b"HMGET" => Ok(Command::HashMultiGet),
             b"hset" | b"HSET" => Ok(Command::HashSet),
+            b"hvals" | b"HVALS" => Ok(Command::HashValues),
             b"set" | b"SET" => Ok(Command::Set),
             _ => Err(()),
         }

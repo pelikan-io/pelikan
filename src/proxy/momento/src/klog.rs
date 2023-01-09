@@ -26,6 +26,14 @@ pub(crate) fn klog_hgetall(key: &str, response_len: usize) {
     }
 }
 
+pub(crate) fn klog_hlen(key: &str, response_len: usize) {
+    if response_len == 0 {
+        klog!("\"hlen {}\" 0 {}", key, response_len);
+    } else {
+        klog!("\"hlen {}\" 4 {}", key, response_len);
+    }
+}
+
 pub(crate) fn klog_hmget(key: &str, field: &str, response_len: usize) {
     if response_len == 0 {
         klog!("\"hmget {} {}\" 0 {}", key, field, response_len);

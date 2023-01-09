@@ -6,19 +6,19 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-counter!(HMGET);
-counter!(HMGET_EX);
-counter!(HMGET_HIT);
-counter!(HMGET_MISS);
+counter!(HEXISTS);
+counter!(HEXISTS_EX);
+counter!(HEXISTS_HIT);
+counter!(HEXISTS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
-pub struct HashMultiGetRequest {
+pub struct HashExistsRequest {
     key: ArcByteSlice,
-    fields: Box<[ArcByteSlice]>,
+    field: ArcByteSlice,
 }
 
-impl TryFrom<Message> for HashMultiGetRequest {
+impl TryFrom<Message> for HashExistsRequest {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -29,7 +29,7 @@ impl TryFrom<Message> for HashMultiGetRequest {
 
             let mut array = array.inner.unwrap();
 
-            if array.len() < 3 {
+            if array.len() != 3 {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
@@ -42,29 +42,25 @@ impl TryFrom<Message> for HashMultiGetRequest {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
-            let mut fields = Vec::with_capacity(array.len());
+            let field = take_bulk_string(&mut array)?
+                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
 
-            while let Some(field) = take_bulk_string(&mut array)? {
-                if field.is_empty() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
-                fields.push(field);
+            if field.is_empty() {
+                return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
-            Ok(Self { key, fields: fields.into_boxed_slice() })
+            Ok(Self { key, field })
         } else {
             Err(Error::new(ErrorKind::Other, "malformed command"))
         }
     }
 }
 
-impl HashMultiGetRequest {
-    pub fn new(key: &[u8], fields: &[&[u8]]) -> Self {
-        let fields: Vec<ArcByteSlice> = fields.iter().map(|f| Arc::new((*f).to_owned().into_boxed_slice())).collect();
-
+impl HashExistsRequest {
+    pub fn new(key: &[u8], field: &[u8]) -> Self {
         Self {
             key: Arc::new(key.to_owned().into_boxed_slice()),
-            fields: fields.into_boxed_slice(),
+            field: Arc::new(field.to_owned().into_boxed_slice()),
         }
     }
 
@@ -72,29 +68,24 @@ impl HashMultiGetRequest {
         &self.key
     }
 
-    pub fn fields(&self) -> &[ArcByteSlice] {
-        &self.fields
+    pub fn field(&self) -> &[u8] {
+        &self.field
     }
 }
 
-impl From<&HashMultiGetRequest> for Message {
-    fn from(other: &HashMultiGetRequest) -> Message {
-        let mut data = vec![
-            Message::BulkString(BulkString::new(b"HMGET")),
-            Message::BulkString(BulkString::from(other.key.clone())),
-        ];
-
-        for field in other.fields.iter() {
-            data.push(Message::BulkString(BulkString::from(field.clone())));
-        }
-
+impl From<&HashExistsRequest> for Message {
+    fn from(other: &HashExistsRequest) -> Message {
         Message::Array(Array {
-            inner: Some(data),
+            inner: Some(vec![
+                Message::BulkString(BulkString::new(b"HEXISTS")),
+                Message::BulkString(BulkString::from(other.key.clone())),
+                Message::BulkString(BulkString::from(other.field.clone())),
+            ]),
         })
     }
 }
 
-impl Compose for HashMultiGetRequest {
+impl Compose for HashExistsRequest {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -109,16 +100,16 @@ mod tests {
     fn parser() {
         let parser = RequestParser::new();
         assert_eq!(
-            parser.parse(b"hmget 0 1 2\r\n").unwrap().into_inner(),
-            Request::HashMultiGet(HashMultiGetRequest::new(b"0", &[b"1", b"2"]))
+            parser.parse(b"hget 0 1\r\n").unwrap().into_inner(),
+            Request::HashExists(HashExistsRequest::new(b"0", b"1"))
         );
 
         assert_eq!(
             parser
-                .parse(b"*4\r\n$5\r\nhmget\r\n$1\r\n0\r\n$1\r\n1\r\n$1\r\n2\r\n")
+                .parse(b"*3\r\n$4\r\nhget\r\n$1\r\n0\r\n$1\r\n1\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::HashMultiGet(HashMultiGetRequest::new(b"0", &[b"1", b"2"]))
+            Request::HashExists(HashExistsRequest::new(b"0", b"1"))
         );
     }
 }

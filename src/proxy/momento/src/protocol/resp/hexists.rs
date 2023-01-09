@@ -7,18 +7,18 @@ use crate::{Error, *};
 use ::net::*;
 use protocol_resp::*;
 
-pub async fn hget(
+pub async fn hexists(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     socket: &mut tokio::net::TcpStream,
     key: &[u8],
     field: &[u8],
 ) -> Result<(), Error> {
-    HGET.increment();
+    HEXISTS.increment();
 
     // check if the key is valid
     if std::str::from_utf8(key).is_err() {
-        HMGET_EX.increment();
+        HEXISTS_EX.increment();
 
         // invalid key
         let _ = socket.write_all(b"-ERR invalid key\r\n").await;
@@ -27,7 +27,7 @@ pub async fn hget(
 
     // check if the field is valid
     if std::str::from_utf8(field).is_err() {
-        HMGET_EX.increment();
+        HEXISTS_EX.increment();
 
         // invalid field
         let _ = socket.write_all(b"-ERR invalid field\r\n").await;
@@ -68,35 +68,28 @@ pub async fn hget(
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     }
 
-                    if let Some(value) = response
+                    if let Some(_value) = response
                         .dictionary
                         .unwrap()
                         .get(&field.clone().into_bytes())
                     {
-                        HMGET_HIT.increment();
+                        HEXISTS_HIT.increment();
 
-                        let item_header = format!("${}\r\n", value.len());
-                        let response_len = 2 + item_header.len() + value.len();
-
-                        klog_hget(&key, &field, response_len);
-
-                        response_buf.extend_from_slice(item_header.as_bytes());
-                        response_buf.extend_from_slice(&value);
-                        response_buf.extend_from_slice(b"\r\n");
+                        response_buf.extend_from_slice(b"$1\r\n");
                     } else {
-                        HMGET_MISS.increment();
+                        HEXISTS_MISS.increment();
 
-                        response_buf.extend_from_slice(b"$-1\r\n");
+                        response_buf.extend_from_slice(b"$0\r\n");
 
                         klog_hmget(&key, &field, 0);
                     }
                 }
                 MomentoDictionaryGetStatus::MISSING => {
-                    HGET_MISS.increment();
+                    HEXISTS_MISS.increment();
 
-                    response_buf.extend_from_slice(b"$-1\r\n");
+                    response_buf.extend_from_slice(b"$0\r\n");
 
-                    klog_hget(&key, &field, 0);
+                    // klog_hget(&key, &field, 0);
                 }
             }
         }
@@ -109,9 +102,9 @@ pub async fn hget(
             // we got some error from the momento client
             // log and incr stats and move on treating it
             // as a miss
-            error!("error for hget: {}", e);
+            error!("error for hexists: {}", e);
             BACKEND_EX.increment();
-            response_buf.extend_from_slice(b"$-1\r\n");
+            response_buf.extend_from_slice(b"$0\r\n");
         }
         Err(_) => {
             // we had a timeout, incr stats and move on
