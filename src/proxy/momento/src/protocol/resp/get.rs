@@ -40,12 +40,7 @@ pub async fn get(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
-
-                    // TODO: what is the right
-                    // way to handle this?
-                    //
-                    // currently ignoring and
-                    // moving on to the next key
+                    response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoGetStatus::HIT => {
                     GET_KEY_HIT.increment();

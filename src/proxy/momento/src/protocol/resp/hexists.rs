@@ -54,32 +54,25 @@ pub async fn hexists(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
-
-                    // TODO: what is the right
-                    // way to handle this?
-                    //
-                    // currently ignoring and
-                    // moving on to the next key
+                    response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryGetStatus::FOUND => {
                     if response.dictionary.is_none() {
                         error!("error for hget: dictionary found but not set in response");
                         BACKEND_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
-                    }
-
-                    if let Some(_value) = response
+                    } else if let Some(_value) = response
                         .dictionary
                         .unwrap()
                         .get(&field.clone().into_bytes())
                     {
                         HEXISTS_HIT.increment();
 
-                        response_buf.extend_from_slice(b"$1\r\n");
+                        response_buf.extend_from_slice(b":1\r\n");
                     } else {
                         HEXISTS_MISS.increment();
 
-                        response_buf.extend_from_slice(b"$0\r\n");
+                        response_buf.extend_from_slice(b":0\r\n");
 
                         klog_hmget(&key, &field, 0);
                     }
@@ -87,7 +80,7 @@ pub async fn hexists(
                 MomentoDictionaryGetStatus::MISSING => {
                     HEXISTS_MISS.increment();
 
-                    response_buf.extend_from_slice(b"$0\r\n");
+                    response_buf.extend_from_slice(b":0\r\n");
 
                     // klog_hget(&key, &field, 0);
                 }
@@ -104,7 +97,7 @@ pub async fn hexists(
             // as a miss
             error!("error for hexists: {}", e);
             BACKEND_EX.increment();
-            response_buf.extend_from_slice(b"$0\r\n");
+            response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
             // we had a timeout, incr stats and move on

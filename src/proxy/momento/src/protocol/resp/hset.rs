@@ -78,12 +78,7 @@ pub async fn hset(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
-
-                    // TODO: what is the right
-                    // way to handle this?
-                    //
-                    // currently ignoring and
-                    // moving on to the next key
+                    response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionarySetStatus::OK => {
                     response_buf.extend_from_slice(format!(":{}\r\n", data.len()).as_bytes());

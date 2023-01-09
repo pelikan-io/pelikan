@@ -54,24 +54,17 @@ pub async fn hget(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
-
-                    // TODO: what is the right
-                    // way to handle this?
-                    //
-                    // currently ignoring and
-                    // moving on to the next key
+                    response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryGetStatus::FOUND => {
                     if response.dictionary.is_none() {
                         error!("error for hget: dictionary found but not set in response");
                         BACKEND_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
-                    }
-
-                    if let Some(value) = response
-                        .dictionary
-                        .unwrap()
-                        .get(&field.clone().into_bytes())
+                    } else if let Some(value) = response
+                            .dictionary
+                            .unwrap()
+                            .get(&field.clone().into_bytes())
                     {
                         HMGET_HIT.increment();
 
@@ -81,7 +74,7 @@ pub async fn hget(
                         klog_hget(&key, &field, response_len);
 
                         response_buf.extend_from_slice(item_header.as_bytes());
-                        response_buf.extend_from_slice(&value);
+                        response_buf.extend_from_slice(value);
                         response_buf.extend_from_slice(b"\r\n");
                     } else {
                         HMGET_MISS.increment();
@@ -111,7 +104,7 @@ pub async fn hget(
             // as a miss
             error!("error for hget: {}", e);
             BACKEND_EX.increment();
-            response_buf.extend_from_slice(b"$-1\r\n");
+            response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
             // we had a timeout, incr stats and move on

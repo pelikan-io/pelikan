@@ -51,7 +51,7 @@ pub async fn hlen(
                     } else {
                         let dictionary = response.dictionary.as_mut().unwrap();
 
-                        let response = format!("${}\r\n", dictionary.len()).into_bytes();
+                        let response = format!(":{}\r\n", dictionary.len()).into_bytes();
 
                         response_buf
                             .extend_from_slice(&response);
@@ -62,7 +62,7 @@ pub async fn hlen(
                 MomentoDictionaryFetchStatus::MISSING => {
                     // NOTE: per the command reference, zero is returned when
                     // the hash does not exist
-                    response_buf.extend_from_slice(b"$0\r\n");
+                    response_buf.extend_from_slice(b":0\r\n");
                     klog_hlen(&key, 0);
                 }
             }

@@ -40,7 +40,7 @@ pub async fn set(
         BACKEND_REQUEST.increment();
 
         let ttl = match request.expire_time() {
-            Some(protocol_resp::ExpireTime::Seconds(v)) => NonZeroU64::new(v as u64),
+            Some(protocol_resp::ExpireTime::Seconds(v)) => NonZeroU64::new(v),
             Some(protocol_resp::ExpireTime::Milliseconds(v)) => {
                 NonZeroU64::new(std::cmp::min(1, v / 1000))
             }
@@ -150,7 +150,7 @@ pub async fn set(
 
                 // let client know this wasn't stored
                 if let Err(e) = socket.write_all(b"-ERR backend error\r\n").await {
-                    // SESSION_SEND_EX.increment();
+                    SESSION_SEND_EX.increment();
                     // hangup if we can't send a response back
                     return Err(e);
                 }

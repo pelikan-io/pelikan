@@ -43,46 +43,41 @@ pub async fn hgetall(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
-
-                    // TODO: what is the right
-                    // way to handle this?
-                    //
-                    // currently ignoring and
-                    // moving on to the next key
+                    response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryFetchStatus::FOUND => {
                     if response.dictionary.is_none() {
                         error!("error for hgetall: dictionary found but not provided in response");
                         BACKEND_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
+                    } else {
+                        let dictionary = response.dictionary.as_mut().unwrap();
+
+                        response_buf
+                            .extend_from_slice(format!("*{}\r\n", dictionary.len() * 2).as_bytes());
+
+                        let mut response_len = 0;
+
+                        for (field, value) in dictionary {
+                            let field_header = format!("${}\r\n", field.len());
+                            let value_header = format!("${}\r\n", value.len());
+
+                            response_len +=
+                                4 + field_header.len() + field.len() + value_header.len() + value.len();
+
+                            response_buf.extend_from_slice(field_header.as_bytes());
+                            response_buf.extend_from_slice(&field);
+                            response_buf.extend_from_slice(b"\r\n");
+                            response_buf.extend_from_slice(value_header.as_bytes());
+                            response_buf.extend_from_slice(&value);
+                            response_buf.extend_from_slice(b"\r\n");
+                        }
+
+                        klog_hgetall(&key, response_len);
                     }
-
-                    let dictionary = response.dictionary.as_mut().unwrap();
-
-                    response_buf
-                        .extend_from_slice(format!("*{}\r\n", dictionary.len() * 2).as_bytes());
-
-                    let mut response_len = 0;
-
-                    for (field, value) in dictionary {
-                        let field_header = format!("${}\r\n", field.len());
-                        let value_header = format!("${}\r\n", value.len());
-
-                        response_len +=
-                            4 + field_header.len() + field.len() + value_header.len() + value.len();
-
-                        response_buf.extend_from_slice(field_header.as_bytes());
-                        response_buf.extend_from_slice(&field);
-                        response_buf.extend_from_slice(b"\r\n");
-                        response_buf.extend_from_slice(value_header.as_bytes());
-                        response_buf.extend_from_slice(&value);
-                        response_buf.extend_from_slice(b"\r\n");
-                    }
-
-                    klog_hgetall(&key, response_len);
                 }
                 MomentoDictionaryFetchStatus::MISSING => {
-                    response_buf.extend_from_slice(b"$-1\r\n");
+                    response_buf.extend_from_slice(b"*0\r\n");
                     klog_hgetall(&key, 0);
                 }
             }
@@ -98,9 +93,7 @@ pub async fn hgetall(
             // as a miss
             error!("error for hgetall: {}", e);
             BACKEND_EX.increment();
-
-            response_buf.extend_from_slice(b"$-1\r\n");
-            klog_hgetall(&key, 0);
+            response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
             // we had a timeout, incr stats and move on
