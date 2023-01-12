@@ -23,6 +23,10 @@ pub(crate) fn klog_2(command: &dyn Display, key: &str, field: &str, status: Stat
     klog!("\"{} {} {}\" {} {}", command, key, field, status as u8, response_len);
 }
 
+pub(crate) fn klog_7(command: &dyn Display, key: &str, field: &str, ttl: i32, value_len: usize, status: Status, response_len: usize) {
+    klog!("\"{} {} {} {} {}\" {} {}", command, key, field, ttl, value_len, status as u8, response_len);
+}
+
 pub(crate) fn klog_hget(key: &str, field: &str, response_len: usize) {
     if response_len == 0 {
         klog!("\"hget {} {}\" 0 {}", key, field, response_len);

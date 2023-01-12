@@ -68,7 +68,7 @@ pub async fn hset(
 
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_set(cache_name, &key, map, None, false),
+        client.dictionary_set(cache_name, &key, map.clone(), None, false),
     )
     .await
     {
@@ -83,8 +83,10 @@ pub async fn hset(
                 }
                 MomentoDictionarySetStatus::OK => {
                     HSET_STORED.increment();
+                    for (field, value) in map.iter() {
+                        klog_7(&"hset", &key, field, 0, value.len(), Status::Stored, 0);
+                    }
                     response_buf.extend_from_slice(format!(":{}\r\n", data.len()).as_bytes());
-                    klog_1(&"hset", &key, Status::Stored, 0);
                 }
             }
         }

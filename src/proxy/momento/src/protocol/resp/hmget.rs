@@ -108,7 +108,6 @@ pub async fn hmget(
                     for field in &fields {
                         klog_2(&"hmget", &key, field, Status::Miss, 0);
                         response_buf.extend_from_slice(b"$-1\r\n");
-                        klog_hget(&key, field, 0);
                     }
 
                     HMGET_FIELD_MISS.add(fields.len() as u64);

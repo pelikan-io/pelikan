@@ -40,6 +40,7 @@ pub async fn get(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
+                    GET_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoGetStatus::HIT => {
@@ -65,6 +66,7 @@ pub async fn get(
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();
+            GET_EX.increment();
             response_buf.extend_from_slice(b"-ERR ratelimit exceed\r\n");
         }
         Ok(Err(e)) => {
@@ -73,6 +75,7 @@ pub async fn get(
             // as a miss
             error!("error for get: {}", e);
             BACKEND_EX.increment();
+            GET_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
@@ -80,6 +83,7 @@ pub async fn get(
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+            GET_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
         }
     }
