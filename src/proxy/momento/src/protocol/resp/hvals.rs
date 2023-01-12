@@ -13,11 +13,11 @@ pub async fn hvals(
     socket: &mut tokio::net::TcpStream,
     key: &[u8],
 ) -> Result<(), Error> {
-    HKEYS.increment();
+    HVALS.increment();
 
     // check if the key is valid
     if std::str::from_utf8(key).is_err() {
-        HKEYS_EX.increment();
+        HVALS_EX.increment();
 
         // invalid key
         let _ = socket.write_all(b"-ERR invalid key\r\n").await;
@@ -43,15 +43,17 @@ pub async fn hvals(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
-
+                    HVALS_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryFetchStatus::FOUND => {
                     if response.dictionary.is_none() {
                         error!("error for hgetall: dictionary found but not provided in response");
                         BACKEND_EX.increment();
+                        HVALS_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     } else {
+                        HVALS_HIT.increment();
                         let dictionary = response.dictionary.as_mut().unwrap();
 
                         response_buf
@@ -65,36 +67,38 @@ pub async fn hvals(
                             response_buf.extend_from_slice(b"\r\n");
                         }
 
-                        klog_1(&"kvals", &key, Status::Hit, response_buf.len());
+                        klog_1(&"hvals", &key, Status::Hit, response_buf.len());
                     }
                 }
                 MomentoDictionaryFetchStatus::MISSING => {
+                    HVALS_MISS.increment();
                     // per command reference, return an empty list
                     response_buf.extend_from_slice(b"*0\r\n");
-                    klog_1(&"kvals", &key, Status::Miss, response_buf.len());
+                    klog_1(&"hvals", &key, Status::Miss, response_buf.len());
                 }
             }
         }
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();
+            HVALS_EX.increment();
             response_buf.extend_from_slice(b"-ERR ratelimit exceed\r\n");
         }
         Ok(Err(e)) => {
             // we got some error from the momento client
             // log and incr stats and move on treating it
             // as a miss
-            error!("error for hgetall: {}", e);
+            error!("error for hvals: {}", e);
             BACKEND_EX.increment();
-
-            response_buf.extend_from_slice(b"$-1\r\n");
-            klog_hgetall(&key, 0);
+            HVALS_EX.increment();
+            response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
             // we had a timeout, incr stats and move on
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+            HVALS_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
         }
     }

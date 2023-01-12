@@ -18,7 +18,7 @@ pub async fn hget(
 
     // check if the key is valid
     if std::str::from_utf8(key).is_err() {
-        HMGET_EX.increment();
+        HGET_EX.increment();
 
         // invalid key
         let _ = socket.write_all(b"-ERR invalid key\r\n").await;
@@ -27,7 +27,7 @@ pub async fn hget(
 
     // check if the field is valid
     if std::str::from_utf8(field).is_err() {
-        HMGET_EX.increment();
+        HGET_EX.increment();
 
         // invalid field
         let _ = socket.write_all(b"-ERR invalid field\r\n").await;
@@ -54,19 +54,21 @@ pub async fn hget(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
+                    HGET_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryGetStatus::FOUND => {
                     if response.dictionary.is_none() {
                         error!("error for hget: dictionary found but not set in response");
                         BACKEND_EX.increment();
+                        HGET_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     } else if let Some(value) = response
                             .dictionary
                             .unwrap()
                             .get(&field.clone().into_bytes())
                     {
-                        HMGET_HIT.increment();
+                        HGET_HIT.increment();
 
                         let item_header = format!("${}\r\n", value.len());
 
@@ -76,25 +78,22 @@ pub async fn hget(
 
                         klog_2(&"hget", &key, &field, Status::Hit, value.len());
                     } else {
-                        HMGET_MISS.increment();
-
+                        HGET_MISS.increment();
                         response_buf.extend_from_slice(b"$-1\r\n");
-
                         klog_2(&"hget", &key, &field, Status::Miss, 0);
                     }
                 }
                 MomentoDictionaryGetStatus::MISSING => {
                     HGET_MISS.increment();
-
                     response_buf.extend_from_slice(b"$-1\r\n");
-
-                    klog_hget(&key, &field, 0);
+                    klog_2(&"hget", &key, &field, Status::Miss, 0);
                 }
             }
         }
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();
+            HGET_EX.increment();
             response_buf.extend_from_slice(b"-ERR ratelimit exceed\r\n");
         }
         Ok(Err(e)) => {
@@ -103,6 +102,7 @@ pub async fn hget(
             // as a miss
             error!("error for hget: {}", e);
             BACKEND_EX.increment();
+            HGET_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
@@ -110,6 +110,7 @@ pub async fn hget(
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+            HGET_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
         }
     }

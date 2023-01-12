@@ -43,14 +43,17 @@ pub async fn hgetall(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
+                    HGETALL_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryFetchStatus::FOUND => {
                     if response.dictionary.is_none() {
                         error!("error for hgetall: dictionary found but not provided in response");
                         BACKEND_EX.increment();
+                        HGETALL_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     } else {
+                        HGETALL_HIT.increment();
                         let dictionary = response.dictionary.as_mut().unwrap();
 
                         response_buf
@@ -72,6 +75,7 @@ pub async fn hgetall(
                     }
                 }
                 MomentoDictionaryFetchStatus::MISSING => {
+                    HGETALL_MISS.increment();
                     response_buf.extend_from_slice(b"*0\r\n");
                     klog_1(&"hgetall", &key, Status::Miss, response_buf.len());
                 }
@@ -80,6 +84,7 @@ pub async fn hgetall(
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();
+            HGETALL_EX.increment();
             response_buf.extend_from_slice(b"-ERR ratelimit exceed\r\n");
         }
         Ok(Err(e)) => {
@@ -88,6 +93,7 @@ pub async fn hgetall(
             // as a miss
             error!("error for hgetall: {}", e);
             BACKEND_EX.increment();
+            HGETALL_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
@@ -95,6 +101,7 @@ pub async fn hgetall(
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+            HGETALL_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
         }
     }

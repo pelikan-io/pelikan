@@ -6,10 +6,10 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-counter!(HKEYS);
-counter!(HKEYS_EX);
-counter!(HKEYS_HIT);
-counter!(HKEYS_MISS);
+counter!(HVALS);
+counter!(HVALS_EX);
+counter!(HVALS_HIT);
+counter!(HVALS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]

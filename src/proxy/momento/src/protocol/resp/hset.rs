@@ -19,7 +19,7 @@ pub async fn hset(
 
     // check if the key is valid
     if std::str::from_utf8(key).is_err() {
-        // HSET_EX.increment();
+        HSET_EX.increment();
 
         // invalid key
         let _ = socket.write_all(b"-ERR invalid key\r\n").await;
@@ -30,7 +30,7 @@ pub async fn hset(
     // sending the requests to the backend
     for (field, value) in data.iter() {
         if std::str::from_utf8(field).is_err() || std::str::from_utf8(value).is_err() {
-            // GET_EX.increment();
+            HSET_EX.increment();
 
             // invalid field
             let _ = socket.write_all(b"ERROR\r\n").await;
@@ -38,7 +38,7 @@ pub async fn hset(
         }
 
         if value.is_empty() {
-            // HSET_EX.increment();
+            HSET_EX.increment();
             error!("empty values are not supported by momento");
             SESSION_SEND.increment();
             SESSION_SEND_BYTE.add(7);
@@ -78,16 +78,20 @@ pub async fn hset(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
+                    HSET_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionarySetStatus::OK => {
+                    HSET_STORED.increment();
                     response_buf.extend_from_slice(format!(":{}\r\n", data.len()).as_bytes());
+                    klog_1(&"hset", &key, Status::Stored, 0);
                 }
             }
         }
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();
+            HSET_EX.increment();
             response_buf.extend_from_slice(b"-ERR ratelimit exceed\r\n");
         }
         Ok(Err(e)) => {
@@ -96,6 +100,7 @@ pub async fn hset(
             // as a miss
             error!("error for hset: {}", e);
             BACKEND_EX.increment();
+            HSET_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
@@ -103,6 +108,7 @@ pub async fn hset(
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+            HSET_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
         }
     }

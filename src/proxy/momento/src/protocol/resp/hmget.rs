@@ -19,7 +19,7 @@ pub async fn hmget(
 
     // check if the key is valid
     if std::str::from_utf8(key).is_err() {
-        HGET_EX.increment();
+        HMGET_EX.increment();
 
         // invalid key
         let _ = socket.write_all(b"-ERR invalid key\r\n").await;
@@ -62,49 +62,63 @@ pub async fn hmget(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
+                    HMGET_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryGetStatus::FOUND => {
                     if response.dictionary.is_none() {
                         error!("error for hmget: dictionary found but not provided in response");
                         BACKEND_EX.increment();
+                        HMGET_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     } else {
                         let dictionary = response.dictionary.as_mut().unwrap();
 
                         response_buf.extend_from_slice(format!("*{}\r\n", fields.len()).as_bytes());
 
-                        for field in fields {
-                            if let Some(value) = dictionary.get(field.as_bytes()) {
-                                let item_header = format!("${}\r\n", value.len());
-                                let response_len = 2 + item_header.len() + value.len();
+                        let mut hit = 0;
+                        let mut miss = 0;
 
-                                klog_hget(&key, &field, response_len);
+                        for field in &fields {
+                            if let Some(value) = dictionary.get(field.as_bytes()) {
+                                hit += 1;
+                                klog_2(&"hmget", &key, field, Status::Hit, value.len());
+
+                                let item_header = format!("${}\r\n", value.len());
 
                                 response_buf.extend_from_slice(item_header.as_bytes());
                                 response_buf.extend_from_slice(value);
                                 response_buf.extend_from_slice(b"\r\n");
                             } else {
+                                miss += 1;
+                                klog_2(&"hmget", &key, field, Status::Miss, 0);
                                 response_buf.extend_from_slice(b"$-1\r\n");
                             }
                         }
+
+                        HMGET_FIELD.add(fields.len() as u64);
+                        HMGET_FIELD_HIT.add(hit);
+                        HMGET_FIELD_MISS.add(miss);
                     }
                 }
                 MomentoDictionaryGetStatus::MISSING => {
                     // treat every requested field as a miss
                     response_buf.extend_from_slice(format!("*{}\r\n", fields.len()).as_bytes());
 
-                    for field in fields {
-                        HGET_MISS.increment();
+                    for field in &fields {
+                        klog_2(&"hmget", &key, field, Status::Miss, 0);
                         response_buf.extend_from_slice(b"$-1\r\n");
-                        klog_hget(&key, &field, 0);
+                        klog_hget(&key, field, 0);
                     }
+
+                    HMGET_FIELD_MISS.add(fields.len() as u64);
                 }
             }
         }
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();
+            HMGET_EX.increment();
             response_buf.extend_from_slice(b"-ERR ratelimit exceed\r\n");
         }
         Ok(Err(e)) => {
@@ -113,6 +127,7 @@ pub async fn hmget(
             // as a miss
             error!("error for hmget: {}", e);
             BACKEND_EX.increment();
+            HMGET_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
@@ -120,6 +135,7 @@ pub async fn hmget(
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+            HMGET_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
         }
     }

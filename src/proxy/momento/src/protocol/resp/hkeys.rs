@@ -43,14 +43,17 @@ pub async fn hkeys(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
+                    HKEYS_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryFetchStatus::FOUND => {
                     if response.dictionary.is_none() {
                         error!("error for hgetall: dictionary found but not provided in response");
                         BACKEND_EX.increment();
+                        HKEYS_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     } else {
+                        HKEYS_HIT.increment();
                         let dictionary = response.dictionary.as_mut().unwrap();
 
                         response_buf
@@ -68,6 +71,7 @@ pub async fn hkeys(
                     }
                 }
                 MomentoDictionaryFetchStatus::MISSING => {
+                    HKEYS_MISS.increment();
                     klog_1(&"hkeys", &key, Status::Miss, response_buf.len());
                 }
             }
@@ -75,6 +79,7 @@ pub async fn hkeys(
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();
+            HKEYS_EX.increment();
             response_buf.extend_from_slice(b"-ERR ratelimit exceed\r\n");
         }
         Ok(Err(e)) => {
@@ -83,6 +88,7 @@ pub async fn hkeys(
             // as a miss
             error!("error for hgetall: {}", e);
             BACKEND_EX.increment();
+            HKEYS_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
@@ -90,6 +96,7 @@ pub async fn hkeys(
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+            HKEYS_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
         }
     }

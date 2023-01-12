@@ -8,9 +8,9 @@ use std::sync::Arc;
 
 counter!(HMGET);
 counter!(HMGET_EX);
-counter!(HMGET_KEY);
-counter!(HMGET_KEY_HIT);
-counter!(HMGET_KEY_MISS);
+counter!(HMGET_FIELD);
+counter!(HMGET_FIELD_HIT);
+counter!(HMGET_FIELD_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]

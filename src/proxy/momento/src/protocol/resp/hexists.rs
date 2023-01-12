@@ -54,43 +54,40 @@ pub async fn hexists(
                     // we got some error from
                     // the backend.
                     BACKEND_EX.increment();
+                    HEXISTS_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryGetStatus::FOUND => {
                     if response.dictionary.is_none() {
                         error!("error for hget: dictionary found but not set in response");
                         BACKEND_EX.increment();
+                        HEXISTS_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     } else if let Some(_value) = response
                         .dictionary
                         .unwrap()
                         .get(&field.clone().into_bytes())
                     {
-                        HEXISTS_EXISTS.increment();
-
+                        HEXISTS_HIT.increment();
                         response_buf.extend_from_slice(b":1\r\n");
-
-                        klog_2(&"hexists", &key, &field, Status::Exists, 1);
+                        klog_2(&"hexists", &key, &field, Status::Hit, 1);
                     } else {
-                        HEXISTS_NOT_FOUND.increment();
-
+                        HEXISTS_MISS.increment();
                         response_buf.extend_from_slice(b":0\r\n");
-
-                        klog_2(&"hexists", &key, &field, Status::NotFound, 0);
+                        klog_2(&"hexists", &key, &field, Status::Miss, 0);
                     }
                 }
                 MomentoDictionaryGetStatus::MISSING => {
                     HEXISTS_MISS.increment();
-
                     response_buf.extend_from_slice(b":0\r\n");
-
-                    // klog_hget(&key, &field, 0);
+                    klog_2(&"hexists", &key, &field, Status::Miss, 0);
                 }
             }
         }
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();
+            HEXISTS_EX.increment();
             response_buf.extend_from_slice(b"-ERR ratelimit exceed\r\n");
         }
         Ok(Err(e)) => {
@@ -99,6 +96,7 @@ pub async fn hexists(
             // as a miss
             error!("error for hexists: {}", e);
             BACKEND_EX.increment();
+            HEXISTS_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
@@ -106,6 +104,7 @@ pub async fn hexists(
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+            HEXISTS_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
         }
     }

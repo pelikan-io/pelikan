@@ -41,16 +41,18 @@ pub async fn hlen(
             match response.result {
                 MomentoDictionaryFetchStatus::ERROR => {
                     BACKEND_EX.increment();
-
+                    HLEN_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
                 }
                 MomentoDictionaryFetchStatus::FOUND => {
                     if response.dictionary.is_none() {
                         BACKEND_EX.increment();
+                        HLEN_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
                     } else {
-                        let dictionary = response.dictionary.as_mut().unwrap();
+                        HLEN_HIT.increment();
 
+                        let dictionary = response.dictionary.as_mut().unwrap();
                         let response = format!(":{}\r\n", dictionary.len()).into_bytes();
 
                         response_buf
@@ -60,8 +62,7 @@ pub async fn hlen(
                     }
                 }
                 MomentoDictionaryFetchStatus::MISSING => {
-                    // NOTE: per the command reference, zero is returned when
-                    // the hash does not exist
+                    HLEN_MISS.increment();
                     response_buf.extend_from_slice(b":0\r\n");
                     klog_1(&"hlen", &key, Status::Miss, response_buf.len());
                 }
@@ -70,6 +71,7 @@ pub async fn hlen(
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();
+            HLEN_EX.increment();
             response_buf.extend_from_slice(b"-ERR ratelimit exceed\r\n");
         }
         Ok(Err(e)) => {
@@ -77,7 +79,7 @@ pub async fn hlen(
             // log and return a generic error to the client
             error!("error for hlen: {}", e);
             BACKEND_EX.increment();
-
+            HLEN_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend error");
         }
         Err(_) => {
@@ -85,6 +87,7 @@ pub async fn hlen(
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+            HLEN_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
         }
     }
