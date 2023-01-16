@@ -23,13 +23,13 @@ pub use server::ServerSession;
 use std::os::unix::prelude::AsRawFd;
 
 use ::net::*;
+use common::time::Nanoseconds;
 use core::borrow::{Borrow, BorrowMut};
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use protocol_common::Compose;
 use protocol_common::Parse;
 use rustcommon_metrics::*;
-use common::time::Nanoseconds;
 use std::collections::VecDeque;
 use std::io::Error;
 use std::io::ErrorKind;
