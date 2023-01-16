@@ -29,7 +29,7 @@ use core::marker::PhantomData;
 use protocol_common::Compose;
 use protocol_common::Parse;
 use rustcommon_metrics::*;
-use rustcommon_time::Nanoseconds;
+use common::time::Nanoseconds;
 use std::collections::VecDeque;
 use std::io::Error;
 use std::io::ErrorKind;
@@ -63,7 +63,7 @@ heatmap!(
     "distribution of request latencies in nanoseconds"
 );
 
-type Instant = rustcommon_time::Instant<Nanoseconds<u64>>;
+type Instant = common::time::Instant<Nanoseconds<u64>>;
 
 // The size of one kilobyte, in bytes
 const KB: usize = 1024;
