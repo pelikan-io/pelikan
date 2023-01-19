@@ -104,12 +104,11 @@ use entrystore::EntryStore;
 use logger::{Drain, Klog};
 use metriken::*;
 use protocol_common::{Compose, Execute, Parse};
-use queues::Queues;
+use queues::{Queues, Waker};
 use session::{Buf, ServerSession, Session};
 use slab::Slab;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
-use waker::Waker;
 
 mod listener;
 mod process;

@@ -23,4 +23,3 @@ protocol-common = { path = "../../protocol/common" }
 queues = { path = "../../queues" }
 session = { path = "../../session" }
 slab = { workspace = true }
-waker = { path = "../waker" }

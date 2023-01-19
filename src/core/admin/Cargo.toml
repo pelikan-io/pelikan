@@ -23,4 +23,3 @@ queues = { path = "../../queues" }
 session = { path = "../../session" }
 slab = { workspace = true }
 tiny_http = { workspace = true }
-waker = { path = "../waker" }

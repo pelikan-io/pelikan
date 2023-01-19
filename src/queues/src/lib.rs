@@ -4,7 +4,7 @@
 
 //! Queue type for inter-process communication (IPC).
 
-pub use waker::Waker;
+pub use awaken::Waker;
 
 use crossbeam_queue::*;
 use rand::distributions::Uniform;

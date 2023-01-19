@@ -11,7 +11,7 @@ use crossbeam_channel::Receiver;
 use logger::*;
 use metriken::*;
 use protocol_admin::*;
-use queues::Queues;
+use queues::{Queues, Waker};
 use session::{Buf, ServerSession, Session};
 use slab::Slab;
 use std::collections::VecDeque;
@@ -19,7 +19,6 @@ use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
 use std::time::Duration;
 use tiny_http::{Method, Request, Response};
-use waker::Waker;
 
 counter!(ADMIN_REQUEST_PARSE);
 counter!(ADMIN_RESPONSE_COMPOSE);
