@@ -497,6 +497,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "clocksource"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b90cc4cec392a6d97223f008b5da7a3c2c71aa6d5ffdf0e3e14d8b2432738387"
+dependencies = [
+ "lazy_static",
+ "libc",
+ "mach",
+ "time 0.3.14",
+ "winapi 0.3.9",
+]
+
+[[package]]
+name = "clocksource"
+version = "0.6.0"
+source = "git+https://github.com/pelikan-io/rustcommon?rev=767b4e9#767b4e9289c7a3f732b344b5faf11397733416bb"
+dependencies = [
+ "lazy_static",
+ "libc",
+ "mach",
+ "time 0.3.14",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "cmake"
 version = "0.1.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -510,11 +535,11 @@ name = "common"
 version = "0.3.1"
 dependencies = [
  "boring",
+ "clocksource 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "macros",
  "net",
  "rustcommon-logger",
  "rustcommon-metrics",
- "rustcommon-time",
  "serde",
 ]
 
@@ -933,11 +958,12 @@ checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 
 [[package]]
 name = "heatmap"
-version = "0.0.0"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44a040d43defb8644617d52575557275232693a27c594d136b16c12283244683"
 dependencies = [
+ "clocksource 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "histogram",
- "rustcommon-time",
  "thiserror",
 ]
 
@@ -958,8 +984,9 @@ dependencies = [
 
 [[package]]
 name = "histogram"
-version = "0.0.0"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913e066ae237bc8adb23b539f140ae81152af2dc3ff357ada35af13bcf48f016"
 dependencies = [
  "thiserror",
 ]
@@ -2091,49 +2118,37 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 [[package]]
 name = "rustcommon-logger"
 version = "0.1.1"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
+source = "git+https://github.com/pelikan-io/rustcommon?rev=767b4e9#767b4e9289c7a3f732b344b5faf11397733416bb"
 dependencies = [
  "ahash",
+ "clocksource 0.6.0 (git+https://github.com/pelikan-io/rustcommon?rev=767b4e9)",
  "log",
  "mpmc",
  "rustcommon-metrics",
- "rustcommon-time",
 ]
 
 [[package]]
 name = "rustcommon-metrics"
 version = "0.1.2"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
+source = "git+https://github.com/pelikan-io/rustcommon?rev=767b4e9#767b4e9289c7a3f732b344b5faf11397733416bb"
 dependencies = [
+ "clocksource 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "heatmap",
  "linkme",
  "once_cell",
  "parking_lot",
  "rustcommon-metrics-derive",
- "rustcommon-time",
 ]
 
 [[package]]
 name = "rustcommon-metrics-derive"
 version = "0.1.1"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
+source = "git+https://github.com/pelikan-io/rustcommon?rev=767b4e9#767b4e9289c7a3f732b344b5faf11397733416bb"
 dependencies = [
  "proc-macro-crate",
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "rustcommon-time"
-version = "0.0.13"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
-dependencies = [
- "lazy_static",
- "libc",
- "mach",
- "time 0.3.14",
- "winapi 0.3.9",
 ]
 
 [[package]]
@@ -2333,11 +2348,11 @@ name = "session"
 version = "0.3.1"
 dependencies = [
  "bytes 1.2.1",
+ "common",
  "log",
  "net",
  "protocol-common",
  "rustcommon-metrics",
- "rustcommon-time",
 ]
 
 [[package]]
@@ -2486,18 +2501,18 @@ checksum = "949517c0cf1bf4ee812e2e07e08ab448e3ae0d23472aee8a06c985f0c8815b16"
 
 [[package]]
 name = "thiserror"
-version = "1.0.37"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10deb33631e3c9018b9baf9dcbbc4f737320d2b576bac10f6aefa048fa407e3e"
+checksum = "6a9cd18aa97d5c45c6603caea1da6628790b37f7a34b6ca89522331c5180fed0"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.37"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "982d17546b47146b28f7c22e3d08465f6b8903d0ea13c1660d9d84a6e7adcdbb"
+checksum = "1fb327af4685e4d03fa8cbcf1716380da910eeb2bb8be417e7f9fd3fb164f36f"
 dependencies = [
  "proc-macro2",
  "quote",

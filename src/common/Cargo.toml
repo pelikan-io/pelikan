@@ -11,9 +11,9 @@ license = { workspace = true }
 
 [dependencies]
 boring = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-net = { path = "../net" }
+clocksource = { workspace = true }
 macros = { path = "../macros" }
+net = { path = "../net" }
 rustcommon-metrics = { workspace = true }
 rustcommon-logger = { workspace = true }
-rustcommon-time = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
