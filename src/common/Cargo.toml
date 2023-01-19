@@ -15,5 +15,5 @@ clocksource = { workspace = true }
 macros = { path = "../macros" }
 metriken = { workspace = true }
 net = { path = "../net" }
-rustcommon-logger = { workspace = true }
+ringlog = { workspace = true }
 serde = { workspace = true, features = ["derive"] }

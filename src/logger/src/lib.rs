@@ -34,7 +34,7 @@
 //! a file, while letting all other log messages pass to standard out. This
 //! could allow splitting command/access/audit logs from the normal logging.
 
-pub use rustcommon_logger::*;
+pub use ringlog::*;
 
 use config::{DebugConfig, KlogConfig};
 

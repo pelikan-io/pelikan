@@ -66,7 +66,7 @@ quote = "1.0.21"
 rand = "0.8.5"
 rand_chacha = "0.3.1"
 rand_xoshiro = "0.6.0"
-rustcommon-logger = { git = "https://github.com/pelikan-io/rustcommon", rev = "4b8e044" }
+ringlog = "0.1.0"
 serde = "1.0.145"
 serde_json = "1.0.85"
 slab = "0.4.7"
