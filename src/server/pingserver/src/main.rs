@@ -14,8 +14,8 @@ extern crate logger;
 use backtrace::Backtrace;
 use clap::{App, Arg};
 use config::PingserverConfig;
+use metriken::*;
 use pelikan_pingserver_rs::Pingserver;
-use rustcommon_metrics::*;
 use server::PERCENTILES;
 
 /// The entry point into the running Pingserver instance. This function parses
@@ -61,7 +61,7 @@ fn main() {
 
         let mut metrics = Vec::new();
 
-        for metric in &rustcommon_metrics::metrics() {
+        for metric in &metriken::metrics() {
             let any = match metric.as_any() {
                 Some(any) => any,
                 None => {

@@ -13,7 +13,7 @@ license = { workspace = true }
 boring = { workspace = true }
 clocksource = { workspace = true }
 macros = { path = "../macros" }
+metriken = { workspace = true }
 net = { path = "../net" }
-rustcommon-metrics = { workspace = true }
-rustcommon-logger = { workspace = true }
+ringlog = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
