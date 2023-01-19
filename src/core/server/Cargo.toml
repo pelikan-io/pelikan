@@ -16,11 +16,11 @@ config = { path = "../../config" }
 crossbeam-channel = { workspace = true }
 entrystore = { path = "../../entrystore" }
 logger = { path = "../../logger" }
+metriken = { workspace = true }
 net = { path = "../../net" }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-common = { path = "../../protocol/common" }
 queues = { path = "../../queues" }
-rustcommon-metrics = { workspace = true }
 session = { path = "../../session" }
 slab = { workspace = true }
 waker = { path = "../waker" }

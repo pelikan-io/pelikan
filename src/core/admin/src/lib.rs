@@ -9,9 +9,9 @@ use common::ssl::tls_acceptor;
 use config::{AdminConfig, TlsConfig};
 use crossbeam_channel::Receiver;
 use logger::*;
+use metriken::*;
 use protocol_admin::*;
 use queues::Queues;
-use rustcommon_metrics::*;
 use session::{Buf, ServerSession, Session};
 use slab::Slab;
 use std::collections::VecDeque;
@@ -460,7 +460,7 @@ impl Admin {
     fn human_stats(&self) -> String {
         let mut data = Vec::new();
 
-        for metric in &rustcommon_metrics::metrics() {
+        for metric in &metriken::metrics() {
             let any = match metric.as_any() {
                 Some(any) => any,
                 None => {
@@ -498,7 +498,7 @@ impl Admin {
 
         let mut data = Vec::new();
 
-        for metric in &rustcommon_metrics::metrics() {
+        for metric in &metriken::metrics() {
             let any = match metric.as_any() {
                 Some(any) => any,
                 None => {
@@ -559,7 +559,7 @@ impl Admin {
     fn prometheus_stats(&self) -> String {
         let mut data = Vec::new();
 
-        for metric in &rustcommon_metrics::metrics() {
+        for metric in &metriken::metrics() {
             let any = match metric.as_any() {
                 Some(any) => any,
                 None => {

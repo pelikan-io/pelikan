@@ -27,11 +27,11 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "net",
  "protocol-admin",
  "protocol-common",
  "queues",
- "rustcommon-metrics",
  "session",
  "slab",
  "tiny_http",
@@ -512,7 +512,7 @@ dependencies = [
 [[package]]
 name = "clocksource"
 version = "0.6.0"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=767b4e9#767b4e9289c7a3f732b344b5faf11397733416bb"
+source = "git+https://github.com/pelikan-io/rustcommon?rev=4b8e044#4b8e0443378ae93a61020884a9f3133239180fb1"
 dependencies = [
  "lazy_static",
  "libc",
@@ -537,9 +537,9 @@ dependencies = [
  "boring",
  "clocksource 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "macros",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "net",
  "rustcommon-logger",
- "rustcommon-metrics",
  "serde",
 ]
 
@@ -1310,6 +1310,45 @@ dependencies = [
 ]
 
 [[package]]
+name = "metriken"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af0a70e90189b46fa6b104f52d68566059d5dc34f55cd314755249a60727dc34"
+dependencies = [
+ "clocksource 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heatmap",
+ "linkme",
+ "metriken-derive",
+ "once_cell",
+ "parking_lot",
+]
+
+[[package]]
+name = "metriken"
+version = "0.1.0"
+source = "git+https://github.com/pelikan-io/rustcommon?rev=4b8e044#4b8e0443378ae93a61020884a9f3133239180fb1"
+dependencies = [
+ "clocksource 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "heatmap",
+ "linkme",
+ "metriken-derive",
+ "once_cell",
+ "parking_lot",
+]
+
+[[package]]
+name = "metriken-derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e58941ebb3d827378ea64a769df9cf65e47f75d78227969d70431c19578e5dc"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "metrohash"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1428,12 +1467,12 @@ dependencies = [
  "config",
  "libc",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "momento",
  "net",
  "protocol-admin",
  "protocol-memcache",
  "protocol-resp",
- "rustcommon-metrics",
  "session",
  "storage-types",
  "tokio",
@@ -1459,8 +1498,8 @@ dependencies = [
  "boring-sys",
  "foreign-types-shared",
  "libc",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.8.4",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1714,9 +1753,9 @@ dependencies = [
  "common",
  "config",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol-ping",
  "proxy",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1730,8 +1769,8 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol-ping",
- "rustcommon-metrics",
  "server",
 ]
 
@@ -1862,8 +1901,8 @@ dependencies = [
  "config",
  "criterion 0.3.6",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol-common",
- "rustcommon-metrics",
  "storage-types",
 ]
 
@@ -1902,9 +1941,9 @@ dependencies = [
  "common",
  "criterion 0.3.6",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom 5.1.2",
  "protocol-common",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1915,8 +1954,8 @@ dependencies = [
  "config",
  "criterion 0.3.6",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol-common",
- "rustcommon-metrics",
  "storage-types",
 ]
 
@@ -1925,9 +1964,9 @@ name = "protocol-resp"
 version = "0.3.1"
 dependencies = [
  "common",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "nom 5.1.2",
  "protocol-common",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1936,8 +1975,8 @@ version = "0.3.1"
 dependencies = [
  "common",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol-common",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1950,11 +1989,11 @@ dependencies = [
  "crossbeam-channel",
  "entrystore",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "net",
  "protocol-admin",
  "protocol-common",
  "queues",
- "rustcommon-metrics",
  "session",
  "slab",
  "waker",
@@ -2118,37 +2157,13 @@ checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
 [[package]]
 name = "rustcommon-logger"
 version = "0.1.1"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=767b4e9#767b4e9289c7a3f732b344b5faf11397733416bb"
+source = "git+https://github.com/pelikan-io/rustcommon?rev=4b8e044#4b8e0443378ae93a61020884a9f3133239180fb1"
 dependencies = [
  "ahash",
- "clocksource 0.6.0 (git+https://github.com/pelikan-io/rustcommon?rev=767b4e9)",
+ "clocksource 0.6.0 (git+https://github.com/pelikan-io/rustcommon?rev=4b8e044)",
  "log",
+ "metriken 0.1.0 (git+https://github.com/pelikan-io/rustcommon?rev=4b8e044)",
  "mpmc",
- "rustcommon-metrics",
-]
-
-[[package]]
-name = "rustcommon-metrics"
-version = "0.1.2"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=767b4e9#767b4e9289c7a3f732b344b5faf11397733416bb"
-dependencies = [
- "clocksource 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "heatmap",
- "linkme",
- "once_cell",
- "parking_lot",
- "rustcommon-metrics-derive",
-]
-
-[[package]]
-name = "rustcommon-metrics-derive"
-version = "0.1.1"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=767b4e9#767b4e9289c7a3f732b344b5faf11397733416bb"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -2258,10 +2273,10 @@ dependencies = [
  "datapool",
  "logger",
  "memmap2",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand",
  "rand_chacha",
  "rand_xoshiro",
- "rustcommon-metrics",
  "storage-types",
  "thiserror",
 ]
@@ -2277,8 +2292,8 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol-memcache",
- "rustcommon-metrics",
  "server",
 ]
 
@@ -2333,11 +2348,11 @@ dependencies = [
  "crossbeam-channel",
  "entrystore",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "net",
  "protocol-admin",
  "protocol-common",
  "queues",
- "rustcommon-metrics",
  "session",
  "slab",
  "waker",
@@ -2350,9 +2365,9 @@ dependencies = [
  "bytes 1.2.1",
  "common",
  "log",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "net",
  "protocol-common",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -2528,9 +2543,9 @@ dependencies = [
  "common",
  "config",
  "logger",
+ "metriken 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol-thrift",
  "proxy",
- "rustcommon-metrics",
 ]
 
 [[package]]

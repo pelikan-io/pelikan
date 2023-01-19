@@ -4,11 +4,11 @@
 
 //! A protocol crate for Thrift binary protocol.
 
+use metriken::*;
 use protocol_common::BufMut;
 use protocol_common::Compose;
 use protocol_common::Parse;
 use protocol_common::ParseOk;
-use rustcommon_metrics::*;
 
 const THRIFT_HEADER_LEN: usize = std::mem::size_of::<u32>();
 

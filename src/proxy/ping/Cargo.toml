@@ -24,6 +24,6 @@ clap = { workspace = true }
 common = { path = "../../common" }
 config = { path = "../../config" }
 logger = { path = "../../logger" }
+metriken = { workspace = true }
 proxy = { path = "../../core/proxy" }
 protocol-ping = { path = "../../protocol/ping", features = ["client", "server"] }
-rustcommon-metrics = { workspace = true }

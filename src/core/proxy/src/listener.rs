@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use crate::*;
-use rustcommon_metrics::*;
+use metriken::*;
 use std::time::Duration;
 
 counter!(LISTENER_EVENT_ERROR, "the number of error events received");

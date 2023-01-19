@@ -14,5 +14,5 @@ boring = { workspace = true }
 boring-sys = { workspace = true }
 foreign-types-shared = { workspace = true }
 libc = { workspace = true }
+metriken = { workspace = true }
 mio = { workspace = true, features = ["os-poll", "net"] }
-rustcommon-metrics = { workspace = true }
