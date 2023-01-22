@@ -31,9 +31,9 @@ dependencies = [
  "net",
  "protocol-admin",
  "protocol-common",
- "queues",
  "session",
  "slab",
+ "switchboard",
  "tiny_http",
 ]
 
@@ -682,9 +682,9 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-queue"
-version = "0.3.6"
+version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cd42583b04998a5363558e5f9291ee5a5ff6b49944332103f251e7479a82aa7"
+checksum = "d1cfb3ea8a53f37c40dea2c7bedcbd88bdfae54f5e2175d6ecaff1c988353add"
 dependencies = [
  "cfg-if 1.0.0",
  "crossbeam-utils",
@@ -1968,7 +1968,6 @@ name = "proxy"
 version = "0.3.1"
 dependencies = [
  "admin",
- "awaken",
  "common",
  "config",
  "crossbeam-channel",
@@ -1978,20 +1977,9 @@ dependencies = [
  "net",
  "protocol-admin",
  "protocol-common",
- "queues",
  "session",
  "slab",
-]
-
-[[package]]
-name = "queues"
-version = "0.3.1"
-dependencies = [
- "awaken",
- "crossbeam-queue",
- "net",
- "rand",
- "rand_chacha",
+ "switchboard",
 ]
 
 [[package]]
@@ -2337,9 +2325,9 @@ dependencies = [
  "net",
  "protocol-admin",
  "protocol-common",
- "queues",
  "session",
  "slab",
+ "switchboard",
 ]
 
 [[package]]
@@ -2445,6 +2433,18 @@ name = "subtle"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6bdef32e8150c2a081110b42772ffe7d7c9032b606bc226c8260fd97e0976601"
+
+[[package]]
+name = "switchboard"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d3578ed09f106e5254e636e6218d1dde3c2bab900f76f44c15e136c3161778fc"
+dependencies = [
+ "awaken",
+ "crossbeam-queue",
+ "rand",
+ "rand_chacha",
+]
 
 [[package]]
 name = "syn"
