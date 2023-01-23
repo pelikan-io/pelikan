@@ -36,9 +36,9 @@ pub use hset::*;
 pub use hvals::*;
 pub use set::*;
 
-type ArcByteSlice = Arc<Box<[u8]>>;
-type ArcKeyValuePair = (ArcByteSlice, ArcByteSlice);
-type ArcFieldValuePair = (ArcByteSlice, ArcByteSlice);
+
+type ArcKeyValuePair = (Arc<[u8]>, Arc<[u8]>);
+type ArcFieldValuePair = (Arc<[u8]>, Arc<[u8]>);
 
 #[derive(Default)]
 pub struct RequestParser {
@@ -73,7 +73,7 @@ impl Parse<Request> for RequestParser {
 
             while let Ok((r, string)) = string(remaining) {
                 message.push(Message::BulkString(BulkString {
-                    inner: Some(Arc::new(string.to_owned().into_boxed_slice())),
+                    inner: Some(string.into()),
                 }));
                 remaining = r;
 

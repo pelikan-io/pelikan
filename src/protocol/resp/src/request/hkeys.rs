@@ -12,9 +12,8 @@ counter!(HKEYS_HIT);
 counter!(HKEYS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct HashKeysRequest {
-    key: ArcByteSlice,
+    key: Arc<[u8]>,
 }
 
 impl TryFrom<Message> for HashKeysRequest {
@@ -51,7 +50,7 @@ impl TryFrom<Message> for HashKeysRequest {
 impl HashKeysRequest {
     pub fn new(key: &[u8]) -> Self {
         Self {
-            key: Arc::new(key.to_owned().into_boxed_slice()),
+            key: key.into(),
         }
     }
 

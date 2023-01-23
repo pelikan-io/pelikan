@@ -12,9 +12,8 @@ counter!(HGETALL_HIT);
 counter!(HGETALL_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct HashGetAllRequest {
-    key: ArcByteSlice,
+    key: Arc<[u8]>,
 }
 
 impl TryFrom<Message> for HashGetAllRequest {
@@ -51,7 +50,7 @@ impl TryFrom<Message> for HashGetAllRequest {
 impl HashGetAllRequest {
     pub fn new(key: &[u8]) -> Self {
         Self {
-            key: Arc::new(key.to_owned().into_boxed_slice()),
+            key: key.into(),
         }
     }
 

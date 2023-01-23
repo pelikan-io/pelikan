@@ -4,7 +4,6 @@
 
 use super::*;
 use std::io::{Error, ErrorKind};
-use std::sync::Arc;
 
 counter!(HVALS);
 counter!(HVALS_EX);
@@ -14,7 +13,7 @@ counter!(HVALS_MISS);
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
 pub struct HashValuesRequest {
-    key: ArcByteSlice,
+    key: Arc<[u8]>,
 }
 
 impl TryFrom<Message> for HashValuesRequest {
@@ -51,7 +50,7 @@ impl TryFrom<Message> for HashValuesRequest {
 impl HashValuesRequest {
     pub fn new(key: &[u8]) -> Self {
         Self {
-            key: Arc::new(key.to_owned().into_boxed_slice()),
+            key: key.into(),
         }
     }
 

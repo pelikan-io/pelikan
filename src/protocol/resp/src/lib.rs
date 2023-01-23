@@ -14,4 +14,8 @@ pub use response::*;
 
 use metriken::*;
 
+use std::sync::Arc;
+
+type ArcByteSlice = Arc<[u8]>;
+
 common::metrics::test_no_duplicates!();

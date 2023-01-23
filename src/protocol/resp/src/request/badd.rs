@@ -11,8 +11,8 @@ use std::sync::Arc;
 /// format is: badd outer_key (inner_key value)+
 #[derive(Debug, PartialEq, Eq)]
 pub struct BAddRequest {
-    outer_key: ArcByteSlice,
-    inner_key_value_pairs: Arc<Box<[ArcKeyValuePair]>>,
+    outer_key: Arc<[u8]>,
+    inner_key_value_pairs: Arc<[ArcKeyValuePair]>,
 }
 
 impl BAddRequest {
@@ -23,7 +23,7 @@ impl BAddRequest {
     pub fn inner_key_value_pairs(&self) -> Box<[(&[u8], &[u8])]> {
         self.inner_key_value_pairs
             .iter()
-            .map(|(k, v)| (&***k, &***v))
+            .map(|(k, v)| (&**k, &**v))
             .collect::<Vec<(&[u8], &[u8])>>()
             .into_boxed_slice()
     }
@@ -92,7 +92,7 @@ impl TryFrom<Message> for BAddRequest {
 
             Ok(Self {
                 outer_key,
-                inner_key_value_pairs: Arc::new(Box::<[ArcKeyValuePair]>::from(pairs)),
+                inner_key_value_pairs: pairs.into(),
             })
         } else {
             Err(Error::new(ErrorKind::Other, "malformed command"))

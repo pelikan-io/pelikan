@@ -14,8 +14,8 @@ counter!(HSET_NOT_STORED);
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
 pub struct HashSetRequest {
-    key: ArcByteSlice,
-    data: Arc<Box<[ArcFieldValuePair]>>,
+    key: Arc<[u8]>,
+    data: Arc<[ArcFieldValuePair]>,
 }
 
 impl TryFrom<Message> for HashSetRequest {
@@ -69,7 +69,7 @@ impl TryFrom<Message> for HashSetRequest {
 
             Ok(Self {
                 key,
-                data: Arc::new(Box::<[ArcKeyValuePair]>::from(data)),
+                data: data.into(),
             })
         } else {
             Err(Error::new(ErrorKind::Other, "malformed command"))
@@ -81,16 +81,12 @@ impl HashSetRequest {
     pub fn new(key: &[u8], data: &[(&[u8], &[u8])]) -> Self {
         let mut d = Vec::with_capacity(data.len());
         for (field, value) in data.iter() {
-            let field = Arc::new((*field).to_owned().into_boxed_slice());
-            let value = Arc::new((*value).to_owned().into_boxed_slice());
-            d.push((field, value));
+            d.push(((*field).into(), (*value).into()));
         }
 
-        let d = Arc::new(d.into_boxed_slice());
-
         Self {
-            key: Arc::new(key.to_owned().into_boxed_slice()),
-            data: d,
+            key: key.into(),
+            data: d.into(),
         }
     }
 

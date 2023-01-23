@@ -4,7 +4,6 @@
 
 use super::*;
 use std::io::{Error, ErrorKind};
-use std::sync::Arc;
 
 counter!(HLEN);
 counter!(HLEN_EX);
@@ -12,9 +11,8 @@ counter!(HLEN_HIT);
 counter!(HLEN_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct HashLengthRequest {
-    key: ArcByteSlice,
+    key: Arc<[u8]>,
 }
 
 impl TryFrom<Message> for HashLengthRequest {
@@ -51,7 +49,7 @@ impl TryFrom<Message> for HashLengthRequest {
 impl HashLengthRequest {
     pub fn new(key: &[u8]) -> Self {
         Self {
-            key: Arc::new(key.to_owned().into_boxed_slice()),
+            key: key.into(),
         }
     }
 

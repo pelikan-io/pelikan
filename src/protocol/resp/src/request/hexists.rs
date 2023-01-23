@@ -4,7 +4,6 @@
 
 use super::*;
 use std::io::{Error, ErrorKind};
-use std::sync::Arc;
 
 counter!(HEXISTS);
 counter!(HEXISTS_EX);
@@ -12,7 +11,6 @@ counter!(HEXISTS_HIT);
 counter!(HEXISTS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct HashExistsRequest {
     key: ArcByteSlice,
     field: ArcByteSlice,
@@ -59,8 +57,8 @@ impl TryFrom<Message> for HashExistsRequest {
 impl HashExistsRequest {
     pub fn new(key: &[u8], field: &[u8]) -> Self {
         Self {
-            key: Arc::new(key.to_owned().into_boxed_slice()),
-            field: Arc::new(field.to_owned().into_boxed_slice()),
+            key: key.into(),
+            field: field.into(),
         }
     }
 

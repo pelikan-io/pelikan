@@ -4,7 +4,6 @@
 
 use super::*;
 use std::io::{Error, ErrorKind};
-use std::sync::Arc;
 
 counter!(HDEL);
 counter!(HDEL_EX);
@@ -50,7 +49,7 @@ impl TryFrom<Message> for HashDeleteRequest {
             }
 
             Ok(Self {
-                key,
+                key: key.into(),
                 fields: fields.into_boxed_slice(),
             })
         } else {
@@ -63,11 +62,11 @@ impl HashDeleteRequest {
     pub fn new(key: &[u8], fields: &[&[u8]]) -> Self {
         let fields: Vec<ArcByteSlice> = fields
             .iter()
-            .map(|f| Arc::new((*f).to_owned().into_boxed_slice()))
+            .map(|f| f.to_owned().into())
             .collect();
 
         Self {
-            key: Arc::new(key.to_owned().into_boxed_slice()),
+            key: key.to_owned().into(),
             fields: fields.into_boxed_slice(),
         }
     }

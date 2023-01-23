@@ -16,8 +16,8 @@ pub enum SetMode {
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
 pub struct SetRequest {
-    key: Arc<Box<[u8]>>,
-    value: Arc<Box<[u8]>>,
+    key: Arc<[u8]>,
+    value: Arc<[u8]>,
     expire_time: Option<ExpireTime>,
     mode: SetMode,
     get_old: bool,

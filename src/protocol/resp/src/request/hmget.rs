@@ -15,8 +15,8 @@ counter!(HMGET_FIELD_MISS);
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
 pub struct HashMultiGetRequest {
-    key: ArcByteSlice,
-    fields: Box<[ArcByteSlice]>,
+    key: Arc<[u8]>,
+    fields: Box<[Arc<[u8]>]>,
 }
 
 impl TryFrom<Message> for HashMultiGetRequest {
@@ -64,14 +64,14 @@ impl TryFrom<Message> for HashMultiGetRequest {
 
 impl HashMultiGetRequest {
     pub fn new(key: &[u8], fields: &[&[u8]]) -> Self {
-        let fields: Vec<ArcByteSlice> = fields
+        let fields: Vec<Arc<[u8]>> = fields
             .iter()
-            .map(|f| Arc::new((*f).to_owned().into_boxed_slice()))
+            .map(|f| (*f).into())
             .collect();
 
         Self {
-            key: Arc::new(key.to_owned().into_boxed_slice()),
-            fields: fields.into_boxed_slice(),
+            key: key.into(),
+            fields: fields.into(),
         }
     }
 
