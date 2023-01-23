@@ -87,7 +87,7 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"hkeys 0\r\n").unwrap().into_inner(),
-            Request::HashGetAll(HashGetAllRequest::new(b"0"))
+            Request::HashKeys(HashKeysRequest::new(b"0"))
         );
 
         assert_eq!(

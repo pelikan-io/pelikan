@@ -92,7 +92,7 @@ mod tests {
 
         assert_eq!(
             parser
-                .parse(b"*2\r\n$7\r\nhlen\r\n$1\r\n0\r\n")
+                .parse(b"*2\r\n$4\r\nhlen\r\n$1\r\n0\r\n")
                 .unwrap()
                 .into_inner(),
             Request::HashLength(HashLengthRequest::new(b"0"))

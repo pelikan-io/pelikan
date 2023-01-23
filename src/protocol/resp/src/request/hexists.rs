@@ -100,13 +100,13 @@ mod tests {
     fn parser() {
         let parser = RequestParser::new();
         assert_eq!(
-            parser.parse(b"hget 0 1\r\n").unwrap().into_inner(),
+            parser.parse(b"hexists 0 1\r\n").unwrap().into_inner(),
             Request::HashExists(HashExistsRequest::new(b"0", b"1"))
         );
 
         assert_eq!(
             parser
-                .parse(b"*3\r\n$4\r\nhget\r\n$1\r\n0\r\n$1\r\n1\r\n")
+                .parse(b"*3\r\n$7\r\nhexists\r\n$1\r\n0\r\n$1\r\n1\r\n")
                 .unwrap()
                 .into_inner(),
             Request::HashExists(HashExistsRequest::new(b"0", b"1"))
