@@ -117,6 +117,9 @@ impl Parse<Request> for RequestParser {
                         Some(b"get") | Some(b"GET") => {
                             GetRequest::try_from(message).map(Request::from)
                         }
+                        Some(b"hdel") | Some(b"HDEL") => {
+                            HashDeleteRequest::try_from(message).map(Request::from)
+                        }
                         Some(b"hexists") | Some(b"HEXISTS") => {
                             HashExistsRequest::try_from(message).map(Request::from)
                         }
