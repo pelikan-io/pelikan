@@ -12,6 +12,7 @@ use std::sync::Arc;
 
 mod badd;
 mod get;
+mod hdel;
 mod hexists;
 mod hget;
 mod hgetall;
@@ -24,6 +25,7 @@ mod set;
 
 pub use badd::*;
 pub use get::*;
+pub use hdel::*;
 pub use hexists::*;
 pub use hget::*;
 pub use hgetall::*;
@@ -164,6 +166,7 @@ impl Compose for Request {
         match self {
             Self::BAdd(r) => r.compose(buf),
             Self::Get(r) => r.compose(buf),
+            Self::HashDelete(r) => r.compose(buf),
             Self::HashExists(r) => r.compose(buf),
             Self::HashGet(r) => r.compose(buf),
             Self::HashGetAll(r) => r.compose(buf),
@@ -181,6 +184,7 @@ impl Compose for Request {
 pub enum Request {
     BAdd(BAddRequest),
     Get(GetRequest),
+    HashDelete(HashDeleteRequest),
     HashExists(HashExistsRequest),
     HashGet(HashGetRequest),
     HashGetAll(HashGetAllRequest),
@@ -201,6 +205,12 @@ impl From<BAddRequest> for Request {
 impl From<GetRequest> for Request {
     fn from(other: GetRequest) -> Self {
         Self::Get(other)
+    }
+}
+
+impl From<HashDeleteRequest> for Request {
+    fn from(other: HashDeleteRequest) -> Self {
+        Self::HashDelete(other)
     }
 }
 
@@ -262,6 +272,8 @@ impl From<SetRequest> for Request {
 pub enum Command {
     BAdd,
     Get,
+    HashDelete,
+    HashExists,
     HashGet,
     HashGetAll,
     HashKeys,
@@ -279,6 +291,8 @@ impl TryFrom<&[u8]> for Command {
         match other {
             b"badd" | b"BADD" => Ok(Command::BAdd),
             b"get" | b"GET" => Ok(Command::Get),
+            b"hdel" | b"HDEL" => Ok(Command::HashDelete),
+            b"hexists" | b"HEXISTS" => Ok(Command::HashExists),
             b"hget" | b"HGET" => Ok(Command::HashGet),
             b"hgetall" | b"HGETALL" => Ok(Command::HashGetAll),
             b"hkeys" | b"HKEYS" => Ok(Command::HashKeys),

@@ -27,14 +27,6 @@ pub(crate) fn klog_7(command: &dyn Display, key: &str, field: &str, ttl: i32, va
     klog!("\"{} {} {} {} {}\" {} {}", command, key, field, ttl, value_len, status as u8, response_len);
 }
 
-pub(crate) fn klog_hget(key: &str, field: &str, response_len: usize) {
-    if response_len == 0 {
-        klog!("\"hget {} {}\" 0 {}", key, field, response_len);
-    } else {
-        klog!("\"hget {} {}\" 4 {}", key, field, response_len);
-    }
-}
-
 pub fn klog_set(
     key: &str,
     flags: u32,
