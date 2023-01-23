@@ -43,7 +43,7 @@ host = "0.0.0.0"
 # port listening on
 port = "6379"
 # the name of the Momento cache to direct requests to
-cache_name = "preview-cache"
+cache_name = "ratings"
 # the TTL, in seconds, to use when items are set as 'no expiry' (TTL is zero)
 # NOTE: accepted values are between 1 and 4_294_967 (inclusive)
 default_ttl = 300
