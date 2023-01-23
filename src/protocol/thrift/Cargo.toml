@@ -11,5 +11,5 @@ license = { workspace = true }
 [dependencies]
 common = { path = "../../common" }
 logger = { path = "../../logger" }
+metriken = { workspace = true }
 protocol-common = { path = "../../protocol/common" }
-rustcommon-metrics = { workspace = true }

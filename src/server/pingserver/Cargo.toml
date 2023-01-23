@@ -36,8 +36,8 @@ common = { path = "../../common" }
 config = { path = "../../config" }
 entrystore = { path = "../../entrystore" }
 logger = { path = "../../logger" }
+metriken = { workspace = true }
 protocol-ping = { path = "../../protocol/ping", features = ["server"] }
-rustcommon-metrics = { workspace = true }
 server = { path = "../../core/server" }
 
 [dev-dependencies]

@@ -13,8 +13,8 @@ license = { workspace = true }
 common = { path = "../../common" }
 config = { path = "../../config" }
 logger = { path = "../../logger" }
+metriken = { workspace = true }
 protocol-common = { path = "../../protocol/common" }
-rustcommon-metrics = { workspace = true }
 storage-types = { path = "../../storage/types" }
 
 [dev-dependencies]

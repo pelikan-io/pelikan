@@ -102,9 +102,9 @@ use core::time::Duration;
 use crossbeam_channel::{bounded, Sender};
 use entrystore::EntryStore;
 use logger::{Drain, Klog};
+use metriken::*;
 use protocol_common::{Compose, Execute, Parse};
 use queues::Queues;
-use rustcommon_metrics::*;
 use session::{Buf, ServerSession, Session};
 use slab::Slab;
 use std::io::{Error, ErrorKind, Result};
@@ -120,7 +120,7 @@ use workers::WorkersBuilder;
 
 pub use process::{Process, ProcessBuilder};
 
-type Instant = rustcommon_metrics::time::Instant<rustcommon_metrics::time::Nanoseconds<u64>>;
+type Instant = metriken::time::Instant<metriken::time::Nanoseconds<u64>>;
 
 // TODO(bmartin): this *should* be plenty safe, the queue should rarely ever be
 // full, and a single wakeup should drain at least one message and make room for

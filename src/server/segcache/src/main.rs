@@ -18,8 +18,8 @@ extern crate logger;
 use backtrace::Backtrace;
 use clap::{App, Arg};
 use config::SegcacheConfig;
+use metriken::*;
 use pelikan_segcache_rs::Segcache;
-use rustcommon_metrics::*;
 use server::PERCENTILES;
 
 /// The entry point into the running Segcache instance. This function parses the
@@ -69,7 +69,7 @@ fn main() {
 
         let mut metrics = Vec::new();
 
-        for metric in &rustcommon_metrics::metrics() {
+        for metric in &metriken::metrics() {
             let any = match metric.as_any() {
                 Some(any) => any,
                 None => {

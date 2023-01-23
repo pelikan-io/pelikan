@@ -27,7 +27,7 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 
 use foreign_types_shared::{ForeignType, ForeignTypeRef};
-use rustcommon_metrics::*;
+use metriken::*;
 
 type Result<T> = std::io::Result<T>;
 

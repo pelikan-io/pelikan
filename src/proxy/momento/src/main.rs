@@ -15,6 +15,7 @@ use core::sync::atomic::{AtomicUsize, Ordering};
 use core::time::Duration;
 use logger::configure_logging;
 use logger::Drain;
+use metriken::*;
 use momento::response::cache_dictionary_fetch_response::*;
 use momento::response::cache_dictionary_get_response::*;
 use momento::response::cache_dictionary_set_response::*;
@@ -24,7 +25,6 @@ use momento::response::error::*;
 use momento::simple_cache_client::*;
 use net::TCP_RECV_BYTE;
 use protocol_admin::*;
-use rustcommon_metrics::*;
 use session::*;
 use std::borrow::{Borrow, BorrowMut};
 use std::io::{Error, ErrorKind};
@@ -185,7 +185,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let mut metrics = Vec::new();
 
-        for metric in &rustcommon_metrics::metrics() {
+        for metric in &metriken::metrics() {
             let any = match metric.as_any() {
                 Some(any) => any,
                 None => {

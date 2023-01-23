@@ -4,7 +4,7 @@
 
 // All metrics for the Seg crate
 
-use rustcommon_metrics::*;
+use metriken::*;
 
 // segment related
 counter!(SEGMENT_REQUEST, "number of segment allocation attempts");

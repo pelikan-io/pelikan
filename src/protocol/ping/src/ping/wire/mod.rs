@@ -11,7 +11,7 @@ pub use request::*;
 pub use response::*;
 
 #[allow(unused)]
-use rustcommon_metrics::*;
+use metriken::*;
 
 counter!(PING);
 counter!(PONG);

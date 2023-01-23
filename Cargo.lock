@@ -27,11 +27,11 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
+ "metriken",
  "net",
  "protocol-admin",
  "protocol-common",
  "queues",
- "rustcommon-metrics",
  "session",
  "slab",
  "tiny_http",
@@ -497,6 +497,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "clocksource"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b90cc4cec392a6d97223f008b5da7a3c2c71aa6d5ffdf0e3e14d8b2432738387"
+dependencies = [
+ "lazy_static",
+ "libc",
+ "mach",
+ "time 0.3.14",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "cmake"
 version = "0.1.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -510,11 +523,11 @@ name = "common"
 version = "0.3.1"
 dependencies = [
  "boring",
+ "clocksource",
  "macros",
+ "metriken",
  "net",
- "rustcommon-logger",
- "rustcommon-metrics",
- "rustcommon-time",
+ "ringlog",
  "serde",
 ]
 
@@ -933,11 +946,12 @@ checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 
 [[package]]
 name = "heatmap"
-version = "0.0.0"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44a040d43defb8644617d52575557275232693a27c594d136b16c12283244683"
 dependencies = [
+ "clocksource",
  "histogram",
- "rustcommon-time",
  "thiserror",
 ]
 
@@ -958,8 +972,9 @@ dependencies = [
 
 [[package]]
 name = "histogram"
-version = "0.0.0"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913e066ae237bc8adb23b539f140ae81152af2dc3ff357ada35af13bcf48f016"
 dependencies = [
  "thiserror",
 ]
@@ -1231,7 +1246,7 @@ version = "0.3.1"
 dependencies = [
  "common",
  "config",
- "rustcommon-logger",
+ "ringlog",
 ]
 
 [[package]]
@@ -1280,6 +1295,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "metriken"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "af0a70e90189b46fa6b104f52d68566059d5dc34f55cd314755249a60727dc34"
+dependencies = [
+ "clocksource",
+ "heatmap",
+ "linkme",
+ "metriken-derive",
+ "once_cell",
+ "parking_lot",
+]
+
+[[package]]
+name = "metriken-derive"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e58941ebb3d827378ea64a769df9cf65e47f75d78227969d70431c19578e5dc"
+dependencies = [
+ "proc-macro-crate",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
@@ -1401,12 +1442,12 @@ dependencies = [
  "config",
  "libc",
  "logger",
+ "metriken",
  "momento",
  "net",
  "protocol-admin",
  "protocol-memcache",
  "protocol-resp",
- "rustcommon-metrics",
  "session",
  "storage-types",
  "tokio",
@@ -1432,8 +1473,8 @@ dependencies = [
  "boring-sys",
  "foreign-types-shared",
  "libc",
+ "metriken",
  "mio 0.8.4",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1687,9 +1728,9 @@ dependencies = [
  "common",
  "config",
  "logger",
+ "metriken",
  "protocol-ping",
  "proxy",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1703,8 +1744,8 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
+ "metriken",
  "protocol-ping",
- "rustcommon-metrics",
  "server",
 ]
 
@@ -1744,9 +1785,9 @@ checksum = "eb9f9e6e233e5c4a35559a617bf40a4ec447db2e84c20b55a6f83167b7e57872"
 
 [[package]]
 name = "prettyplease"
-version = "0.1.22"
+version = "0.1.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c8992a85d8e93a28bdf76137db888d3874e3b230dee5ed8bebac4c9f7617773"
+checksum = "e97e3215779627f01ee256d2fad52f3d95e8e1c11e9fc6fd08f7cd455d5d5c78"
 dependencies = [
  "proc-macro2",
  "syn",
@@ -1835,8 +1876,8 @@ dependencies = [
  "config",
  "criterion 0.3.6",
  "logger",
+ "metriken",
  "protocol-common",
- "rustcommon-metrics",
  "storage-types",
 ]
 
@@ -1875,9 +1916,9 @@ dependencies = [
  "common",
  "criterion 0.3.6",
  "logger",
+ "metriken",
  "nom 5.1.2",
  "protocol-common",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1888,8 +1929,8 @@ dependencies = [
  "config",
  "criterion 0.3.6",
  "logger",
+ "metriken",
  "protocol-common",
- "rustcommon-metrics",
  "storage-types",
 ]
 
@@ -1898,9 +1939,9 @@ name = "protocol-resp"
 version = "0.3.1"
 dependencies = [
  "common",
+ "metriken",
  "nom 5.1.2",
  "protocol-common",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1909,8 +1950,8 @@ version = "0.3.1"
 dependencies = [
  "common",
  "logger",
+ "metriken",
  "protocol-common",
- "rustcommon-metrics",
 ]
 
 [[package]]
@@ -1923,11 +1964,11 @@ dependencies = [
  "crossbeam-channel",
  "entrystore",
  "logger",
+ "metriken",
  "net",
  "protocol-admin",
  "protocol-common",
  "queues",
- "rustcommon-metrics",
  "session",
  "slab",
  "waker",
@@ -2077,6 +2118,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ringlog"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a481f46b429f20e0dc310ddee227e5e35b86acaff897bfc5db9e37aa35c828be"
+dependencies = [
+ "ahash",
+ "clocksource",
+ "log",
+ "metriken",
+ "mpmc",
+]
+
+[[package]]
 name = "rustc-demangle"
 version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2087,54 +2141,6 @@ name = "rustc-hash"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08d43f7aa6b08d49f382cde6a7982047c3426db949b1424bc4b7ec9ae12c6ce2"
-
-[[package]]
-name = "rustcommon-logger"
-version = "0.1.1"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
-dependencies = [
- "ahash",
- "log",
- "mpmc",
- "rustcommon-metrics",
- "rustcommon-time",
-]
-
-[[package]]
-name = "rustcommon-metrics"
-version = "0.1.2"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
-dependencies = [
- "heatmap",
- "linkme",
- "once_cell",
- "parking_lot",
- "rustcommon-metrics-derive",
- "rustcommon-time",
-]
-
-[[package]]
-name = "rustcommon-metrics-derive"
-version = "0.1.1"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
-dependencies = [
- "proc-macro-crate",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "rustcommon-time"
-version = "0.0.13"
-source = "git+https://github.com/pelikan-io/rustcommon?rev=2d865da#2d865da861e3b845137f6002614de0728a0404f3"
-dependencies = [
- "lazy_static",
- "libc",
- "mach",
- "time 0.3.14",
- "winapi 0.3.9",
-]
 
 [[package]]
 name = "rustls"
@@ -2243,10 +2249,10 @@ dependencies = [
  "datapool",
  "logger",
  "memmap2",
+ "metriken",
  "rand",
  "rand_chacha",
  "rand_xoshiro",
- "rustcommon-metrics",
  "storage-types",
  "thiserror",
 ]
@@ -2262,8 +2268,8 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
+ "metriken",
  "protocol-memcache",
- "rustcommon-metrics",
  "server",
 ]
 
@@ -2318,11 +2324,11 @@ dependencies = [
  "crossbeam-channel",
  "entrystore",
  "logger",
+ "metriken",
  "net",
  "protocol-admin",
  "protocol-common",
  "queues",
- "rustcommon-metrics",
  "session",
  "slab",
  "waker",
@@ -2333,11 +2339,11 @@ name = "session"
 version = "0.3.1"
 dependencies = [
  "bytes 1.2.1",
+ "common",
  "log",
+ "metriken",
  "net",
  "protocol-common",
- "rustcommon-metrics",
- "rustcommon-time",
 ]
 
 [[package]]
@@ -2486,18 +2492,18 @@ checksum = "949517c0cf1bf4ee812e2e07e08ab448e3ae0d23472aee8a06c985f0c8815b16"
 
 [[package]]
 name = "thiserror"
-version = "1.0.37"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10deb33631e3c9018b9baf9dcbbc4f737320d2b576bac10f6aefa048fa407e3e"
+checksum = "6a9cd18aa97d5c45c6603caea1da6628790b37f7a34b6ca89522331c5180fed0"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.37"
+version = "1.0.38"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "982d17546b47146b28f7c22e3d08465f6b8903d0ea13c1660d9d84a6e7adcdbb"
+checksum = "1fb327af4685e4d03fa8cbcf1716380da910eeb2bb8be417e7f9fd3fb164f36f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2513,9 +2519,9 @@ dependencies = [
  "common",
  "config",
  "logger",
+ "metriken",
  "protocol-thrift",
  "proxy",
- "rustcommon-metrics",
 ]
 
 [[package]]

@@ -10,8 +10,8 @@ license = { workspace = true }
 
 [dependencies]
 bytes = { workspace = true }
+common = { path = "../common" }
 log = { workspace = true }
+metriken = { workspace = true }
 net = { path = "../net" }
 protocol-common = { path = "../protocol/common" }
-rustcommon-metrics = { workspace = true }
-rustcommon-time = { workspace = true }
