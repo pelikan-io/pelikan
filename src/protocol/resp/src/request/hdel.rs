@@ -49,7 +49,10 @@ impl TryFrom<Message> for HashDeleteRequest {
                 fields.push(field);
             }
 
-            Ok(Self { key, fields: fields.into_boxed_slice() })
+            Ok(Self {
+                key,
+                fields: fields.into_boxed_slice(),
+            })
         } else {
             Err(Error::new(ErrorKind::Other, "malformed command"))
         }
@@ -58,7 +61,10 @@ impl TryFrom<Message> for HashDeleteRequest {
 
 impl HashDeleteRequest {
     pub fn new(key: &[u8], fields: &[&[u8]]) -> Self {
-        let fields: Vec<ArcByteSlice> = fields.iter().map(|f| Arc::new((*f).to_owned().into_boxed_slice())).collect();
+        let fields: Vec<ArcByteSlice> = fields
+            .iter()
+            .map(|f| Arc::new((*f).to_owned().into_boxed_slice()))
+            .collect();
 
         Self {
             key: Arc::new(key.to_owned().into_boxed_slice()),
@@ -86,9 +92,7 @@ impl From<&HashDeleteRequest> for Message {
             data.push(Message::BulkString(BulkString::from(field.clone())));
         }
 
-        Message::Array(Array {
-            inner: Some(data),
-        })
+        Message::Array(Array { inner: Some(data) })
     }
 }
 

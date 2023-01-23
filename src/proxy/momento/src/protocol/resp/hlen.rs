@@ -18,7 +18,7 @@ pub async fn hlen(
     // check if the key is valid
     if std::str::from_utf8(key).is_err() {
         HLEN_EX.increment();
-        
+
         // invalid key
         let _ = socket.write_all(b"-ERR invalid key\r\n").await;
         return Err(Error::from(ErrorKind::InvalidInput));
@@ -37,37 +37,34 @@ pub async fn hlen(
     )
     .await
     {
-        Ok(Ok(mut response)) => {
-            match response.result {
-                MomentoDictionaryFetchStatus::ERROR => {
+        Ok(Ok(mut response)) => match response.result {
+            MomentoDictionaryFetchStatus::ERROR => {
+                BACKEND_EX.increment();
+                HLEN_EX.increment();
+                response_buf.extend_from_slice(b"-ERR backend error\r\n");
+            }
+            MomentoDictionaryFetchStatus::FOUND => {
+                if response.dictionary.is_none() {
                     BACKEND_EX.increment();
                     HLEN_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
-                }
-                MomentoDictionaryFetchStatus::FOUND => {
-                    if response.dictionary.is_none() {
-                        BACKEND_EX.increment();
-                        HLEN_EX.increment();
-                        response_buf.extend_from_slice(b"-ERR backend error\r\n");
-                    } else {
-                        HLEN_HIT.increment();
+                } else {
+                    HLEN_HIT.increment();
 
-                        let dictionary = response.dictionary.as_mut().unwrap();
-                        let response = format!(":{}\r\n", dictionary.len()).into_bytes();
+                    let dictionary = response.dictionary.as_mut().unwrap();
+                    let response = format!(":{}\r\n", dictionary.len()).into_bytes();
 
-                        response_buf
-                            .extend_from_slice(&response);
+                    response_buf.extend_from_slice(&response);
 
-                        klog_1(&"hlen", &key, Status::Hit, response_buf.len());
-                    }
-                }
-                MomentoDictionaryFetchStatus::MISSING => {
-                    HLEN_MISS.increment();
-                    response_buf.extend_from_slice(b":0\r\n");
-                    klog_1(&"hlen", &key, Status::Miss, response_buf.len());
+                    klog_1(&"hlen", &key, Status::Hit, response_buf.len());
                 }
             }
-        }
+            MomentoDictionaryFetchStatus::MISSING => {
+                HLEN_MISS.increment();
+                response_buf.extend_from_slice(b":0\r\n");
+                klog_1(&"hlen", &key, Status::Miss, response_buf.len());
+            }
+        },
         Ok(Err(MomentoError::LimitExceeded(_))) => {
             BACKEND_EX.increment();
             BACKEND_EX_RATE_LIMITED.increment();

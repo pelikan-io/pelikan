@@ -19,12 +19,42 @@ pub(crate) fn klog_1(command: &dyn Display, key: &str, status: Status, response_
     klog!("\"{} {}\" {} {}", command, key, status as u8, response_len);
 }
 
-pub(crate) fn klog_2(command: &dyn Display, key: &str, field: &str, status: Status, response_len: usize) {
-    klog!("\"{} {} {}\" {} {}", command, key, field, status as u8, response_len);
+pub(crate) fn klog_2(
+    command: &dyn Display,
+    key: &str,
+    field: &str,
+    status: Status,
+    response_len: usize,
+) {
+    klog!(
+        "\"{} {} {}\" {} {}",
+        command,
+        key,
+        field,
+        status as u8,
+        response_len
+    );
 }
 
-pub(crate) fn klog_7(command: &dyn Display, key: &str, field: &str, ttl: i32, value_len: usize, status: Status, response_len: usize) {
-    klog!("\"{} {} {} {} {}\" {} {}", command, key, field, ttl, value_len, status as u8, response_len);
+pub(crate) fn klog_7(
+    command: &dyn Display,
+    key: &str,
+    field: &str,
+    ttl: i32,
+    value_len: usize,
+    status: Status,
+    response_len: usize,
+) {
+    klog!(
+        "\"{} {} {} {} {}\" {} {}",
+        command,
+        key,
+        field,
+        ttl,
+        value_len,
+        status as u8,
+        response_len
+    );
 }
 
 pub fn klog_set(

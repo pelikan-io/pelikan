@@ -15,7 +15,7 @@ counter!(HSET_NOT_STORED);
 #[allow(clippy::redundant_allocation)]
 pub struct HashSetRequest {
     key: ArcByteSlice,
-    data: Arc<Box<[ArcFieldValuePair]>>
+    data: Arc<Box<[ArcFieldValuePair]>>,
 }
 
 impl TryFrom<Message> for HashSetRequest {
@@ -107,16 +107,15 @@ impl From<&HashSetRequest> for Message {
     fn from(other: &HashSetRequest) -> Message {
         let mut data = vec![
             Message::BulkString(BulkString::new(b"HSET")),
-            Message::BulkString(BulkString::from(other.key.clone()))];
+            Message::BulkString(BulkString::from(other.key.clone())),
+        ];
 
         for (field, value) in other.data.iter() {
             data.push(Message::BulkString(BulkString::from(field.clone())));
             data.push(Message::BulkString(BulkString::from(value.clone())));
         }
 
-        Message::Array(Array {
-            inner: Some(data),
-        })
+        Message::Array(Array { inner: Some(data) })
     }
 }
 
@@ -154,7 +153,9 @@ mod tests {
 
         assert_eq!(
             parser
-                .parse(b"*6\r\n$4\r\nhset\r\n$1\r\n0\r\n$1\r\n1\r\n$1\r\n2\r\n$1\r\n3\r\n$1\r\n4\r\n")
+                .parse(
+                    b"*6\r\n$4\r\nhset\r\n$1\r\n0\r\n$1\r\n1\r\n$1\r\n2\r\n$1\r\n3\r\n$1\r\n4\r\n"
+                )
                 .unwrap()
                 .into_inner(),
             Request::HashSet(HashSetRequest::new(b"0", &[(b"1", b"2"), (b"3", b"4")]))
