@@ -81,7 +81,7 @@ pub async fn hlen(
         }
         Err(_) => {
             // we had a timeout, incr stats and move on
-            // treating it as a miss
+            // treating it as an error
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
             HLEN_EX.increment();

@@ -99,7 +99,7 @@ pub async fn hget(
         Ok(Err(e)) => {
             // we got some error from the momento client
             // log and incr stats and move on treating it
-            // as a miss
+            // as an error
             error!("error for hget: {}", e);
             BACKEND_EX.increment();
             HGET_EX.increment();
@@ -107,7 +107,7 @@ pub async fn hget(
         }
         Err(_) => {
             // we had a timeout, incr stats and move on
-            // treating it as a miss
+            // treating it as an error
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
             HGET_EX.increment();

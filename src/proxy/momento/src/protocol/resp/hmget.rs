@@ -3,17 +3,17 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use crate::klog::*;
+use crate::protocol::resp::ArcByteSlice;
 use crate::{Error, *};
 use ::net::*;
 use protocol_resp::*;
-use std::sync::Arc;
 
 pub async fn hmget(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     socket: &mut tokio::net::TcpStream,
     key: &[u8],
-    fields: &[Arc<Box<[u8]>>],
+    fields: &[ArcByteSlice],
 ) -> Result<(), Error> {
     HMGET.increment();
 
@@ -123,7 +123,7 @@ pub async fn hmget(
         Ok(Err(e)) => {
             // we got some error from the momento client
             // log and incr stats and move on treating it
-            // as a miss
+            // as an error
             error!("error for hmget: {}", e);
             BACKEND_EX.increment();
             HMGET_EX.increment();
@@ -131,7 +131,7 @@ pub async fn hmget(
         }
         Err(_) => {
             // we had a timeout, incr stats and move on
-            // treating it as a miss
+            // treating it as an error
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
             HMGET_EX.increment();

@@ -4,6 +4,10 @@
 
 pub use protocol_resp::{Request, RequestParser};
 
+use std::sync::Arc;
+
+type ArcByteSlice = Arc<Box<[u8]>>;
+
 mod get;
 mod hdel;
 mod hexists;

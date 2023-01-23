@@ -87,7 +87,7 @@ pub async fn hvals(
         Ok(Err(e)) => {
             // we got some error from the momento client
             // log and incr stats and move on treating it
-            // as a miss
+            // as an error
             error!("error for hvals: {}", e);
             BACKEND_EX.increment();
             HVALS_EX.increment();
@@ -95,7 +95,7 @@ pub async fn hvals(
         }
         Err(_) => {
             // we had a timeout, incr stats and move on
-            // treating it as a miss
+            // treating it as an error
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
             HVALS_EX.increment();

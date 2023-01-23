@@ -57,6 +57,8 @@ pub async fn hdel(
     .await
     {
         Ok(Ok(_)) => {
+            // NOTE: the Momento protocol does not inform us of how many fields are
+            // deleted. We lie to the client and say that they all were deleted.
             response_buf.extend_from_slice(format!(":{}\r\n", fields.len()).as_bytes());
 
             for field in &fields {
@@ -72,15 +74,15 @@ pub async fn hdel(
         Ok(Err(e)) => {
             // we got some error from the momento client
             // log and incr stats and move on treating it
-            // as a miss
-            error!("error for hmget: {}", e);
+            // as an error
+            error!("error for hdel: {}", e);
             BACKEND_EX.increment();
             HDEL_EX.increment();
             response_buf.extend_from_slice(b"-ERR backend error\r\n");
         }
         Err(_) => {
             // we had a timeout, incr stats and move on
-            // treating it as a miss
+            // treating it as an error
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
             HDEL_EX.increment();
