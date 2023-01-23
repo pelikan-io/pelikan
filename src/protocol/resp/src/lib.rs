@@ -12,6 +12,6 @@ pub(crate) use util::*;
 pub use request::*;
 pub use response::*;
 
-use rustcommon_metrics::*;
+use metriken::*;
 
 common::metrics::test_no_duplicates!();
