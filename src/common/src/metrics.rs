@@ -1,4 +1,4 @@
-pub use metriken::*;
+use metriken::*;
 
 #[doc(hidden)]
 pub use macros::to_lowercase;
