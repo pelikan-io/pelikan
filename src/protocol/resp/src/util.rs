@@ -37,7 +37,6 @@ pub fn string(input: &[u8]) -> IResult<&[u8], &[u8]> {
     }
 }
 
-#[allow(clippy::redundant_allocation)]
 pub fn take_bulk_string(array: &mut Vec<Message>) -> Result<Option<Arc<[u8]>>, Error> {
     if array.is_empty() {
         return Ok(None);
@@ -82,5 +81,5 @@ pub fn take_bulk_string_as_u64(array: &mut Vec<Message>) -> Result<Option<u64>, 
         .map_err(|_| Error::new(ErrorKind::Other, "bulk string not valid utf8"))?
         .parse::<u64>()
         .map_err(|_| Error::new(ErrorKind::Other, "bulk string is not a u64"))
-        .map(|v| Some(v))
+        .map(Some)
 }

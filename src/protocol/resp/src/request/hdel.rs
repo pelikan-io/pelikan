@@ -9,7 +9,6 @@ counter!(HDEL);
 counter!(HDEL_EX);
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct HashDeleteRequest {
     key: Arc<[u8]>,
     fields: Box<[Arc<[u8]>]>,

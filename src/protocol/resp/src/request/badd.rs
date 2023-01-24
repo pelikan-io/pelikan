@@ -12,7 +12,7 @@ use std::sync::Arc;
 #[derive(Debug, PartialEq, Eq)]
 pub struct BAddRequest {
     outer_key: Arc<[u8]>,
-    inner_key_value_pairs: Arc<[(Arc<[u8]>, Arc<[u8]>)]>,
+    inner_key_value_pairs: Box<[(Arc<[u8]>, Arc<[u8]>)]>,
 }
 
 impl BAddRequest {

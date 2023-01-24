@@ -11,7 +11,6 @@ counter!(HVALS_HIT);
 counter!(HVALS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct HashValuesRequest {
     key: Arc<[u8]>,
 }

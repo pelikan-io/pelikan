@@ -14,7 +14,6 @@ pub enum SetMode {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct SetRequest {
     key: Arc<[u8]>,
     value: Arc<[u8]>,

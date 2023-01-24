@@ -106,7 +106,7 @@ impl Parse<Request> for RequestParser {
                 }
 
                 match &array[0] {
-                    Message::BulkString(c) => match c.inner.as_ref().map(|v| v.as_ref().as_ref()) {
+                    Message::BulkString(c) => match c.inner.as_ref().map(|v| v.as_ref()) {
                         Some(b"badd") | Some(b"BADD") => {
                             BAddRequest::try_from(message).map(Request::from)
                         }

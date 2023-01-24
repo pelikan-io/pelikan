@@ -7,7 +7,6 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct GetRequest {
     key: Arc<[u8]>,
 }

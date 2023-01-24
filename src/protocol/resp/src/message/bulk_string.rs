@@ -8,7 +8,6 @@ use std::sync::Arc;
 use std::io::{Error, ErrorKind};
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct BulkString {
     pub(crate) inner: Option<Arc<[u8]>>,
 }

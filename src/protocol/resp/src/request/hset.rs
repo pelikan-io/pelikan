@@ -12,10 +12,9 @@ counter!(HSET_STORED);
 counter!(HSET_NOT_STORED);
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct HashSetRequest {
     key: Arc<[u8]>,
-    data: Arc<[(Arc<[u8]>, Arc<[u8]>)]>,
+    data: Box<[(Arc<[u8]>, Arc<[u8]>)]>,
 }
 
 impl TryFrom<Message> for HashSetRequest {

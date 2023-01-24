@@ -13,7 +13,6 @@ counter!(HMGET_FIELD_HIT);
 counter!(HMGET_FIELD_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct HashMultiGetRequest {
     key: Arc<[u8]>,
     fields: Box<[Arc<[u8]>]>,
