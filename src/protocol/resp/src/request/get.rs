@@ -52,9 +52,7 @@ impl TryFrom<Message> for GetRequest {
 
 impl GetRequest {
     pub fn new(key: &[u8]) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 
     pub fn key(&self) -> &[u8] {

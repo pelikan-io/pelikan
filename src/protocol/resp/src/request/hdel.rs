@@ -60,10 +60,7 @@ impl TryFrom<Message> for HashDeleteRequest {
 
 impl HashDeleteRequest {
     pub fn new(key: &[u8], fields: &[&[u8]]) -> Self {
-        let fields: Vec<Arc<[u8]>> = fields
-            .iter()
-            .map(|f| (*f).into())
-            .collect();
+        let fields: Vec<Arc<[u8]>> = fields.iter().map(|f| (*f).into()).collect();
 
         Self {
             key: key.into(),

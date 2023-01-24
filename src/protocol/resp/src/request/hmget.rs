@@ -64,10 +64,7 @@ impl TryFrom<Message> for HashMultiGetRequest {
 
 impl HashMultiGetRequest {
     pub fn new(key: &[u8], fields: &[&[u8]]) -> Self {
-        let fields: Vec<Arc<[u8]>> = fields
-            .iter()
-            .map(|f| (*f).into())
-            .collect();
+        let fields: Vec<Arc<[u8]>> = fields.iter().map(|f| (*f).into()).collect();
 
         Self {
             key: key.into(),

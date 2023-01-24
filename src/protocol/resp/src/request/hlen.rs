@@ -48,9 +48,7 @@ impl TryFrom<Message> for HashLengthRequest {
 
 impl HashLengthRequest {
     pub fn new(key: &[u8]) -> Self {
-        Self {
-            key: key.into(),
-        }
+        Self { key: key.into() }
     }
 
     pub fn key(&self) -> &[u8] {
