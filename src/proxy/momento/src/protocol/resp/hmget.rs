@@ -21,10 +21,7 @@ pub async fn hmget(
 
     BACKEND_REQUEST.increment();
 
-    let fields: Vec<Vec<u8>> = fields
-        .iter()
-        .map(|f| f.as_ref().to_owned())
-        .collect();
+    let fields: Vec<Vec<u8>> = fields.iter().map(|f| f.as_ref().to_owned()).collect();
 
     match timeout(
         Duration::from_millis(200),

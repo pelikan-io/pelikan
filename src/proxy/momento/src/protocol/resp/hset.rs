@@ -57,10 +57,7 @@ pub async fn hset(
 
     let mut map = std::collections::HashMap::new();
     for (field, value) in data.iter() {
-        map.insert(
-            field.as_ref().to_owned(),
-            value.as_ref().to_owned(),
-        );
+        map.insert(field.as_ref().to_owned(), value.as_ref().to_owned());
     }
 
     match timeout(
