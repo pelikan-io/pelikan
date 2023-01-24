@@ -30,9 +30,18 @@ pub async fn get(
     for key in keys {
         BACKEND_REQUEST.increment();
 
-        // we've already checked the keys, so we
-        // know this unwrap is safe
-        let key = std::str::from_utf8(key).unwrap();
+        // we don't have a strict guarantee this function was called with memcache
+        // safe keys. This matters mostly for writing the response back to the client
+        // in a protocol compliant way.
+        let key = std::str::from_utf8(key);
+
+        // invalid keys will be treated as a miss
+        if key.is_err() {
+            continue;
+        }
+
+        // unwrap is safe now, rebind for convenience
+        let key = key.unwrap();
 
         match timeout(Duration::from_millis(200), client.get(cache_name, key)).await {
             Ok(Ok(response)) => {
