@@ -15,7 +15,7 @@ counter!(HSET_NOT_STORED);
 #[allow(clippy::redundant_allocation)]
 pub struct HashSetRequest {
     key: Arc<[u8]>,
-    data: Arc<[ArcFieldValuePair]>,
+    data: Arc<[(Arc<[u8]>, Arc<[u8]>)]>,
 }
 
 impl TryFrom<Message> for HashSetRequest {
@@ -94,7 +94,7 @@ impl HashSetRequest {
         &self.key
     }
 
-    pub fn data(&self) -> &[ArcFieldValuePair] {
+    pub fn data(&self) -> &[(Arc<[u8]>, Arc<[u8]>)] {
         &self.data
     }
 }

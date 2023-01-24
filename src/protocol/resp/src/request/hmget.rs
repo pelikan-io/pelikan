@@ -79,7 +79,7 @@ impl HashMultiGetRequest {
         &self.key
     }
 
-    pub fn fields(&self) -> &[ArcByteSlice] {
+    pub fn fields(&self) -> &[Arc<[u8]>] {
         &self.fields
     }
 }

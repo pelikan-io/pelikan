@@ -39,7 +39,7 @@ pub fn string(input: &[u8]) -> IResult<&[u8], &[u8]> {
 
 #[allow(clippy::redundant_allocation)]
 pub fn take_bulk_string(array: &mut Vec<Message>) -> Result<Option<Arc<[u8]>>, Error> {
-    if array.len() == 0 {
+    if array.is_empty() {
         return Ok(None);
     }
 

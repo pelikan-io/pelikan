@@ -10,7 +10,7 @@ use std::io::{Error, ErrorKind};
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
 pub struct BulkString {
-    pub(crate) inner: Option<ArcByteSlice>,
+    pub(crate) inner: Option<Arc<[u8]>>,
 }
 
 impl BulkString {

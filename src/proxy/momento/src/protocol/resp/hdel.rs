@@ -13,7 +13,7 @@ pub async fn hdel(
     cache_name: &str,
     socket: &mut tokio::net::TcpStream,
     key: &[u8],
-    fields: &[Arc<Box<[u8]>>],
+    fields: &[Arc<[u8]>],
 ) -> Result<(), Error> {
     HDEL.increment();
 

@@ -12,8 +12,8 @@ counter!(HEXISTS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashExistsRequest {
-    key: ArcByteSlice,
-    field: ArcByteSlice,
+    key: Arc<[u8]>,
+    field: Arc<[u8]>,
 }
 
 impl TryFrom<Message> for HashExistsRequest {

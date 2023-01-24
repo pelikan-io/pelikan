@@ -11,8 +11,8 @@ counter!(HDEL_EX);
 #[derive(Debug, PartialEq, Eq)]
 #[allow(clippy::redundant_allocation)]
 pub struct HashDeleteRequest {
-    key: ArcByteSlice,
-    fields: Box<[ArcByteSlice]>,
+    key: Arc<[u8]>,
+    fields: Box<[Arc<[u8]>]>,
 }
 
 impl TryFrom<Message> for HashDeleteRequest {
@@ -60,14 +60,14 @@ impl TryFrom<Message> for HashDeleteRequest {
 
 impl HashDeleteRequest {
     pub fn new(key: &[u8], fields: &[&[u8]]) -> Self {
-        let fields: Vec<ArcByteSlice> = fields
+        let fields: Vec<Arc<[u8]>> = fields
             .iter()
-            .map(|f| f.to_owned().into())
+            .map(|f| (*f).into())
             .collect();
 
         Self {
-            key: key.to_owned().into(),
-            fields: fields.into_boxed_slice(),
+            key: key.into(),
+            fields: fields.into(),
         }
     }
 
@@ -75,7 +75,7 @@ impl HashDeleteRequest {
         &self.key
     }
 
-    pub fn fields(&self) -> &[ArcByteSlice] {
+    pub fn fields(&self) -> &[Arc<[u8]>] {
         &self.fields
     }
 }

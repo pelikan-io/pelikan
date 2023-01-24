@@ -2,8 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use std::sync::Arc;
 use crate::klog::*;
-use crate::protocol::resp::ArcByteSlice;
 use crate::{Error, *};
 use ::net::*;
 use protocol_resp::*;
@@ -13,7 +13,7 @@ pub async fn hset(
     cache_name: &str,
     socket: &mut tokio::net::TcpStream,
     key: &[u8],
-    data: &[(ArcByteSlice, ArcByteSlice)],
+    data: &[(Arc<[u8]>, Arc<[u8]>)],
 ) -> Result<(), Error> {
     HSET.increment();
 
