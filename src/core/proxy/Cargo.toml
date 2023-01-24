@@ -19,7 +19,6 @@ metriken = { workspace = true }
 net = { path = "../../net" }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-common = { path = "../../protocol/common" }
-queues = { path = "../../queues" }
 session = { path = "../../session" }
 slab = { workspace = true }
-waker = { path = "../waker" }
+switchboard = { workspace = true }
