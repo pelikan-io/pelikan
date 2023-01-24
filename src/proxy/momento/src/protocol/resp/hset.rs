@@ -55,20 +55,17 @@ pub async fn hset(
 
     BACKEND_REQUEST.increment();
 
-    // already checked the key, so we know this unwraps is safe
-    let key = std::str::from_utf8(key).unwrap().to_owned();
-
     let mut map = std::collections::HashMap::new();
     for (field, value) in data.iter() {
         map.insert(
-            std::str::from_utf8(field).unwrap().to_owned(),
-            std::str::from_utf8(value).unwrap().to_owned(),
+            field.as_ref().to_owned(),
+            value.as_ref().to_owned(),
         );
     }
 
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_set(cache_name, &key, map.clone(), None, false),
+        client.dictionary_set(cache_name, key, map.clone(), None, false),
     )
     .await
     {

@@ -52,7 +52,7 @@ pub async fn get(
 
                         let item_header = format!("VALUE {} 0 {}\r\n", key, length);
 
-                        klog_1(&"get", key, Status::Hit, length);
+                        klog_1(&"get", &key, Status::Hit, length);
 
                         response_buf.extend_from_slice(item_header.as_bytes());
                         response_buf.extend_from_slice(&response.value);
@@ -63,7 +63,7 @@ pub async fn get(
 
                         // we don't write anything for a miss
 
-                        klog_1(&"get", key, Status::Miss, 0);
+                        klog_1(&"get", &key, Status::Miss, 0);
                     }
                 }
             }

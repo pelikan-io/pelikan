@@ -15,36 +15,13 @@ pub async fn hexists(
     field: &[u8],
 ) -> Result<(), Error> {
     HEXISTS.increment();
-
-    // check if the key is valid
-    if std::str::from_utf8(key).is_err() {
-        HEXISTS_EX.increment();
-
-        // invalid key
-        let _ = socket.write_all(b"-ERR invalid key\r\n").await;
-        return Err(Error::from(ErrorKind::InvalidInput));
-    }
-
-    // check if the field is valid
-    if std::str::from_utf8(field).is_err() {
-        HEXISTS_EX.increment();
-
-        // invalid field
-        let _ = socket.write_all(b"-ERR invalid field\r\n").await;
-        return Err(Error::from(ErrorKind::InvalidInput));
-    }
-
     let mut response_buf = Vec::new();
 
     BACKEND_REQUEST.increment();
 
-    // already checked the key and field, so we know these unwraps are safe
-    let key = std::str::from_utf8(key).unwrap().to_owned();
-    let field = std::str::from_utf8(field).unwrap().to_owned();
-
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_get(cache_name, &key, vec![field.clone()]),
+        client.dictionary_get(cache_name, key, vec![field.clone()]),
     )
     .await
     {

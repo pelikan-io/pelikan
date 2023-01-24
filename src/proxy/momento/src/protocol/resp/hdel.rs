@@ -17,15 +17,6 @@ pub async fn hdel(
 ) -> Result<(), Error> {
     HDEL.increment();
 
-    // check if the key is valid
-    if std::str::from_utf8(key).is_err() {
-        HDEL_EX.increment();
-
-        // invalid key
-        let _ = socket.write_all(b"-ERR invalid key\r\n").await;
-        return Err(Error::from(ErrorKind::InvalidInput));
-    }
-
     // check if the fields are valid before
     // sending the request to the backend
     for field in fields.iter() {
@@ -42,9 +33,6 @@ pub async fn hdel(
 
     BACKEND_REQUEST.increment();
 
-    // already checked the key and field, so we know these unwraps are safe
-    let key = std::str::from_utf8(key).unwrap().to_owned();
-
     let fields: Vec<String> = fields
         .iter()
         .map(|f| std::str::from_utf8(f).unwrap().to_owned())
@@ -52,7 +40,7 @@ pub async fn hdel(
 
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_delete(cache_name, &key, Fields::Some(fields.clone())),
+        client.dictionary_delete(cache_name, key, Fields::Some(fields.clone())),
     )
     .await
     {

@@ -17,42 +17,18 @@ pub async fn hmget(
 ) -> Result<(), Error> {
     HMGET.increment();
 
-    // check if the key is valid
-    if std::str::from_utf8(key).is_err() {
-        HMGET_EX.increment();
-
-        // invalid key
-        let _ = socket.write_all(b"-ERR invalid key\r\n").await;
-        return Err(Error::from(ErrorKind::InvalidInput));
-    }
-
-    // check if the fields are valid before
-    // sending the request to the backend
-    for field in fields.iter() {
-        if std::str::from_utf8(field).is_err() {
-            HMGET_EX.increment();
-
-            // invalid field
-            let _ = socket.write_all(b"-ERR invalid field\r\n").await;
-            return Err(Error::from(ErrorKind::InvalidInput));
-        }
-    }
-
     let mut response_buf = Vec::new();
 
     BACKEND_REQUEST.increment();
 
-    // already checked the key and field, so we know these unwraps are safe
-    let key = std::str::from_utf8(key).unwrap().to_owned();
-
-    let fields: Vec<String> = fields
+    let fields: Vec<Vec<u8>> = fields
         .iter()
-        .map(|f| std::str::from_utf8(f).unwrap().to_owned())
+        .map(|f| f.as_ref().to_owned())
         .collect();
 
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_get(cache_name, &key, fields.clone()),
+        client.dictionary_get(cache_name, key, fields.clone()),
     )
     .await
     {
@@ -80,7 +56,7 @@ pub async fn hmget(
                         let mut miss = 0;
 
                         for field in &fields {
-                            if let Some(value) = dictionary.get(field.as_bytes()) {
+                            if let Some(value) = dictionary.get(field) {
                                 hit += 1;
                                 klog_2(&"hmget", &key, field, Status::Hit, value.len());
 

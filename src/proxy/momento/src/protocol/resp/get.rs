@@ -52,14 +52,14 @@ pub async fn get(
                     response_buf.extend_from_slice(&response.value);
                     response_buf.extend_from_slice(b"\r\n");
 
-                    klog_1(&"get", key, Status::Hit, response.value.len());
+                    klog_1(&"get", &key, Status::Hit, response.value.len());
                 }
                 MomentoGetStatus::MISS => {
                     GET_KEY_MISS.increment();
 
                     response_buf.extend_from_slice(b"$-1\r\n");
 
-                    klog_1(&"get", key, Status::Miss, 0);
+                    klog_1(&"get", &key, Status::Miss, 0);
                 }
             }
         }

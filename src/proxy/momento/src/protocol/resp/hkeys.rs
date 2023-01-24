@@ -15,25 +15,13 @@ pub async fn hkeys(
 ) -> Result<(), Error> {
     HKEYS.increment();
 
-    // check if the key is valid
-    if std::str::from_utf8(key).is_err() {
-        HKEYS_EX.increment();
-
-        // invalid key
-        let _ = socket.write_all(b"-ERR invalid key\r\n").await;
-        return Err(Error::from(ErrorKind::InvalidInput));
-    }
-
     let mut response_buf = Vec::new();
 
     BACKEND_REQUEST.increment();
 
-    // already checked the key so we know this unwraps is safe
-    let key = std::str::from_utf8(key).unwrap().to_owned();
-
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_fetch(cache_name, &key),
+        client.dictionary_fetch(cache_name, key),
     )
     .await
     {

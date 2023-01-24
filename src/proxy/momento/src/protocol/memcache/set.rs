@@ -63,7 +63,7 @@ pub async fn set(
                         SET_STORED.increment();
                         if request.noreply() {
                             klog_set(
-                                key,
+                                &key,
                                 request.flags(),
                                 request.ttl().get().unwrap_or(0),
                                 value.len(),
@@ -72,7 +72,7 @@ pub async fn set(
                             );
                         } else {
                             klog_set(
-                                key,
+                                &key,
                                 request.flags(),
                                 request.ttl().get().unwrap_or(0),
                                 value.len(),
@@ -93,7 +93,7 @@ pub async fn set(
                         SET_NOT_STORED.increment();
                         if request.noreply() {
                             klog_set(
-                                key,
+                                &key,
                                 request.flags(),
                                 request.ttl().get().unwrap_or(0),
                                 value.len(),
@@ -102,7 +102,7 @@ pub async fn set(
                             );
                         } else {
                             klog_set(
-                                key,
+                                &key,
                                 request.flags(),
                                 request.ttl().get().unwrap_or(0),
                                 value.len(),
