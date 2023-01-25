@@ -1,4 +1,4 @@
-// Copyright 2022 Twitter, Inc.
+// Copyright 2023 Pelikan Foundation LLC.
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
@@ -6,12 +6,17 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
+counter!(HGETALL);
+counter!(HGETALL_EX);
+counter!(HGETALL_HIT);
+counter!(HGETALL_MISS);
+
 #[derive(Debug, PartialEq, Eq)]
-pub struct GetRequest {
+pub struct HashGetAllRequest {
     key: Arc<[u8]>,
 }
 
-impl TryFrom<Message> for GetRequest {
+impl TryFrom<Message> for HashGetAllRequest {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -22,25 +27,18 @@ impl TryFrom<Message> for GetRequest {
 
             let mut array = array.inner.unwrap();
 
-            if array.len() != 2 {
+            if array.len() < 2 {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
-            let key = if let Message::BulkString(key) = array.remove(1) {
-                if key.inner.is_none() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
+            let _command = take_bulk_string(&mut array)?;
 
-                let key = key.inner.unwrap();
+            let key = take_bulk_string(&mut array)?
+                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
-                if key.len() == 0 {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
-
-                key
-            } else {
+            if key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
-            };
+            }
 
             Ok(Self { key })
         } else {
@@ -49,7 +47,7 @@ impl TryFrom<Message> for GetRequest {
     }
 }
 
-impl GetRequest {
+impl HashGetAllRequest {
     pub fn new(key: &[u8]) -> Self {
         Self { key: key.into() }
     }
@@ -59,18 +57,18 @@ impl GetRequest {
     }
 }
 
-impl From<&GetRequest> for Message {
-    fn from(other: &GetRequest) -> Message {
+impl From<&HashGetAllRequest> for Message {
+    fn from(other: &HashGetAllRequest) -> Message {
         Message::Array(Array {
             inner: Some(vec![
-                Message::BulkString(BulkString::new(b"GET")),
+                Message::BulkString(BulkString::new(b"HGETALL")),
                 Message::BulkString(BulkString::from(other.key.clone())),
             ]),
         })
     }
 }
 
-impl Compose for GetRequest {
+impl Compose for HashGetAllRequest {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -85,24 +83,16 @@ mod tests {
     fn parser() {
         let parser = RequestParser::new();
         assert_eq!(
-            parser.parse(b"get 0\r\n").unwrap().into_inner(),
-            Request::Get(GetRequest::new(b"0"))
+            parser.parse(b"hgetall 0\r\n").unwrap().into_inner(),
+            Request::HashGetAll(HashGetAllRequest::new(b"0"))
         );
 
         assert_eq!(
             parser
-                .parse(b"get \"\0\r\n key\"\r\n")
+                .parse(b"*2\r\n$7\r\nhgetall\r\n$1\r\n0\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::Get(GetRequest::new(b"\0\r\n key"))
-        );
-
-        assert_eq!(
-            parser
-                .parse(b"*2\r\n$3\r\nget\r\n$1\r\n0\r\n")
-                .unwrap()
-                .into_inner(),
-            Request::Get(GetRequest::new(b"0"))
+            Request::HashGetAll(HashGetAllRequest::new(b"0"))
         );
     }
 }

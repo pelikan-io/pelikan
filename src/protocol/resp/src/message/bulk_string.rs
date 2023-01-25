@@ -8,21 +8,20 @@ use std::sync::Arc;
 use std::io::{Error, ErrorKind};
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct BulkString {
-    pub(crate) inner: Option<Arc<Box<[u8]>>>,
+    pub(crate) inner: Option<Arc<[u8]>>,
 }
 
 impl BulkString {
     pub fn new(bytes: &[u8]) -> Self {
         Self {
-            inner: Some(Arc::new(bytes.to_owned().into_boxed_slice())),
+            inner: Some(bytes.into()),
         }
     }
 }
 
-impl From<Arc<Box<[u8]>>> for BulkString {
-    fn from(other: Arc<Box<[u8]>>) -> Self {
+impl From<Arc<[u8]>> for BulkString {
+    fn from(other: Arc<[u8]>) -> Self {
         Self { inner: Some(other) }
     }
 }
@@ -80,7 +79,7 @@ pub fn parse(input: &[u8]) -> IResult<&[u8], BulkString> {
             Ok((
                 input,
                 BulkString {
-                    inner: Some(Arc::new(value.to_vec().into_boxed_slice())),
+                    inner: Some(value.into()),
                 },
             ))
         }

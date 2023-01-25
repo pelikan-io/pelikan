@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use crate::klog::klog_get;
+use crate::klog::{klog_1, Status};
 use crate::{Error, *};
 use ::net::*;
 use protocol_memcache::*;
@@ -30,9 +30,18 @@ pub async fn get(
     for key in keys {
         BACKEND_REQUEST.increment();
 
-        // we've already checked the keys, so we
-        // know this unwrap is safe
-        let key = std::str::from_utf8(key).unwrap();
+        // we don't have a strict guarantee this function was called with memcache
+        // safe keys. This matters mostly for writing the response back to the client
+        // in a protocol compliant way.
+        let key = std::str::from_utf8(key);
+
+        // invalid keys will be treated as a miss
+        if key.is_err() {
+            continue;
+        }
+
+        // unwrap is safe now, rebind for convenience
+        let key = key.unwrap();
 
         match timeout(Duration::from_millis(200), client.get(cache_name, key)).await {
             Ok(Ok(response)) => {
@@ -52,7 +61,7 @@ pub async fn get(
 
                         let item_header = format!("VALUE {} 0 {}\r\n", key, length);
 
-                        klog_get(key, response.value.len());
+                        klog_1(&"get", &key, Status::Hit, length);
 
                         response_buf.extend_from_slice(item_header.as_bytes());
                         response_buf.extend_from_slice(&response.value);
@@ -63,7 +72,7 @@ pub async fn get(
 
                         // we don't write anything for a miss
 
-                        klog_get(key, 0);
+                        klog_1(&"get", &key, Status::Miss, 0);
                     }
                 }
             }

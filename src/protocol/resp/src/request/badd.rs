@@ -6,16 +6,13 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-type ArcByteSlice = Arc<Box<[u8]>>;
-type ArcKeyValuePair = (ArcByteSlice, ArcByteSlice);
-
 /// Represents the btree add command which was added to Twitter's internal
 /// version of redis32.
 /// format is: badd outer_key (inner_key value)+
 #[derive(Debug, PartialEq, Eq)]
 pub struct BAddRequest {
-    outer_key: Arc<Box<[u8]>>,
-    inner_key_value_pairs: Arc<Box<[ArcKeyValuePair]>>,
+    outer_key: Arc<[u8]>,
+    inner_key_value_pairs: Box<[(Arc<[u8]>, Arc<[u8]>)]>,
 }
 
 impl BAddRequest {
@@ -26,7 +23,7 @@ impl BAddRequest {
     pub fn inner_key_value_pairs(&self) -> Box<[(&[u8], &[u8])]> {
         self.inner_key_value_pairs
             .iter()
-            .map(|(k, v)| (&***k, &***v))
+            .map(|(k, v)| (&**k, &**v))
             .collect::<Vec<(&[u8], &[u8])>>()
             .into_boxed_slice()
     }
@@ -95,7 +92,7 @@ impl TryFrom<Message> for BAddRequest {
 
             Ok(Self {
                 outer_key,
-                inner_key_value_pairs: Arc::new(Box::<[ArcKeyValuePair]>::from(pairs)),
+                inner_key_value_pairs: pairs.into(),
             })
         } else {
             Err(Error::new(ErrorKind::Other, "malformed command"))

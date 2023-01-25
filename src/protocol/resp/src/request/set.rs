@@ -14,10 +14,9 @@ pub enum SetMode {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-#[allow(clippy::redundant_allocation)]
 pub struct SetRequest {
-    key: Arc<Box<[u8]>>,
-    value: Arc<Box<[u8]>>,
+    key: Arc<[u8]>,
+    value: Arc<[u8]>,
     expire_time: Option<ExpireTime>,
     mode: SetMode,
     get_old: bool,
@@ -63,14 +62,14 @@ impl TryFrom<Message> for SetRequest {
             let _command = take_bulk_string(&mut array)?;
 
             let key = take_bulk_string(&mut array)?
-                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
             if key.is_empty() {
                 return Err(Error::new(ErrorKind::Other, "malformed command"));
             }
 
             let value = take_bulk_string(&mut array)?
-                .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
             let mut expire_time = None;
             let mut mode = SetMode::Set;
@@ -84,7 +83,7 @@ impl TryFrom<Message> for SetRequest {
                         }
 
                         let s = take_bulk_string_as_u64(&mut array)?
-                            .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
                         expire_time = Some(ExpireTime::Seconds(s));
                     }
@@ -94,7 +93,7 @@ impl TryFrom<Message> for SetRequest {
                         }
 
                         let ms = take_bulk_string_as_u64(&mut array)?
-                            .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
                         expire_time = Some(ExpireTime::Milliseconds(ms));
                     }
@@ -104,7 +103,7 @@ impl TryFrom<Message> for SetRequest {
                         }
 
                         let s = take_bulk_string_as_u64(&mut array)?
-                            .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
                         expire_time = Some(ExpireTime::UnixSeconds(s));
                     }
@@ -114,7 +113,7 @@ impl TryFrom<Message> for SetRequest {
                         }
 
                         let ms = take_bulk_string_as_u64(&mut array)?
-                            .ok_or(Error::new(ErrorKind::Other, "malformed command"))?;
+                            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
                         expire_time = Some(ExpireTime::UnixMilliseconds(ms));
                     }

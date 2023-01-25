@@ -12,4 +12,6 @@ pub(crate) use util::*;
 pub use request::*;
 pub use response::*;
 
+use metriken::*;
+
 common::metrics::test_no_duplicates!();
