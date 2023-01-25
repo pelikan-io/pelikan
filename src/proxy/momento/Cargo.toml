@@ -24,4 +24,4 @@ protocol-memcache = { path = "../../protocol/memcache" }
 protocol-resp = { path = "../../protocol/resp" }
 session = { path = "../../session" }
 storage-types = { path = "../../storage/types" }
-tokio = { version = "1.23.0", features = ["full"] }
+tokio = { version = "1.23.1", features = ["full"] }
