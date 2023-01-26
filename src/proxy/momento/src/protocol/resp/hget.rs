@@ -41,10 +41,8 @@ pub async fn hget(
                         BACKEND_EX.increment();
                         HGET_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
-                    } else if let Some(value) = response
-                        .dictionary
-                        .unwrap()
-                        .get(&field.into_bytes())
+                    } else if let Some(value) =
+                        response.dictionary.unwrap().get(&field.into_bytes())
                     {
                         HGET_HIT.increment();
 

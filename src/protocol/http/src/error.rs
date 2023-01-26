@@ -34,9 +34,7 @@ impl Error {
             Self::BadRequestMethod => Response::builder(405)
                 .should_close(true)
                 .header("Content-Type", b"text/plain")
-                .body(
-                    b"Unsupported method, only GET, PUT, and DELETE are supported"
-                ),
+                .body(b"Unsupported method, only GET, PUT, and DELETE are supported"),
             Self::BadContentLength => Response::builder(400)
                 .should_close(true)
                 .header("Content-Type", b"text/plain")
@@ -44,9 +42,7 @@ impl Error {
             Self::MissingContentLength => Response::builder(411)
                 .should_close(true)
                 .header("Content-Type", b"text/plain")
-                .body(
-                    b"A Content-Length header is required for all PUT requests",
-                ),
+                .body(b"A Content-Length header is required for all PUT requests"),
             Self::InternalError(message) => Response::builder(500)
                 .should_close(true)
                 .header("Content-Type", b"text/plain")
