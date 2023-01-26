@@ -111,7 +111,7 @@ impl Header {
     }
 
     fn as_bytes(&self) -> &[u8] {
-        unsafe { std::slice::from_raw_parts((&*self as *const Header) as *const u8, HEADER_SIZE) }
+        unsafe { std::slice::from_raw_parts((self as *const Header) as *const u8, HEADER_SIZE) }
     }
 
     fn checksum(&self) -> &[u8; 32] {

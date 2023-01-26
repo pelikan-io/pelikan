@@ -141,7 +141,7 @@ impl Segments {
     ) -> Option<RawItem> {
         let seg_id = seg_id.map(|v| v.get())?;
         trace!("getting item from: seg: {} offset: {}", seg_id, offset);
-        assert!(seg_id <= self.cap as u32);
+        assert!(seg_id <= self.cap);
 
         let seg_begin = self.segment_size() as usize * (seg_id as usize - 1);
         let seg_end = seg_begin + self.segment_size() as usize;
