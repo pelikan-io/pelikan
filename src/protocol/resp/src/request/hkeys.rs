@@ -12,11 +12,11 @@ counter!(HKEYS_HIT);
 counter!(HKEYS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct HashKeysRequest {
+pub struct HashKeys {
     key: Arc<[u8]>,
 }
 
-impl TryFrom<Message> for HashKeysRequest {
+impl TryFrom<Message> for HashKeys {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -47,7 +47,7 @@ impl TryFrom<Message> for HashKeysRequest {
     }
 }
 
-impl HashKeysRequest {
+impl HashKeys {
     pub fn new(key: &[u8]) -> Self {
         Self { key: key.into() }
     }
@@ -57,8 +57,8 @@ impl HashKeysRequest {
     }
 }
 
-impl From<&HashKeysRequest> for Message {
-    fn from(other: &HashKeysRequest) -> Message {
+impl From<&HashKeys> for Message {
+    fn from(other: &HashKeys) -> Message {
         Message::Array(Array {
             inner: Some(vec![
                 Message::BulkString(BulkString::new(b"HKEYS")),
@@ -68,7 +68,7 @@ impl From<&HashKeysRequest> for Message {
     }
 }
 
-impl Compose for HashKeysRequest {
+impl Compose for HashKeys {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -84,7 +84,7 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"hkeys 0\r\n").unwrap().into_inner(),
-            Request::HashKeys(HashKeysRequest::new(b"0"))
+            Request::HashKeys(HashKeys::new(b"0"))
         );
 
         assert_eq!(
@@ -92,7 +92,7 @@ mod tests {
                 .parse(b"*2\r\n$5\r\nhkeys\r\n$1\r\n0\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::HashKeys(HashKeysRequest::new(b"0"))
+            Request::HashKeys(HashKeys::new(b"0"))
         );
     }
 }

@@ -7,11 +7,11 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct GetRequest {
+pub struct Get {
     key: Arc<[u8]>,
 }
 
-impl TryFrom<Message> for GetRequest {
+impl TryFrom<Message> for Get {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -49,7 +49,7 @@ impl TryFrom<Message> for GetRequest {
     }
 }
 
-impl GetRequest {
+impl Get {
     pub fn new(key: &[u8]) -> Self {
         Self { key: key.into() }
     }
@@ -59,8 +59,8 @@ impl GetRequest {
     }
 }
 
-impl From<&GetRequest> for Message {
-    fn from(other: &GetRequest) -> Message {
+impl From<&Get> for Message {
+    fn from(other: &Get) -> Message {
         Message::Array(Array {
             inner: Some(vec![
                 Message::BulkString(BulkString::new(b"GET")),
@@ -70,7 +70,7 @@ impl From<&GetRequest> for Message {
     }
 }
 
-impl Compose for GetRequest {
+impl Compose for Get {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -86,7 +86,7 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"get 0\r\n").unwrap().into_inner(),
-            Request::Get(GetRequest::new(b"0"))
+            Request::Get(Get::new(b"0"))
         );
 
         assert_eq!(
@@ -94,7 +94,7 @@ mod tests {
                 .parse(b"get \"\0\r\n key\"\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::Get(GetRequest::new(b"\0\r\n key"))
+            Request::Get(Get::new(b"\0\r\n key"))
         );
 
         assert_eq!(
@@ -102,7 +102,7 @@ mod tests {
                 .parse(b"*2\r\n$3\r\nget\r\n$1\r\n0\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::Get(GetRequest::new(b"0"))
+            Request::Get(Get::new(b"0"))
         );
     }
 }

@@ -6,13 +6,13 @@ use crate::klog::klog_set;
 use crate::{Error, *};
 use ::net::*;
 use protocol_memcache::*;
-use protocol_resp::SetRequest;
+use protocol_resp::Set;
 
 pub async fn set(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     socket: &mut tokio::net::TcpStream,
-    request: &SetRequest,
+    request: &Set,
 ) -> Result<(), Error> {
     SET.increment();
 

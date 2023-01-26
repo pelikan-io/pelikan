@@ -9,12 +9,12 @@ counter!(HDEL);
 counter!(HDEL_EX);
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct HashDeleteRequest {
+pub struct HashDelete {
     key: Arc<[u8]>,
     fields: Box<[Arc<[u8]>]>,
 }
 
-impl TryFrom<Message> for HashDeleteRequest {
+impl TryFrom<Message> for HashDelete {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -48,7 +48,7 @@ impl TryFrom<Message> for HashDeleteRequest {
             }
 
             Ok(Self {
-                key: key.into(),
+                key,
                 fields: fields.into_boxed_slice(),
             })
         } else {
@@ -57,7 +57,7 @@ impl TryFrom<Message> for HashDeleteRequest {
     }
 }
 
-impl HashDeleteRequest {
+impl HashDelete {
     pub fn new(key: &[u8], fields: &[&[u8]]) -> Self {
         let fields: Vec<Arc<[u8]>> = fields.iter().map(|f| (*f).into()).collect();
 
@@ -76,8 +76,8 @@ impl HashDeleteRequest {
     }
 }
 
-impl From<&HashDeleteRequest> for Message {
-    fn from(other: &HashDeleteRequest) -> Message {
+impl From<&HashDelete> for Message {
+    fn from(other: &HashDelete) -> Message {
         let mut data = vec![
             Message::BulkString(BulkString::new(b"HDEL")),
             Message::BulkString(BulkString::from(other.key.clone())),
@@ -91,7 +91,7 @@ impl From<&HashDeleteRequest> for Message {
     }
 }
 
-impl Compose for HashDeleteRequest {
+impl Compose for HashDelete {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -107,7 +107,7 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"hdel 0 1 2\r\n").unwrap().into_inner(),
-            Request::HashDelete(HashDeleteRequest::new(b"0", &[b"1", b"2"]))
+            Request::HashDelete(HashDelete::new(b"0", &[b"1", b"2"]))
         );
 
         assert_eq!(
@@ -115,7 +115,7 @@ mod tests {
                 .parse(b"*4\r\n$4\r\nhdel\r\n$1\r\n0\r\n$1\r\n1\r\n$1\r\n2\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::HashDelete(HashDeleteRequest::new(b"0", &[b"1", b"2"]))
+            Request::HashDelete(HashDelete::new(b"0", &[b"1", b"2"]))
         );
     }
 }
