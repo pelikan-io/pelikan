@@ -260,7 +260,14 @@ impl Request {
         })
     }
 
-    pub fn cas(key: Box<[u8]>, value: Box<[u8]>, flags: u32, ttl: Ttl, cas: u64, noreply: bool) -> Self {
+    pub fn cas(
+        key: Box<[u8]>,
+        value: Box<[u8]>,
+        flags: u32,
+        ttl: Ttl,
+        cas: u64,
+        noreply: bool,
+    ) -> Self {
         Self::Cas(Cas {
             key,
             value,
@@ -280,22 +287,15 @@ impl Request {
     }
 
     pub fn delete(key: Box<[u8]>, noreply: bool) -> Self {
-        Self::Delete(Delete {
-            key,
-            noreply,
-        })
+        Self::Delete(Delete { key, noreply })
     }
 
     pub fn get(keys: Box<[Box<[u8]>]>) -> Self {
-        Self::Get(Get {
-            keys,
-        })
+        Self::Get(Get { keys })
     }
 
     pub fn gets(keys: Box<[Box<[u8]>]>) -> Self {
-        Self::Gets(Gets {
-            keys,
-        })
+        Self::Gets(Gets { keys })
     }
 
     pub fn incr(key: Box<[u8]>, value: u64, noreply: bool) -> Self {
