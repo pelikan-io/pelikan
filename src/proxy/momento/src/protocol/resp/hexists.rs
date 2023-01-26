@@ -21,7 +21,7 @@ pub async fn hexists(
 
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_get(cache_name, key, vec![field.clone()]),
+        client.dictionary_get(cache_name, key, vec![field]),
     )
     .await
     {
@@ -40,10 +40,8 @@ pub async fn hexists(
                         BACKEND_EX.increment();
                         HEXISTS_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
-                    } else if let Some(_value) = response
-                        .dictionary
-                        .unwrap()
-                        .get(&field.clone().into_bytes())
+                    } else if let Some(_value) =
+                        response.dictionary.unwrap().get(&field.into_bytes())
                     {
                         HEXISTS_HIT.increment();
                         response_buf.extend_from_slice(b":1\r\n");

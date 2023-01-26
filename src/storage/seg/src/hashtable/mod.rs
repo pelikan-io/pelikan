@@ -221,8 +221,8 @@ impl HashTable {
         let total_buckets = (buckets as f64 * (1.0 + overflow_factor)).ceil() as usize;
 
         let mut data = Vec::with_capacity(0);
-        data.reserve_exact(total_buckets as usize);
-        data.resize(total_buckets as usize, HashBucket::new());
+        data.reserve_exact(total_buckets);
+        data.resize(total_buckets, HashBucket::new());
         debug!(
             "hashtable has: {} primary slots across {} primary buckets and {} total buckets",
             slots, buckets, total_buckets,
@@ -241,7 +241,7 @@ impl HashTable {
             mask,
             data: data.into_boxed_slice(),
             started: Instant::now(),
-            next_to_chain: buckets as u64,
+            next_to_chain: buckets,
             _pad: [0; 8],
         }
     }

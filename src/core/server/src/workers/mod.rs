@@ -39,6 +39,9 @@ fn map_result(result: Result<usize>) -> Result<()> {
     }
 }
 
+// NOTE: as it is expected to have very few instances of this enum
+// we suppress the warning about the large variant
+#[allow(clippy::large_enum_variant)]
 pub enum Workers<Parser, Request, Response, Storage> {
     Single {
         worker: SingleWorker<Parser, Request, Response, Storage>,

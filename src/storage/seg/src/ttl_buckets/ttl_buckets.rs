@@ -59,7 +59,7 @@ impl TtlBuckets {
         ];
 
         let mut buckets = Vec::with_capacity(0);
-        buckets.reserve_exact(intervals.len() * N_BUCKET_PER_STEP as usize);
+        buckets.reserve_exact(intervals.len() * N_BUCKET_PER_STEP);
 
         for interval in &intervals {
             for j in 0..N_BUCKET_PER_STEP {

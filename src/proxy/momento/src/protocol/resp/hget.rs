@@ -22,7 +22,7 @@ pub async fn hget(
 
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_get(cache_name, key, vec![field.clone()]),
+        client.dictionary_get(cache_name, key, vec![field]),
     )
     .await
     {
@@ -41,10 +41,8 @@ pub async fn hget(
                         BACKEND_EX.increment();
                         HGET_EX.increment();
                         response_buf.extend_from_slice(b"-ERR backend error\r\n");
-                    } else if let Some(value) = response
-                        .dictionary
-                        .unwrap()
-                        .get(&field.clone().into_bytes())
+                    } else if let Some(value) =
+                        response.dictionary.unwrap().get(&field.into_bytes())
                     {
                         HGET_HIT.increment();
 

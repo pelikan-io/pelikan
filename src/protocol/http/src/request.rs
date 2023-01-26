@@ -71,7 +71,7 @@ impl RequestParser {
         let mut request = httparse::Request::new(&mut []);
         let status =
             self.config
-                .parse_request_with_uninit_headers(&mut request, *buf, &mut headers)?;
+                .parse_request_with_uninit_headers(&mut request, buf, &mut headers)?;
 
         let count = match status {
             Status::Complete(count) => count,
@@ -87,7 +87,7 @@ impl RequestParser {
             .path
             .ok_or(Error::InternalError("request was complete but had no path"))?;
 
-        let key = urlencoding::decode_binary(&key.as_bytes()).into_owned();
+        let key = urlencoding::decode_binary(key.as_bytes()).into_owned();
         let headers = Headers::from_httparse(request.headers);
 
         match method {
@@ -120,7 +120,7 @@ impl RequestParser {
                     headers,
                 })
             }
-            _ => return Err(Error::BadRequestMethod),
+            _ => Err(Error::BadRequestMethod),
         }
     }
 }

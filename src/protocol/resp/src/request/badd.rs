@@ -12,11 +12,11 @@ use std::sync::Arc;
 #[derive(Debug, PartialEq, Eq)]
 pub struct BtreeAdd {
     outer_key: Arc<[u8]>,
-    inner_key_value_pairs: Box<[(Arc<[u8]>, Arc<[u8]>)]>,
+    inner_key_value_pairs: Box<[FieldValuePair]>,
 }
 
 impl BtreeAdd {
-    pub fn new(outer_key: Arc<[u8]>, inner_key_value_pairs: Box<[(Arc<[u8]>, Arc<[u8]>)]>) -> Self {
+    pub fn new(outer_key: Arc<[u8]>, inner_key_value_pairs: Box<[FieldValuePair]>) -> Self {
         Self {
             outer_key,
             inner_key_value_pairs,

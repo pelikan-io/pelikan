@@ -181,7 +181,7 @@ impl ItemHeader {
         if let Some(value_type) = value_type {
             self.set_typed(true);
             self.len &= KLEN_MASK;
-            self.len |= (value_type.len() as u32) << VLEN_SHIFT;
+            self.len |= value_type.len() << VLEN_SHIFT;
             let value_type: u8 = value_type.into();
             self.len |= (value_type as u32) << TYPE_SHIFT;
         }
