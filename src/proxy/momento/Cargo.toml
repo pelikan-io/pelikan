@@ -17,7 +17,7 @@ config = { path = "../../config" }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-momento = "0.11.0"
+momento = "0.17.0"
 net = { path = "../../net" }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-memcache = { path = "../../protocol/memcache" }
