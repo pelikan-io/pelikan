@@ -7,10 +7,10 @@ mod request;
 mod response;
 mod util;
 
-pub(crate) use util::*;
+pub(crate) use crate::util::*;
 
-pub use request::*;
-pub use response::*;
+pub use crate::request::*;
+pub use crate::response::*;
 
 use metriken::*;
 
