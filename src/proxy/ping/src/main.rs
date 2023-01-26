@@ -6,8 +6,7 @@
 extern crate logger;
 
 use backtrace::Backtrace;
-use clap::App;
-use clap::Arg;
+use clap::{Arg, Command};
 use config::PingproxyConfig;
 use metriken::*;
 use pingproxy::Pingproxy;
@@ -23,30 +22,30 @@ fn main() {
     }));
 
     // parse command line options
-    let matches = App::new(env!("CARGO_BIN_NAME"))
+    let matches = Command::new(env!("CARGO_BIN_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
-        .version_short("v")
         .long_about(
             "A Pelikan proxy server which speaks the ASCII `ping` protocol. It \
             accepts connections on the listening port, routing requests to the \
             backend servers and responses back to clients.",
         )
         .arg(
-            Arg::with_name("stats")
-                .short("s")
+            Arg::new("stats")
+                .short('s')
                 .long("stats")
                 .help("List all metrics in stats")
-                .takes_value(false),
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
-            Arg::with_name("CONFIG")
+            Arg::new("CONFIG")
                 .help("Server configuration file")
+                .action(clap::ArgAction::Set)
                 .index(1),
         )
         .get_matches();
 
     // output stats descriptions and exit if the `stats` option was provided
-    if matches.is_present("stats") {
+    if matches.get_flag("stats") {
         println!("{:<31} {:<15} DESCRIPTION", "NAME", "TYPE");
 
         let mut metrics = Vec::new();
@@ -81,7 +80,7 @@ fn main() {
     }
 
     // load config from file
-    let config = if let Some(file) = matches.value_of("CONFIG") {
+    let config = if let Some(file) = matches.get_one::<String>("CONFIG") {
         match PingproxyConfig::load(file) {
             Ok(c) => c,
             Err(e) => {

@@ -105,7 +105,10 @@ impl RequestParser {
             b"set" | b"SET" => Command::Set,
             _ => {
                 // TODO(bmartin): we can return an unknown command error here
-                return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+                return Err(nom::Err::Failure(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
             }
         };
         Ok((remaining, command))

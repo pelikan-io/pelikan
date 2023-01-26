@@ -42,12 +42,18 @@ impl RequestParser {
             }
 
             if keys.len() >= self.max_batch_size {
-                return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+                return Err(nom::Err::Failure(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
             }
         }
 
         if keys.is_empty() {
-            return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+            return Err(nom::Err::Failure(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
         }
 
         let (input, _) = space0(input)?;

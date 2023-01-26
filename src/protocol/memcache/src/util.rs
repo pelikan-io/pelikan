@@ -51,7 +51,7 @@ pub fn key(input: &[u8], max_len: usize) -> IResult<&[u8], Option<&[u8]>> {
     let (i, key) = take_till(|b| (b == b' ' || b == b'\r'))(input).map_err(|e| {
         if let nom::Err::Incomplete(_) = e {
             if input.len() > max_len {
-                nom::Err::Failure((input, nom::error::ErrorKind::Tag))
+                nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
             } else {
                 e
             }
@@ -60,7 +60,10 @@ pub fn key(input: &[u8], max_len: usize) -> IResult<&[u8], Option<&[u8]>> {
         }
     })?;
     if key.len() > max_len {
-        return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+        return Err(nom::Err::Failure(nom::error::Error::new(
+            input,
+            nom::error::ErrorKind::Tag,
+        )));
     }
     if key.is_empty() {
         // returns unmodified input and signals that no key was found
@@ -78,9 +81,9 @@ pub fn parse_usize(input: &[u8]) -> IResult<&[u8], usize> {
     // slice being transformed to a str here
     let value = unsafe { std::str::from_utf8_unchecked(value) };
 
-    let value = value
-        .parse::<usize>()
-        .map_err(|_| nom::Err::Failure((input, nom::error::ErrorKind::Tag)))?;
+    let value = value.parse::<usize>().map_err(|_| {
+        nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+    })?;
     Ok((input, value))
 }
 
@@ -91,9 +94,9 @@ pub fn parse_u64(input: &[u8]) -> IResult<&[u8], u64> {
     // slice being transformed to a str here
     let value = unsafe { std::str::from_utf8_unchecked(value) };
 
-    let value = value
-        .parse::<u64>()
-        .map_err(|_| nom::Err::Failure((input, nom::error::ErrorKind::Tag)))?;
+    let value = value.parse::<u64>().map_err(|_| {
+        nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+    })?;
     Ok((input, value))
 }
 
@@ -104,9 +107,9 @@ pub fn parse_i64(input: &[u8]) -> IResult<&[u8], i64> {
     // slice being transformed to a str here
     let value = unsafe { std::str::from_utf8_unchecked(value) };
 
-    let value = value
-        .parse::<i64>()
-        .map_err(|_| nom::Err::Failure((input, nom::error::ErrorKind::Tag)))?;
+    let value = value.parse::<i64>().map_err(|_| {
+        nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+    })?;
     Ok((input, value))
 }
 
@@ -125,8 +128,8 @@ pub fn parse_u32(input: &[u8]) -> IResult<&[u8], u32> {
     // slice being transformed to a str here
     let value = unsafe { std::str::from_utf8_unchecked(value) };
 
-    let value = value
-        .parse::<u32>()
-        .map_err(|_| nom::Err::Failure((input, nom::error::ErrorKind::Tag)))?;
+    let value = value.parse::<u32>().map_err(|_| {
+        nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+    })?;
     Ok((input, value))
 }

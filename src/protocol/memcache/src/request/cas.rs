@@ -51,7 +51,10 @@ impl RequestParser {
         let key = match key {
             Some(k) => k,
             None => {
-                return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+                return Err(nom::Err::Failure(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
             }
         };
 
@@ -63,7 +66,10 @@ impl RequestParser {
         let (input, bytes) = parse_usize(input)?;
 
         if bytes > self.max_value_size {
-            return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+            return Err(nom::Err::Failure(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
         }
 
         let (input, _) = space1(input)?;

@@ -35,16 +35,17 @@ impl RequestParser {
             let (i, c) = take_till(|b| (b == b' ' || b == b'\r'))(i)?;
             if !c.is_empty() {
                 // make sure it's a valid string
-                let c = std::str::from_utf8(c)
-                    .map_err(|_| nom::Err::Failure((i, nom::error::ErrorKind::Tag)))?;
+                let c = std::str::from_utf8(c).map_err(|_| {
+                    nom::Err::Failure(nom::error::Error::new(i, nom::error::ErrorKind::Tag))
+                })?;
 
                 if c == "noreply" {
                     noreply = true;
                 } else {
                     // and make sure that sring represents a 64bit integer
-                    delay = c
-                        .parse::<u32>()
-                        .map_err(|_| nom::Err::Failure((i, nom::error::ErrorKind::Tag)))?;
+                    delay = c.parse::<u32>().map_err(|_| {
+                        nom::Err::Failure(nom::error::Error::new(i, nom::error::ErrorKind::Tag))
+                    })?;
                 }
             }
             input = i;
