@@ -11,11 +11,11 @@ counter!(HVALS_HIT);
 counter!(HVALS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct HashValuesRequest {
+pub struct HashValues {
     key: Arc<[u8]>,
 }
 
-impl TryFrom<Message> for HashValuesRequest {
+impl TryFrom<Message> for HashValues {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -46,7 +46,7 @@ impl TryFrom<Message> for HashValuesRequest {
     }
 }
 
-impl HashValuesRequest {
+impl HashValues {
     pub fn new(key: &[u8]) -> Self {
         Self { key: key.into() }
     }
@@ -56,8 +56,8 @@ impl HashValuesRequest {
     }
 }
 
-impl From<&HashValuesRequest> for Message {
-    fn from(other: &HashValuesRequest) -> Message {
+impl From<&HashValues> for Message {
+    fn from(other: &HashValues) -> Message {
         Message::Array(Array {
             inner: Some(vec![
                 Message::BulkString(BulkString::new(b"HVALS")),
@@ -67,7 +67,7 @@ impl From<&HashValuesRequest> for Message {
     }
 }
 
-impl Compose for HashValuesRequest {
+impl Compose for HashValues {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -83,7 +83,7 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"hvals 0\r\n").unwrap().into_inner(),
-            Request::HashValues(HashValuesRequest::new(b"0"))
+            Request::HashValues(HashValues::new(b"0"))
         );
 
         assert_eq!(
@@ -91,7 +91,7 @@ mod tests {
                 .parse(b"*2\r\n$5\r\nhvals\r\n$1\r\n0\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::HashValues(HashValuesRequest::new(b"0"))
+            Request::HashValues(HashValues::new(b"0"))
         );
     }
 }

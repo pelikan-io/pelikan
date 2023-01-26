@@ -11,11 +11,11 @@ counter!(HLEN_HIT);
 counter!(HLEN_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct HashLengthRequest {
+pub struct HashLength {
     key: Arc<[u8]>,
 }
 
-impl TryFrom<Message> for HashLengthRequest {
+impl TryFrom<Message> for HashLength {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -46,7 +46,7 @@ impl TryFrom<Message> for HashLengthRequest {
     }
 }
 
-impl HashLengthRequest {
+impl HashLength {
     pub fn new(key: &[u8]) -> Self {
         Self { key: key.into() }
     }
@@ -56,8 +56,8 @@ impl HashLengthRequest {
     }
 }
 
-impl From<&HashLengthRequest> for Message {
-    fn from(other: &HashLengthRequest) -> Message {
+impl From<&HashLength> for Message {
+    fn from(other: &HashLength) -> Message {
         Message::Array(Array {
             inner: Some(vec![
                 Message::BulkString(BulkString::new(b"HLEN")),
@@ -67,7 +67,7 @@ impl From<&HashLengthRequest> for Message {
     }
 }
 
-impl Compose for HashLengthRequest {
+impl Compose for HashLength {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -83,7 +83,7 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"hlen 0\r\n").unwrap().into_inner(),
-            Request::HashLength(HashLengthRequest::new(b"0"))
+            Request::HashLength(HashLength::new(b"0"))
         );
 
         assert_eq!(
@@ -91,7 +91,7 @@ mod tests {
                 .parse(b"*2\r\n$4\r\nhlen\r\n$1\r\n0\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::HashLength(HashLengthRequest::new(b"0"))
+            Request::HashLength(HashLength::new(b"0"))
         );
     }
 }

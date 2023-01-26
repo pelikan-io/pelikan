@@ -108,41 +108,37 @@ impl Parse<Request> for RequestParser {
                 match &array[0] {
                     Message::BulkString(c) => match c.inner.as_ref().map(|v| v.as_ref()) {
                         Some(b"badd") | Some(b"BADD") => {
-                            BAddRequest::try_from(message).map(Request::from)
+                            BtreeAdd::try_from(message).map(Request::from)
                         }
-                        Some(b"get") | Some(b"GET") => {
-                            GetRequest::try_from(message).map(Request::from)
-                        }
+                        Some(b"get") | Some(b"GET") => Get::try_from(message).map(Request::from),
                         Some(b"hdel") | Some(b"HDEL") => {
-                            HashDeleteRequest::try_from(message).map(Request::from)
+                            HashDelete::try_from(message).map(Request::from)
                         }
                         Some(b"hexists") | Some(b"HEXISTS") => {
-                            HashExistsRequest::try_from(message).map(Request::from)
+                            HashExists::try_from(message).map(Request::from)
                         }
                         Some(b"hget") | Some(b"HGET") => {
-                            HashGetRequest::try_from(message).map(Request::from)
+                            HashGet::try_from(message).map(Request::from)
                         }
                         Some(b"hgetall") | Some(b"HGETALL") => {
-                            HashGetAllRequest::try_from(message).map(Request::from)
+                            HashGetAll::try_from(message).map(Request::from)
                         }
                         Some(b"hkeys") | Some(b"HKEYS") => {
-                            HashKeysRequest::try_from(message).map(Request::from)
+                            HashKeys::try_from(message).map(Request::from)
                         }
                         Some(b"hlen") | Some(b"HLEN") => {
-                            HashLengthRequest::try_from(message).map(Request::from)
+                            HashLength::try_from(message).map(Request::from)
                         }
                         Some(b"hmget") | Some(b"HMGET") => {
-                            HashMultiGetRequest::try_from(message).map(Request::from)
+                            HashMultiGet::try_from(message).map(Request::from)
                         }
                         Some(b"hset") | Some(b"HSET") => {
-                            HashSetRequest::try_from(message).map(Request::from)
+                            HashSet::try_from(message).map(Request::from)
                         }
                         Some(b"hvals") | Some(b"HVALS") => {
-                            HashValuesRequest::try_from(message).map(Request::from)
+                            HashValues::try_from(message).map(Request::from)
                         }
-                        Some(b"set") | Some(b"SET") => {
-                            SetRequest::try_from(message).map(Request::from)
-                        }
+                        Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
                         _ => Err(Error::new(ErrorKind::Other, "unknown command")),
                     },
                     _ => {
@@ -163,7 +159,7 @@ impl Parse<Request> for RequestParser {
 impl Compose for Request {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         match self {
-            Self::BAdd(r) => r.compose(buf),
+            Self::BtreeAdd(r) => r.compose(buf),
             Self::Get(r) => r.compose(buf),
             Self::HashDelete(r) => r.compose(buf),
             Self::HashExists(r) => r.compose(buf),
@@ -181,88 +177,140 @@ impl Compose for Request {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Request {
-    BAdd(BAddRequest),
-    Get(GetRequest),
-    HashDelete(HashDeleteRequest),
-    HashExists(HashExistsRequest),
-    HashGet(HashGetRequest),
-    HashGetAll(HashGetAllRequest),
-    HashKeys(HashKeysRequest),
-    HashLength(HashLengthRequest),
-    HashMultiGet(HashMultiGetRequest),
-    HashSet(HashSetRequest),
-    HashValues(HashValuesRequest),
-    Set(SetRequest),
+    BtreeAdd(BtreeAdd),
+    Get(Get),
+    HashDelete(HashDelete),
+    HashExists(HashExists),
+    HashGet(HashGet),
+    HashGetAll(HashGetAll),
+    HashKeys(HashKeys),
+    HashLength(HashLength),
+    HashMultiGet(HashMultiGet),
+    HashSet(HashSet),
+    HashValues(HashValues),
+    Set(Set),
 }
 
-impl From<BAddRequest> for Request {
-    fn from(other: BAddRequest) -> Self {
-        Self::BAdd(other)
+impl Request {
+    pub fn get(key: &[u8]) -> Self {
+        Self::Get(Get::new(key))
+    }
+
+    pub fn hash_delete(key: &[u8], fields: &[&[u8]]) -> Self {
+        Self::HashDelete(HashDelete::new(key, fields))
+    }
+
+    pub fn hash_exists(key: &[u8], field: &[u8]) -> Self {
+        Self::HashExists(HashExists::new(key, field))
+    }
+
+    pub fn hash_get(key: &[u8], field: &[u8]) -> Self {
+        Self::HashGet(HashGet::new(key, field))
+    }
+
+    pub fn hash_get_all(key: &[u8]) -> Self {
+        Self::HashGetAll(HashGetAll::new(key))
+    }
+
+    pub fn hash_keys(key: &[u8]) -> Self {
+        Self::HashKeys(HashKeys::new(key))
+    }
+
+    pub fn hash_length(key: &[u8]) -> Self {
+        Self::HashLength(HashLength::new(key))
+    }
+
+    pub fn hash_multi_get(key: &[u8], fields: &[&[u8]]) -> Self {
+        Self::HashMultiGet(HashMultiGet::new(key, fields))
+    }
+
+    pub fn hash_set(key: &[u8], data: &[(&[u8], &[u8])]) -> Self {
+        Self::HashSet(HashSet::new(key, data))
+    }
+
+    pub fn hash_values(key: &[u8]) -> Self {
+        Self::HashValues(HashValues::new(key))
+    }
+
+    pub fn set(
+        key: &[u8],
+        value: &[u8],
+        expire_time: Option<ExpireTime>,
+        mode: SetMode,
+        get_old: bool,
+    ) -> Self {
+        Self::Set(Set::new(key, value, expire_time, mode, get_old))
     }
 }
 
-impl From<GetRequest> for Request {
-    fn from(other: GetRequest) -> Self {
+impl From<BtreeAdd> for Request {
+    fn from(other: BtreeAdd) -> Self {
+        Self::BtreeAdd(other)
+    }
+}
+
+impl From<Get> for Request {
+    fn from(other: Get) -> Self {
         Self::Get(other)
     }
 }
 
-impl From<HashDeleteRequest> for Request {
-    fn from(other: HashDeleteRequest) -> Self {
+impl From<HashDelete> for Request {
+    fn from(other: HashDelete) -> Self {
         Self::HashDelete(other)
     }
 }
 
-impl From<HashExistsRequest> for Request {
-    fn from(other: HashExistsRequest) -> Self {
+impl From<HashExists> for Request {
+    fn from(other: HashExists) -> Self {
         Self::HashExists(other)
     }
 }
 
-impl From<HashGetRequest> for Request {
-    fn from(other: HashGetRequest) -> Self {
+impl From<HashGet> for Request {
+    fn from(other: HashGet) -> Self {
         Self::HashGet(other)
     }
 }
 
-impl From<HashGetAllRequest> for Request {
-    fn from(other: HashGetAllRequest) -> Self {
+impl From<HashGetAll> for Request {
+    fn from(other: HashGetAll) -> Self {
         Self::HashGetAll(other)
     }
 }
 
-impl From<HashKeysRequest> for Request {
-    fn from(other: HashKeysRequest) -> Self {
+impl From<HashKeys> for Request {
+    fn from(other: HashKeys) -> Self {
         Self::HashKeys(other)
     }
 }
 
-impl From<HashLengthRequest> for Request {
-    fn from(other: HashLengthRequest) -> Self {
+impl From<HashLength> for Request {
+    fn from(other: HashLength) -> Self {
         Self::HashLength(other)
     }
 }
 
-impl From<HashMultiGetRequest> for Request {
-    fn from(other: HashMultiGetRequest) -> Self {
+impl From<HashMultiGet> for Request {
+    fn from(other: HashMultiGet) -> Self {
         Self::HashMultiGet(other)
     }
 }
 
-impl From<HashSetRequest> for Request {
-    fn from(other: HashSetRequest) -> Self {
+impl From<HashSet> for Request {
+    fn from(other: HashSet) -> Self {
         Self::HashSet(other)
     }
 }
 
-impl From<HashValuesRequest> for Request {
-    fn from(other: HashValuesRequest) -> Self {
+impl From<HashValues> for Request {
+    fn from(other: HashValues) -> Self {
         Self::HashValues(other)
     }
 }
 
-impl From<SetRequest> for Request {
-    fn from(other: SetRequest) -> Self {
+impl From<Set> for Request {
+    fn from(other: Set) -> Self {
         Self::Set(other)
     }
 }
