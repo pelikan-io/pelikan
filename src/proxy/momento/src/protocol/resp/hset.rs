@@ -6,14 +6,13 @@ use crate::klog::*;
 use crate::{Error, *};
 use ::net::*;
 use protocol_resp::*;
-use std::sync::Arc;
 
 pub async fn hset(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     socket: &mut tokio::net::TcpStream,
     key: &[u8],
-    data: &[(Arc<[u8]>, Arc<[u8]>)],
+    data: &[FieldValuePair],
 ) -> Result<(), Error> {
     HSET.increment();
 

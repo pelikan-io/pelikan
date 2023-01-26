@@ -22,7 +22,7 @@ pub async fn hget(
 
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_get(cache_name, key, vec![field.clone()]),
+        client.dictionary_get(cache_name, key, vec![field]),
     )
     .await
     {
@@ -44,7 +44,7 @@ pub async fn hget(
                     } else if let Some(value) = response
                         .dictionary
                         .unwrap()
-                        .get(&field.clone().into_bytes())
+                        .get(&field.into_bytes())
                     {
                         HGET_HIT.increment();
 

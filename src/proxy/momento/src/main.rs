@@ -287,7 +287,7 @@ async fn spawn(
         };
         let ttl = cache.default_ttl();
 
-        let tcp_listener = match std::net::TcpListener::bind(&addr) {
+        let tcp_listener = match std::net::TcpListener::bind(addr) {
             Ok(v) => {
                 if let Err(e) = v.set_nonblocking(true) {
                     error!(

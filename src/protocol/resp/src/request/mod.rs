@@ -36,6 +36,8 @@ pub use hset::*;
 pub use hvals::*;
 pub use set::*;
 
+pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
+
 #[derive(Default)]
 pub struct RequestParser {
     message_parser: MessageParser,

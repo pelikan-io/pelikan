@@ -14,7 +14,7 @@ counter!(HSET_NOT_STORED);
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashSet {
     key: Arc<[u8]>,
-    data: Box<[(Arc<[u8]>, Arc<[u8]>)]>,
+    data: Box<[FieldValuePair]>,
 }
 
 impl TryFrom<Message> for HashSet {
@@ -93,7 +93,7 @@ impl HashSet {
         &self.key
     }
 
-    pub fn data(&self) -> &[(Arc<[u8]>, Arc<[u8]>)] {
+    pub fn data(&self) -> &[FieldValuePair] {
         &self.data
     }
 }
