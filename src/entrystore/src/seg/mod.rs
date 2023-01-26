@@ -13,6 +13,7 @@ use config::SegConfig;
 use seg::{Policy, SegError};
 
 mod memcache;
+mod resp;
 
 /// A wrapper around [`seg::Seg`] which implements `EntryStore` and storage
 /// protocol traits.

@@ -27,6 +27,7 @@ members = [
     "src/proxy/ping",
     "src/proxy/thrift",
     "src/server/pingserver",
+    "src/server/rds",
     "src/server/segcache",
     "src/session",
     "src/storage/bloom",

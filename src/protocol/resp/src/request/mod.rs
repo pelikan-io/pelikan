@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use logger::Klog;
 use crate::message::*;
 use crate::*;
 use protocol_common::BufMut;
@@ -40,7 +41,7 @@ pub use set::*;
 
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RequestParser {
     message_parser: MessageParser,
 }
@@ -200,10 +201,19 @@ pub enum Request {
     Set(Set),
 }
 
+
+impl Klog for Request {
+    type Response = Response;
+
+    fn klog(&self, _response: &Self::Response) {
+    }
+}
+
 impl Request {
     pub fn get(key: &[u8]) -> Self {
         Self::Get(Get::new(key))
     }
+
 
     pub fn hash_delete(key: &[u8], fields: &[&[u8]]) -> Self {
         Self::HashDelete(HashDelete::new(key, fields))
