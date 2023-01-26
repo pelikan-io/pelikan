@@ -11,12 +11,12 @@ counter!(HEXISTS_HIT);
 counter!(HEXISTS_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct HashExistsRequest {
+pub struct HashExists {
     key: Arc<[u8]>,
     field: Arc<[u8]>,
 }
 
-impl TryFrom<Message> for HashExistsRequest {
+impl TryFrom<Message> for HashExists {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -54,7 +54,7 @@ impl TryFrom<Message> for HashExistsRequest {
     }
 }
 
-impl HashExistsRequest {
+impl HashExists {
     pub fn new(key: &[u8], field: &[u8]) -> Self {
         Self {
             key: key.into(),
@@ -71,8 +71,8 @@ impl HashExistsRequest {
     }
 }
 
-impl From<&HashExistsRequest> for Message {
-    fn from(other: &HashExistsRequest) -> Message {
+impl From<&HashExists> for Message {
+    fn from(other: &HashExists) -> Message {
         Message::Array(Array {
             inner: Some(vec![
                 Message::BulkString(BulkString::new(b"HEXISTS")),
@@ -83,7 +83,7 @@ impl From<&HashExistsRequest> for Message {
     }
 }
 
-impl Compose for HashExistsRequest {
+impl Compose for HashExists {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -99,7 +99,7 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"hexists 0 1\r\n").unwrap().into_inner(),
-            Request::HashExists(HashExistsRequest::new(b"0", b"1"))
+            Request::HashExists(HashExists::new(b"0", b"1"))
         );
 
         assert_eq!(
@@ -107,7 +107,7 @@ mod tests {
                 .parse(b"*3\r\n$7\r\nhexists\r\n$1\r\n0\r\n$1\r\n1\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::HashExists(HashExistsRequest::new(b"0", b"1"))
+            Request::HashExists(HashExists::new(b"0", b"1"))
         );
     }
 }

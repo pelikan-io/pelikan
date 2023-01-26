@@ -11,12 +11,12 @@ counter!(HGET_HIT);
 counter!(HGET_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct HashGetRequest {
+pub struct HashGet {
     key: Arc<[u8]>,
     field: Arc<[u8]>,
 }
 
-impl TryFrom<Message> for HashGetRequest {
+impl TryFrom<Message> for HashGet {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -54,7 +54,7 @@ impl TryFrom<Message> for HashGetRequest {
     }
 }
 
-impl HashGetRequest {
+impl HashGet {
     pub fn new(key: &[u8], field: &[u8]) -> Self {
         Self {
             key: key.into(),
@@ -71,8 +71,8 @@ impl HashGetRequest {
     }
 }
 
-impl From<&HashGetRequest> for Message {
-    fn from(other: &HashGetRequest) -> Message {
+impl From<&HashGet> for Message {
+    fn from(other: &HashGet) -> Message {
         Message::Array(Array {
             inner: Some(vec![
                 Message::BulkString(BulkString::new(b"HGET")),
@@ -83,7 +83,7 @@ impl From<&HashGetRequest> for Message {
     }
 }
 
-impl Compose for HashGetRequest {
+impl Compose for HashGet {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -99,7 +99,7 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"hget 0 1\r\n").unwrap().into_inner(),
-            Request::HashGet(HashGetRequest::new(b"0", b"1"))
+            Request::HashGet(HashGet::new(b"0", b"1"))
         );
 
         assert_eq!(
@@ -107,7 +107,7 @@ mod tests {
                 .parse(b"*3\r\n$4\r\nhget\r\n$1\r\n0\r\n$1\r\n1\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::HashGet(HashGetRequest::new(b"0", b"1"))
+            Request::HashGet(HashGet::new(b"0", b"1"))
         );
     }
 }

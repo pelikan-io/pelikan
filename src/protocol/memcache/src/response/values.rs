@@ -54,6 +54,10 @@ impl Value {
     pub fn len(&self) -> Option<usize> {
         self.data.as_ref().map(|v| v.len())
     }
+
+    pub fn value(&self) -> Option<&[u8]> {
+        self.data.as_ref().map(|v| v.as_ref())
+    }
 }
 
 impl Compose for Values {

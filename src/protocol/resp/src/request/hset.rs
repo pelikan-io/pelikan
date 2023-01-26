@@ -12,12 +12,12 @@ counter!(HSET_STORED);
 counter!(HSET_NOT_STORED);
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct HashSetRequest {
+pub struct HashSet {
     key: Arc<[u8]>,
     data: Box<[(Arc<[u8]>, Arc<[u8]>)]>,
 }
 
-impl TryFrom<Message> for HashSetRequest {
+impl TryFrom<Message> for HashSet {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -76,7 +76,7 @@ impl TryFrom<Message> for HashSetRequest {
     }
 }
 
-impl HashSetRequest {
+impl HashSet {
     pub fn new(key: &[u8], data: &[(&[u8], &[u8])]) -> Self {
         let mut d = Vec::with_capacity(data.len());
         for (field, value) in data.iter() {
@@ -98,8 +98,8 @@ impl HashSetRequest {
     }
 }
 
-impl From<&HashSetRequest> for Message {
-    fn from(other: &HashSetRequest) -> Message {
+impl From<&HashSet> for Message {
+    fn from(other: &HashSet) -> Message {
         let mut data = vec![
             Message::BulkString(BulkString::new(b"HSET")),
             Message::BulkString(BulkString::from(other.key.clone())),
@@ -114,7 +114,7 @@ impl From<&HashSetRequest> for Message {
     }
 }
 
-impl Compose for HashSetRequest {
+impl Compose for HashSet {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -130,12 +130,12 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"hset 0 1 2\r\n").unwrap().into_inner(),
-            Request::HashSet(HashSetRequest::new(b"0", &[(b"1", b"2")]))
+            Request::HashSet(HashSet::new(b"0", &[(b"1", b"2")]))
         );
 
         assert_eq!(
             parser.parse(b"hset 0 1 2 3 4\r\n").unwrap().into_inner(),
-            Request::HashSet(HashSetRequest::new(b"0", &[(b"1", b"2"), (b"3", b"4")]))
+            Request::HashSet(HashSet::new(b"0", &[(b"1", b"2"), (b"3", b"4")]))
         );
 
         assert_eq!(
@@ -143,7 +143,7 @@ mod tests {
                 .parse(b"*4\r\n$4\r\nhset\r\n$1\r\n0\r\n$1\r\n1\r\n$1\r\n2\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::HashSet(HashSetRequest::new(b"0", &[(b"1", b"2")]))
+            Request::HashSet(HashSet::new(b"0", &[(b"1", b"2")]))
         );
 
         assert_eq!(
@@ -153,7 +153,7 @@ mod tests {
                 )
                 .unwrap()
                 .into_inner(),
-            Request::HashSet(HashSetRequest::new(b"0", &[(b"1", b"2"), (b"3", b"4")]))
+            Request::HashSet(HashSet::new(b"0", &[(b"1", b"2"), (b"3", b"4")]))
         );
     }
 }

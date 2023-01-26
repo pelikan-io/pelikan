@@ -249,6 +249,84 @@ pub enum Request {
     Set(Set),
 }
 
+impl Request {
+    pub fn add(key: Box<[u8]>, value: Box<[u8]>, flags: u32, ttl: Ttl, noreply: bool) -> Self {
+        Self::Add(Add {
+            key,
+            value,
+            flags,
+            ttl,
+            noreply,
+        })
+    }
+
+    pub fn cas(
+        key: Box<[u8]>,
+        value: Box<[u8]>,
+        flags: u32,
+        ttl: Ttl,
+        cas: u64,
+        noreply: bool,
+    ) -> Self {
+        Self::Cas(Cas {
+            key,
+            value,
+            flags,
+            ttl,
+            cas,
+            noreply,
+        })
+    }
+
+    pub fn decr(key: Box<[u8]>, value: u64, noreply: bool) -> Self {
+        Self::Decr(Decr {
+            key,
+            value,
+            noreply,
+        })
+    }
+
+    pub fn delete(key: Box<[u8]>, noreply: bool) -> Self {
+        Self::Delete(Delete { key, noreply })
+    }
+
+    pub fn get(keys: Box<[Box<[u8]>]>) -> Self {
+        Self::Get(Get { keys })
+    }
+
+    pub fn gets(keys: Box<[Box<[u8]>]>) -> Self {
+        Self::Gets(Gets { keys })
+    }
+
+    pub fn incr(key: Box<[u8]>, value: u64, noreply: bool) -> Self {
+        Self::Incr(Incr {
+            key,
+            value,
+            noreply,
+        })
+    }
+
+    pub fn replace(key: Box<[u8]>, value: Box<[u8]>, flags: u32, ttl: Ttl, noreply: bool) -> Self {
+        Self::Replace(Replace {
+            key,
+            value,
+            flags,
+            ttl,
+            noreply,
+        })
+    }
+
+    pub fn set(key: Box<[u8]>, value: Box<[u8]>, flags: u32, ttl: Ttl, noreply: bool) -> Self {
+        Self::Set(Set {
+            key,
+            value,
+            flags,
+            ttl,
+            noreply,
+        })
+    }
+}
+
 impl Display for Request {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         match self {

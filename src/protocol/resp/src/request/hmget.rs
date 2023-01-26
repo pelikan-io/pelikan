@@ -13,12 +13,12 @@ counter!(HMGET_FIELD_HIT);
 counter!(HMGET_FIELD_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct HashMultiGetRequest {
+pub struct HashMultiGet {
     key: Arc<[u8]>,
     fields: Box<[Arc<[u8]>]>,
 }
 
-impl TryFrom<Message> for HashMultiGetRequest {
+impl TryFrom<Message> for HashMultiGet {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -61,7 +61,7 @@ impl TryFrom<Message> for HashMultiGetRequest {
     }
 }
 
-impl HashMultiGetRequest {
+impl HashMultiGet {
     pub fn new(key: &[u8], fields: &[&[u8]]) -> Self {
         let fields: Vec<Arc<[u8]>> = fields.iter().map(|f| (*f).into()).collect();
 
@@ -80,8 +80,8 @@ impl HashMultiGetRequest {
     }
 }
 
-impl From<&HashMultiGetRequest> for Message {
-    fn from(other: &HashMultiGetRequest) -> Message {
+impl From<&HashMultiGet> for Message {
+    fn from(other: &HashMultiGet) -> Message {
         let mut data = vec![
             Message::BulkString(BulkString::new(b"HMGET")),
             Message::BulkString(BulkString::from(other.key.clone())),
@@ -95,7 +95,7 @@ impl From<&HashMultiGetRequest> for Message {
     }
 }
 
-impl Compose for HashMultiGetRequest {
+impl Compose for HashMultiGet {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
@@ -111,7 +111,7 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"hmget 0 1 2\r\n").unwrap().into_inner(),
-            Request::HashMultiGet(HashMultiGetRequest::new(b"0", &[b"1", b"2"]))
+            Request::HashMultiGet(HashMultiGet::new(b"0", &[b"1", b"2"]))
         );
 
         assert_eq!(
@@ -119,7 +119,7 @@ mod tests {
                 .parse(b"*4\r\n$5\r\nhmget\r\n$1\r\n0\r\n$1\r\n1\r\n$1\r\n2\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::HashMultiGet(HashMultiGetRequest::new(b"0", &[b"1", b"2"]))
+            Request::HashMultiGet(HashMultiGet::new(b"0", &[b"1", b"2"]))
         );
     }
 }

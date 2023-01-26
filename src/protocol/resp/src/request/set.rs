@@ -14,7 +14,7 @@ pub enum SetMode {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct SetRequest {
+pub struct Set {
     key: Arc<[u8]>,
     value: Arc<[u8]>,
     expire_time: Option<ExpireTime>,
@@ -22,7 +22,23 @@ pub struct SetRequest {
     get_old: bool,
 }
 
-impl SetRequest {
+impl Set {
+    pub fn new(
+        key: &[u8],
+        value: &[u8],
+        expire_time: Option<ExpireTime>,
+        mode: SetMode,
+        get_old: bool,
+    ) -> Self {
+        Self {
+            key: key.into(),
+            value: value.into(),
+            expire_time,
+            mode,
+            get_old,
+        }
+    }
+
     pub fn key(&self) -> &[u8] {
         &self.key
     }
@@ -44,7 +60,7 @@ impl SetRequest {
     }
 }
 
-impl TryFrom<Message> for SetRequest {
+impl TryFrom<Message> for Set {
     type Error = Error;
 
     fn try_from(other: Message) -> Result<Self, Error> {
@@ -163,8 +179,8 @@ impl TryFrom<Message> for SetRequest {
     }
 }
 
-impl From<&SetRequest> for Message {
-    fn from(other: &SetRequest) -> Message {
+impl From<&Set> for Message {
+    fn from(other: &Set) -> Message {
         let mut v = vec![
             Message::bulk_string(b"SET"),
             Message::BulkString(BulkString::from(other.key.clone())),
@@ -212,7 +228,7 @@ impl From<&SetRequest> for Message {
     }
 }
 
-impl Compose for SetRequest {
+impl Compose for Set {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
