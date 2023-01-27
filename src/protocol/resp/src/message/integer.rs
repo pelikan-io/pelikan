@@ -4,9 +4,19 @@
 
 use super::*;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Integer {
     pub(crate) inner: i64,
+}
+
+impl Integer {
+    pub fn new(value: i64) -> Self {
+        Self { inner: value }
+    }
+
+    pub fn value(self) -> i64 {
+        self.inner
+    }
 }
 
 impl Compose for Integer {
