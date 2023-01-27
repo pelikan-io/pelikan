@@ -126,6 +126,14 @@ pub(crate) async fn handle_resp_client(
                             break;
                         }
                     }
+                    resp::Request::HashIncrBy(r) => {
+                        if resp::hincrby(&mut client, &cache_name, &mut socket, r)
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
                     resp::Request::HashKeys(r) => {
                         if resp::hkeys(&mut client, &cache_name, &mut socket, r.key())
                             .await
