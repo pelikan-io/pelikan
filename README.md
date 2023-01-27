@@ -167,9 +167,9 @@ on our website. Meanwhile, check out the current material under `docs/`
 This software is licensed under the Apache 2.0 license, see [LICENSE](LICENSE) for details.
 
 [@pelikan_cache]: https://twitter.com/pelikan_cache
-[cargo-build-badge]: https://img.shields.io/github/workflow/status/pelikan-io/pelikan/cargo-build/main?label=build
+[cargo-build-badge]: https://img.shields.io/github/actions/workflow/status/pelikan-io/pelikan/cargo.yml?branch=main
 [cargo-build-url]: https://github.com/pelikan-io/pelikan/actions/workflows/cargo.yml?query=branch%3Amain+event%3Apush
-[cargo-fuzz-badge]: https://img.shields.io/github/workflow/status/pelikan-io/pelikan/cargo-fuzz/main?label=fuzz
+[cargo-fuzz-badge]: https://img.shields.io/github/actions/workflow/status/pelikan-io/pelikan/fuzz.yml?branch=main
 [cargo-fuzz-url]: https://github.com/pelikan-io/pelikan/actions/workflows/fuzz.yml?query=branch%3Amain+event%3Apush
 [check]: (http://libcheck.github.io/check/)
 [check-linker-bug]: (https://sourceforge.net/p/check/mailman/message/32835594/)
