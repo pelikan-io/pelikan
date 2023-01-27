@@ -24,7 +24,7 @@ pub fn parse(input: &[u8]) -> IResult<&[u8], Integer> {
     let string = unsafe { std::str::from_utf8_unchecked(string).to_owned() };
     let value = string
         .parse::<i64>()
-        .map_err(|_| nom::Err::Failure((input, nom::error::ErrorKind::Tag)))?;
+        .map_err(|_| Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag)))?;
     Ok((input, Integer { inner: value }))
 }
 

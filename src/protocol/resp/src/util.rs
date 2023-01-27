@@ -33,7 +33,7 @@ pub fn string(input: &[u8]) -> IResult<&[u8], &[u8]> {
             Ok((input, key))
         }
         Some(_) => take_till(|b| (b == b' ' || b == b'\r' || b == b'\n'))(input),
-        None => Err(Err::Incomplete(Needed::Size(1))),
+        None => Err(Err::Incomplete(Needed::new(1))),
     }
 }
 

@@ -62,7 +62,10 @@ pub fn parse(input: &[u8]) -> IResult<&[u8], BulkString> {
             let (input, _) = take(1usize)(input)?;
             let (input, len) = digit1(input)?;
             if len != b"1" {
-                return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+                return Err(Err::Failure(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
             }
             let (input, _) = crlf(input)?;
             Ok((input, BulkString { inner: None }))
@@ -70,9 +73,9 @@ pub fn parse(input: &[u8]) -> IResult<&[u8], BulkString> {
         Some(_) => {
             let (input, len) = digit1(input)?;
             let len = unsafe { std::str::from_utf8_unchecked(len).to_owned() };
-            let len = len
-                .parse::<usize>()
-                .map_err(|_| nom::Err::Failure((input, nom::error::ErrorKind::Tag)))?;
+            let len = len.parse::<usize>().map_err(|_| {
+                Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag))
+            })?;
             let (input, _) = crlf(input)?;
             let (input, value) = take(len)(input)?;
             let (input, _) = crlf(input)?;
@@ -83,7 +86,7 @@ pub fn parse(input: &[u8]) -> IResult<&[u8], BulkString> {
                 },
             ))
         }
-        None => Err(Err::Incomplete(Needed::Size(1))),
+        None => Err(Err::Incomplete(Needed::new(1))),
     }
 }
 

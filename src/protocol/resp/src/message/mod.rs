@@ -85,7 +85,10 @@ pub(crate) fn message_type(input: &[u8]) -> IResult<&[u8], MessageType> {
         b"$" => MessageType::BulkString,
         b"*" => MessageType::Array,
         _ => {
-            return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+            return Err(Err::Failure(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
         }
     };
     Ok((remaining, response_type))

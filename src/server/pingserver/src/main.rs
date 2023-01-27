@@ -12,7 +12,7 @@
 extern crate logger;
 
 use backtrace::Backtrace;
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use config::PingserverConfig;
 use metriken::*;
 use pelikan_pingserver_rs::Pingserver;
@@ -30,9 +30,8 @@ fn main() {
     }));
 
     // parse command line options
-    let matches = App::new(env!("CARGO_BIN_NAME"))
+    let matches = Command::new(env!("CARGO_BIN_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
-        .version_short("v")
         .long_about(
             "A rust implementation of, arguably, the most over-engineered ping \
             server.\n\n\
@@ -43,20 +42,21 @@ fn main() {
             environment.",
         )
         .arg(
-            Arg::with_name("stats")
-                .short("s")
+            Arg::new("stats")
+                .short('s')
                 .long("stats")
                 .help("List all metrics in stats")
-                .takes_value(false),
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
-            Arg::with_name("CONFIG")
+            Arg::new("CONFIG")
                 .help("Server configuration file")
+                .action(clap::ArgAction::Set)
                 .index(1),
         )
         .get_matches();
 
-    if matches.is_present("stats") {
+    if matches.get_flag("stats") {
         println!("{:<31} {:<15} DESCRIPTION", "NAME", "TYPE");
 
         let mut metrics = Vec::new();
@@ -91,7 +91,7 @@ fn main() {
     }
 
     // load config from file
-    let config = if let Some(file) = matches.value_of("CONFIG") {
+    let config = if let Some(file) = matches.get_one::<String>("CONFIG") {
         debug!("loading config: {}", file);
         match PingserverConfig::load(file) {
             Ok(c) => c,

@@ -36,7 +36,10 @@ impl RequestParser {
         let key = match key {
             Some(k) => k,
             None => {
-                return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+                return Err(nom::Err::Failure(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
             }
         };
 

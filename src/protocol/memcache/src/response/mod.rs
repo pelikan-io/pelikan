@@ -155,10 +155,16 @@ pub(crate) fn response_type(input: &[u8]) -> IResult<&[u8], ResponseType> {
                 if let Ok(value) = s.parse::<u64>() {
                     ResponseType::Numeric(value)
                 } else {
-                    return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+                    return Err(nom::Err::Failure(nom::error::Error::new(
+                        input,
+                        nom::error::ErrorKind::Tag,
+                    )));
                 }
             } else {
-                return Err(nom::Err::Failure((input, nom::error::ErrorKind::Tag)));
+                return Err(nom::Err::Failure(nom::error::Error::new(
+                    input,
+                    nom::error::ErrorKind::Tag,
+                )));
             }
         }
     };
