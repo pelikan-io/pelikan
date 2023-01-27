@@ -147,8 +147,8 @@ included under the `config` directory.
 
 ## Contributing
 
-Please take a look at our [community manifesto](https://github.com/pelikan-io/pelikan/blob/master/docs/manifesto.rst)
-and [coding style guide](https://github.com/pelikan-io/pelikan/blob/master/docs/coding_style.rst).
+Please take a look at our [community manifesto](https://github.com/pelikan-io/pelikan/blob/main/docs/manifesto.rst)
+and [coding style guide](https://github.com/pelikan-io/pelikan/blob/main/docs/coding_style.rst).
 
 If you want to submit a patch, please follow these steps:
 
@@ -167,14 +167,14 @@ on our website. Meanwhile, check out the current material under `docs/`
 This software is licensed under the Apache 2.0 license, see [LICENSE](LICENSE) for details.
 
 [@pelikan_cache]: https://twitter.com/pelikan_cache
-[cargo-build-badge]: https://img.shields.io/github/workflow/status/pelikan-io/pelikan/cargo-build/master?label=build
-[cargo-build-url]: https://github.com/pelikan-io/pelikan/actions/workflows/cargo.yml?query=branch%3Amaster+event%3Apush
-[cargo-fuzz-badge]: https://img.shields.io/github/workflow/status/pelikan-io/pelikan/cargo-fuzz/master?label=fuzz
-[cargo-fuzz-url]: https://github.com/pelikan-io/pelikan/actions/workflows/fuzz.yml?query=branch%3Amaster+event%3Apush
+[cargo-build-badge]: https://img.shields.io/github/workflow/status/pelikan-io/pelikan/cargo-build/main?label=build
+[cargo-build-url]: https://github.com/pelikan-io/pelikan/actions/workflows/cargo.yml?query=branch%3Amain+event%3Apush
+[cargo-fuzz-badge]: https://img.shields.io/github/workflow/status/pelikan-io/pelikan/cargo-fuzz/main?label=fuzz
+[cargo-fuzz-url]: https://github.com/pelikan-io/pelikan/actions/workflows/fuzz.yml?query=branch%3Amain+event%3Apush
 [check]: (http://libcheck.github.io/check/)
 [check-linker-bug]: (https://sourceforge.net/p/check/mailman/message/32835594/)
 [license-badge]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
-[license-url]: https://github.com/pelikan-io/pelikan/blob/master/LICENSE
+[license-url]: https://github.com/pelikan-io/pelikan/blob/main/LICENSE
 [momento_proxy-url]: src/proxy/momento/README.md
 [NSDI'21 paper]: https://www.usenix.org/conference/nsdi21/presentation/yang-juncheng
 [zulip-badge]: https://img.shields.io/badge/zulip-join_chat-blue.svg
