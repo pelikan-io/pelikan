@@ -8,8 +8,6 @@ use std::sync::Arc;
 
 counter!(HINCRBY);
 counter!(HINCRBY_EX);
-counter!(HINCRBY_HIT);
-counter!(HINCRBY_MISS);
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashIncrBy {

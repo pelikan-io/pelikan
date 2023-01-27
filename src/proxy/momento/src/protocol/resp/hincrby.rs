@@ -44,9 +44,7 @@ pub async fn hincrby(
     {
         Ok(Ok(response)) => {
             write!(&mut response_buf, ":{}\r\n", response.value).unwrap();
-            HGETALL_HIT.increment();
-
-            klog_1(&"hgetall", &req.key(), Status::Hit, response_buf.len());
+            klog_1(&"hincrby", &req.key(), Status::Hit, response_buf.len());
         }
         Ok(Err(error)) => {
             HINCRBY_EX.increment();
