@@ -16,6 +16,7 @@ mod hdel;
 mod hexists;
 mod hget;
 mod hgetall;
+mod hincrby;
 mod hkeys;
 mod hlen;
 mod hmget;
@@ -29,6 +30,7 @@ pub use hdel::*;
 pub use hexists::*;
 pub use hget::*;
 pub use hgetall::*;
+pub use hincrby::*;
 pub use hkeys::*;
 pub use hlen::*;
 pub use hmget::*;
@@ -140,6 +142,9 @@ impl Parse<Request> for RequestParser {
                         Some(b"hvals") | Some(b"HVALS") => {
                             HashValues::try_from(message).map(Request::from)
                         }
+                        Some(b"hincrby") | Some(b"HINCRBY") => {
+                            HashIncrBy::try_from(message).map(Request::from)
+                        }
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
                         _ => Err(Error::new(ErrorKind::Other, "unknown command")),
                     },
@@ -172,6 +177,7 @@ impl Compose for Request {
             Self::HashMultiGet(r) => r.compose(buf),
             Self::HashSet(r) => r.compose(buf),
             Self::HashValues(r) => r.compose(buf),
+            Self::HashIncrBy(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
         }
     }
@@ -190,6 +196,7 @@ pub enum Request {
     HashMultiGet(HashMultiGet),
     HashSet(HashSet),
     HashValues(HashValues),
+    HashIncrBy(HashIncrBy),
     Set(Set),
 }
 
@@ -232,6 +239,10 @@ impl Request {
 
     pub fn hash_values(key: &[u8]) -> Self {
         Self::HashValues(HashValues::new(key))
+    }
+
+    pub fn hash_incrby(key: &[u8], field: &[u8], increment: i64) -> Self {
+        Self::HashIncrBy(HashIncrBy::new(key, field, increment))
     }
 
     pub fn set(
@@ -308,6 +319,12 @@ impl From<HashSet> for Request {
 impl From<HashValues> for Request {
     fn from(other: HashValues) -> Self {
         Self::HashValues(other)
+    }
+}
+
+impl From<HashIncrBy> for Request {
+    fn from(value: HashIncrBy) -> Self {
+        Self::HashIncrBy(value)
     }
 }
 
