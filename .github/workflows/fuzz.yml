@@ -29,13 +29,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: nightly
-      - name: Install Protoc
-        uses: arduino/setup-protoc@v1
-        with:
-          # Github ratelimits some API requests that this action does. However,
-          # if requests are authenticated then they get a higher rate limit. So
-          # we use the default actions token to authenticate here.
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: ./.github/actions/setup-protoc
       - uses: Swatinem/rust-cache@v1
         with:
           key: ${{ matrix.os }}-${{ matrix.target }}

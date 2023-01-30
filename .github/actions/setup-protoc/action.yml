@@ -1,0 +1,23 @@
+name: setup-protoc
+description: Install the protoc compiler
+runs:
+  using: composite
+  steps:
+    - name: Debug Info
+      run: |
+        case $RUNNER_OS in
+          Linux)
+            sudo apt-get install -y protobuf-compiler
+            ;;
+          macOS)
+            brew install protobuf
+            ;;
+          *)
+            echo "setup-protoc does not support $RUNNER_OS!"
+            exit 1
+            ;;
+        esac
+
+        echo Running on $RUNNER_OS
+        protoc --version
+      shell: bash
