@@ -9,7 +9,6 @@ use backtrace::Backtrace;
 use clap::{Arg, Command};
 use config::momento_proxy::Protocol;
 use config::*;
-use core::num::NonZeroU64;
 use core::num::NonZeroUsize;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::time::Duration;
@@ -17,7 +16,7 @@ use logger::configure_logging;
 use logger::Drain;
 use metriken::*;
 use momento::response::*;
-use momento::simple_cache_client::*;
+use momento::*;
 use net::TCP_RECV_BYTE;
 use protocol_admin::*;
 use session::*;
@@ -61,7 +60,13 @@ pub const MAX_REQUEST_SIZE: usize = 100 * MB;
 // The Momento cache client requires providing a default TTL. For the current
 // implementation of the proxy, we don't actually let the client use the default,
 // we always specify a TTL for each `set`.
-const DEFAULT_TTL_SECONDS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(3600) };
+const DEFAULT_TTL: Duration = Duration::from_secs(3600);
+
+/// Default collection TTL policy used on collection operations.
+///
+/// Basically, we use the DEFAULT_TTL above and never update the TTL of the
+/// item within the momento cache.
+const COLLECTION_TTL: CollectionTtl = CollectionTtl::new(None, false);
 
 // we interpret TTLs the same way memcached would
 pub const TIME_TYPE: TimeType = TimeType::Memcache;
@@ -157,9 +162,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // validate config parameters
     for cache in config.caches() {
         let name = cache.cache_name();
-        let ttl = cache.default_ttl();
+        let ttl = cache
+            .default_ttl()
+            .as_micros()
+            .try_into()
+            .unwrap_or(u64::MAX);
         let limit = u64::MAX / 1000;
-        if ttl.get() > limit {
+        if ttl > limit {
             error!("default ttl of {ttl} for cache `{name}` is greater than {limit}");
             let _ = log_drain.flush();
             std::process::exit(1);
@@ -249,7 +258,7 @@ async fn spawn(
     }
     let auth_token =
         std::env::var("MOMENTO_AUTHENTICATION").expect("MOMENTO_AUTHENTICATION must be set");
-    let client_builder = match SimpleCacheClientBuilder::new(auth_token, DEFAULT_TTL_SECONDS) {
+    let client_builder = match SimpleCacheClientBuilder::new(auth_token, DEFAULT_TTL) {
         Ok(c) => c,
         Err(e) => {
             error!("could not create cache client: {}", e);
@@ -310,9 +319,7 @@ async fn spawn(
         };
 
         tokio::spawn(async move {
-            let client_builder = client_builder
-                .default_ttl_seconds(ttl)
-                .expect("bad default ttl");
+            let client_builder = client_builder.default_ttl(ttl).expect("bad default ttl");
 
             info!(
                 "starting proxy frontend listener for cache `{}` on: {}",

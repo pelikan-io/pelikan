@@ -27,15 +27,10 @@ pub async fn set(
 
     BACKEND_REQUEST.increment();
 
-    let ttl = if let Some(ttl) = request.ttl().get() {
-        if ttl < 0 {
-            NonZeroU64::new(1)
-        } else {
-            NonZeroU64::new(ttl as u64)
-        }
-    } else {
-        None
-    };
+    let ttl = request
+        .ttl()
+        .get()
+        .map(|ttl| Duration::from_millis(ttl.max(1) as u64));
 
     match timeout(
         Duration::from_millis(200),

@@ -34,9 +34,9 @@ pub async fn set(
     BACKEND_REQUEST.increment();
 
     let ttl = match request.expire_time() {
-        Some(protocol_resp::ExpireTime::Seconds(v)) => NonZeroU64::new(v),
+        Some(protocol_resp::ExpireTime::Seconds(v)) => Some(Duration::from_secs(v)),
         Some(protocol_resp::ExpireTime::Milliseconds(v)) => {
-            NonZeroU64::new(std::cmp::min(1, v / 1000))
+            Some(Duration::from_millis((v / 1000).max(1)))
         }
         Some(_) => {
             if socket.write_all(b"-ERR expire time\r\n").await.is_err() {
@@ -60,7 +60,7 @@ pub async fn set(
                     klog_set(
                         &key,
                         0,
-                        ttl.map(|v| v.get()).unwrap_or(0) as i32,
+                        ttl.map(|v| v.as_millis()).unwrap_or(0) as i32,
                         value.len(),
                         5,
                         8,
@@ -80,7 +80,7 @@ pub async fn set(
                     klog_set(
                         &key,
                         0,
-                        ttl.map(|v| v.get()).unwrap_or(0) as i32,
+                        ttl.map(|v| v.as_millis()).unwrap_or(0) as i32,
                         value.len(),
                         9,
                         12,

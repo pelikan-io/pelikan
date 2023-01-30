@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use std::collections::HashMap;
+
 use crate::klog::*;
 use crate::{Error, *};
 use ::net::*;
@@ -54,14 +56,14 @@ pub async fn hset(
 
     BACKEND_REQUEST.increment();
 
-    let mut map = std::collections::HashMap::new();
+    let mut map: HashMap<&[u8], &[u8]> = std::collections::HashMap::new();
     for (field, value) in data.iter() {
-        map.insert(field.as_ref().to_owned(), value.as_ref().to_owned());
+        map.insert(&**field, &**value);
     }
 
     match timeout(
         Duration::from_millis(200),
-        client.dictionary_set(cache_name, key, map.clone(), None, false),
+        client.dictionary_set(cache_name, key, map.clone(), COLLECTION_TTL),
     )
     .await
     {
