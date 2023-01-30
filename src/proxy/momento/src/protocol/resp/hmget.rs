@@ -21,7 +21,7 @@ pub async fn hmget(
 
     BACKEND_REQUEST.increment();
 
-    let fields: Vec<Vec<u8>> = fields.iter().map(|f| f.as_ref().to_owned()).collect();
+    let fields: Vec<&[u8]> = fields.iter().map(|f| &f[..]).collect();
 
     match timeout(
         Duration::from_millis(200),
@@ -53,7 +53,7 @@ pub async fn hmget(
                         let mut miss = 0;
 
                         for field in &fields {
-                            if let Some(value) = dictionary.get(field) {
+                            if let Some(value) = dictionary.get(*field) {
                                 hit += 1;
                                 klog_2(&"hmget", &key, field, Status::Hit, value.len());
 

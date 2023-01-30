@@ -5,7 +5,7 @@
 use std::io::Write;
 use std::time::Duration;
 
-use momento::simple_cache_client::SimpleCacheClient;
+use momento::SimpleCacheClient;
 use net::TCP_SEND_BYTE;
 use protocol_resp::*;
 use session::{SESSION_SEND, SESSION_SEND_BYTE, SESSION_SEND_EX};
@@ -14,7 +14,7 @@ use tokio::net::TcpStream;
 use tokio::time::timeout;
 
 use crate::klog::{klog_1, Status};
-use crate::{BACKEND_EX, BACKEND_EX_TIMEOUT, BACKEND_REQUEST};
+use crate::{BACKEND_EX, BACKEND_EX_TIMEOUT, BACKEND_REQUEST, COLLECTION_TTL};
 
 use super::momento_error_to_resp_error;
 
@@ -36,8 +36,7 @@ pub async fn hincrby(
             req.key(),
             req.field(),
             req.increment(),
-            None,
-            false,
+            COLLECTION_TTL,
         ),
     )
     .await

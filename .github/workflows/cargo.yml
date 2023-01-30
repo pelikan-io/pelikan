@@ -18,7 +18,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: ./.github/actions/setup-protoc
+      - name: Setup rustc toolchain
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
 
@@ -59,6 +61,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup-protoc
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -90,6 +93,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup-protoc
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -122,6 +126,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
+      - uses: ./.github/actions/setup-protoc
       - uses: Swatinem/rust-cache@v1
         with:
           key: clippy
@@ -146,6 +151,10 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: pelikan
+      - uses: ./pelikan/.github/actions/setup-protoc
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
       - name: Build Cache for Pelikan
         uses: Swatinem/rust-cache@v1
         with:
@@ -171,6 +180,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: pelikan
+      - uses: ./pelikan/.github/actions/setup-protoc
       - name: Build Cache for Pelikan
         uses: Swatinem/rust-cache@v1
         with:
@@ -196,6 +206,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: pelikan
+      - uses: ./pelikan/.github/actions/setup-protoc
       - name: Build Cache for Pelikan
         uses: Swatinem/rust-cache@v1
         with:
@@ -224,6 +235,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: pelikan
+      - uses: ./pelikan/.github/actions/setup-protoc
       - name: Build Cache for Pelikan
         uses: Swatinem/rust-cache@v1
         with:
@@ -252,6 +264,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: pelikan
+      - uses: ./pelikan/.github/actions/setup-protoc
       - name: Build Cache for Pelikan
         uses: Swatinem/rust-cache@v1
         with:
