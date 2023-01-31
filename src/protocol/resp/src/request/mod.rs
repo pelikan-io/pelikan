@@ -208,7 +208,6 @@ pub enum Request {
     Set(Set),
 }
 
-
 impl Klog for Request {
     type Response = Response;
 
@@ -225,7 +224,6 @@ impl Request {
     pub fn get(key: &[u8]) -> Self {
         Self::Get(Get::new(key))
     }
-
 
     pub fn hash_delete(key: &[u8], fields: &[&[u8]]) -> Self {
         Self::HashDelete(HashDelete::new(key, fields))

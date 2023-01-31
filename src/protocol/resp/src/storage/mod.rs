@@ -11,11 +11,11 @@ pub trait Storage {
     // fn decr(&mut self, request: &Decr) -> Response;
     // fn delete(&mut self, request: &Delete) -> Response;
     // fn flush_all(&mut self, request: &FlushAll) -> Response;
-    fn get(&mut self, request: &GetRequest) -> Response;
+    fn get(&mut self, request: &Get) -> Response;
     // fn gets(&mut self, request: &Gets) -> Response;
     // fn incr(&mut self, request: &Incr) -> Response;
     // fn prepend(&mut self, request: &Prepend) -> Response;
     // fn quit(&mut self, request: &Quit) -> Response;
     // fn replace(&mut self, request: &Replace) -> Response;
-    fn set(&mut self, request: &SetRequest) -> Response;
+    fn set(&mut self, request: &Set) -> Response;
 }

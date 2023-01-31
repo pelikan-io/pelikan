@@ -247,7 +247,7 @@ impl Compose for Set {
     }
 }
 
-impl Klog for SetRequest {
+impl Klog for Set {
     type Response = Response;
 
     fn klog(&self, response: &Self::Response) {

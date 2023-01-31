@@ -16,7 +16,7 @@
 extern crate logger;
 
 use backtrace::Backtrace;
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use config::SegcacheConfig;
 use metriken::*;
 use pelikan_rds::Rds;
@@ -34,9 +34,8 @@ fn main() {
     }));
 
     // parse command line options
-    let matches = App::new(env!("CARGO_BIN_NAME"))
+    let matches = Command::new(env!("CARGO_BIN_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
-        .version_short("v")
         .long_about(
             "One of the unified cache backends implemented in Rust. It \
             uses segment-based storage to cache key/val pairs. It speaks the \
@@ -44,27 +43,29 @@ fn main() {
             commands.",
         )
         .arg(
-            Arg::with_name("stats")
-                .short("s")
+            Arg::new("stats")
+                .short('s')
                 .long("stats")
                 .help("List all metrics in stats")
-                .takes_value(false),
+                .num_args(0)
+                .action(clap::ArgAction::SetTrue),
         )
         .arg(
-            Arg::with_name("CONFIG")
+            Arg::new("CONFIG")
                 .help("Server configuration file")
                 .index(1),
         )
         .arg(
-            Arg::with_name("print-config")
+            Arg::new("print-config")
                 .help("List all options in config")
                 .long("config")
-                .short("c"),
+                .short('c')
+                .action(clap::ArgAction::SetTrue),
         )
         .get_matches();
 
     // output stats descriptions and exit if the `stats` option was provided
-    if matches.is_present("stats") {
+    if matches.get_flag("stats") {
         println!("{:<31} {:<15} DESCRIPTION", "NAME", "TYPE");
 
         let mut metrics = Vec::new();
@@ -99,7 +100,7 @@ fn main() {
     }
 
     // load config from file
-    let config = if let Some(file) = matches.value_of("CONFIG") {
+    let config = if let Some(file) = matches.get_one::<String>("CONFIG") {
         debug!("loading config: {}", file);
         match SegcacheConfig::load(file) {
             Ok(c) => c,
@@ -112,7 +113,7 @@ fn main() {
         Default::default()
     };
 
-    if matches.is_present("print-config") {
+    if matches.get_flag("print-config") {
         config.print();
         std::process::exit(0);
     }

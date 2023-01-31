@@ -36,7 +36,7 @@ impl Execute<Request, Response> for Seg {
 }
 
 impl Storage for Seg {
-    fn get(&mut self, get: &GetRequest) -> Response {
+    fn get(&mut self, get: &Get) -> Response {
         if let Some(item) = self.data.get(get.key()) {
             match item.value() {
                 seg::Value::Bytes(b) => Response::bulk_string(b),
@@ -73,7 +73,7 @@ impl Storage for Seg {
     //     Values::new(values.into_boxed_slice()).into()
     // }
 
-    fn set(&mut self, set: &SetRequest) -> Response {
+    fn set(&mut self, set: &Set) -> Response {
         let ttl = match set.expire_time().unwrap_or(ExpireTime::default()) {
             ExpireTime::Seconds(n) => n,
             _ => 0,

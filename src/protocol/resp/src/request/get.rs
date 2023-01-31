@@ -78,7 +78,7 @@ impl Compose for Get {
     }
 }
 
-impl Klog for GetRequest {
+impl Klog for Get {
     type Response = Response;
 
     fn klog(&self, response: &Self::Response) {
