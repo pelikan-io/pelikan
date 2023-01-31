@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-//! This module defines how `Seg` storage will be used to execute `Memcache`
+//! This module defines how `Seg` storage will be used to execute `Redis`
 //! storage commands.
 
 use super::*;
@@ -20,7 +20,6 @@ impl Execute<Request, Response> for Seg {
             _ => {
                 Response::error("not supported")
             }
-            // Request::Gets(gets) => self.gets(gets),
             // Request::Set(set) => self.set(set),
             // Request::Add(add) => self.add(add),
             // Request::Replace(replace) => self.replace(replace),
@@ -38,15 +37,10 @@ impl Execute<Request, Response> for Seg {
 
 impl Storage for Seg {
     fn get(&mut self, get: &GetRequest) -> Response {
-        // let mut values = Vec::with_capacity(get.keys().len());
         if let Some(item) = self.data.get(get.key()) {
             match item.value() {
-                seg::Value::Bytes(b) => {
-                    Response::bulk_string(b)
-                }
-                seg::Value::U64(v) => {
-                    Response::bulk_string(format!("{}", v).as_bytes())
-                }
+                seg::Value::Bytes(b) => Response::bulk_string(b),
+                seg::Value::U64(v) => Response::bulk_string(format!("{}", v).as_bytes()),
             }
         } else {
             Response::null()
@@ -80,81 +74,23 @@ impl Storage for Seg {
     // }
 
     fn set(&mut self, set: &SetRequest) -> Response {
-        let ttl = match set.expire_time() {
-            None => 0,
-            Some(ExpireTime::Seconds(n)) => n,
+        let ttl = match set.expire_time().unwrap_or(ExpireTime::default()) {
+            ExpireTime::Seconds(n) => n,
             _ => 0,
         };
 
         if self
             .data
-            .insert(
-                set.key(),
-                set.value(),
-                None,
-                Duration::from_secs(ttl),
-            )
-            .is_ok() {
-                Response::simple_string("OK")
-            } else {
-                Response::error("not stored")
-            }
+            .insert(set.key(), set.value(), None, Duration::from_secs(ttl))
+            .is_ok()
+        {
+            Response::simple_string("OK")
+        } else {
+            Response::error("not stored")
+        }
 
         // Response::null()
     }
-
-    // fn set(&mut self, set: &Set) -> Response {
-    //     let ttl = set.ttl().get().unwrap_or(0);
-
-    //     if ttl < 0 {
-    //         // immediate expire maps to a delete
-    //         self.data.delete(set.key());
-    //         Response::stored(set.noreply())
-    //     } else if let Ok(s) = std::str::from_utf8(set.value()) {
-    //         if let Ok(v) = s.parse::<u64>() {
-    //             if self
-    //                 .data
-    //                 .insert(
-    //                     set.key(),
-    //                     v,
-    //                     Some(&set.flags().to_be_bytes()),
-    //                     Duration::from_secs(ttl as u64),
-    //                 )
-    //                 .is_ok()
-    //             {
-    //                 Response::stored(set.noreply())
-    //             } else {
-    //                 Response::server_error("")
-    //             }
-    //         } else if self
-    //             .data
-    //             .insert(
-    //                 set.key(),
-    //                 set.value(),
-    //                 Some(&set.flags().to_be_bytes()),
-    //                 Duration::from_secs(ttl as u64),
-    //             )
-    //             .is_ok()
-    //         {
-    //             Response::stored(set.noreply())
-    //         } else {
-    //             Response::server_error("")
-    //         }
-    //     } else if self
-    //         .data
-    //         .insert(
-    //             set.key(),
-    //             set.value(),
-    //             Some(&set.flags().to_be_bytes()),
-    //             Duration::from_secs(ttl as u64),
-    //         )
-    //         .is_ok()
-    //     {
-    //         Response::stored(set.noreply())
-    //     } else {
-    //         Response::server_error("")
-    //     }
-    // }
 
     // fn add(&mut self, add: &Add) -> Response {
     //     if self.data.get_no_freq_incr(add.key()).is_some() {

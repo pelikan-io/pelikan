@@ -2,12 +2,14 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use logger::Klog;
 use crate::message::*;
 use crate::*;
+use logger::Klog;
 use protocol_common::BufMut;
 use protocol_common::Parse;
 use protocol_common::ParseOk;
+use std::borrow::Cow;
+use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -38,6 +40,11 @@ pub use hmget::*;
 pub use hset::*;
 pub use hvals::*;
 pub use set::*;
+// response codes for klog
+const MISS: u8 = 0;
+const HIT: u8 = 4;
+const STORED: u8 = 5;
+const NOT_STORED: u8 = 9;
 
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
 
@@ -205,7 +212,12 @@ pub enum Request {
 impl Klog for Request {
     type Response = Response;
 
-    fn klog(&self, _response: &Self::Response) {
+    fn klog(&self, response: &Self::Response) {
+        match self {
+            Request::Get(r) => r.klog(response),
+            Request::Set(r) => r.klog(response),
+            _ => (),
+        }
     }
 }
 
@@ -389,4 +401,24 @@ pub enum ExpireTime {
     UnixSeconds(u64),
     UnixMilliseconds(u64),
     KeepTtl,
+}
+impl Default for ExpireTime {
+    fn default() -> Self {
+        ExpireTime::Seconds(0)
+    }
+}
+impl Display for ExpireTime {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpireTime::Seconds(s) => write!(f, "{}s", s),
+            ExpireTime::Milliseconds(ms) => write!(f, "{}ms", ms),
+            ExpireTime::UnixSeconds(s) => write!(f, "{}unix_secs", s),
+            ExpireTime::UnixMilliseconds(ms) => write!(f, "{}unix_ms", ms),
+            ExpireTime::KeepTtl => write!(f, "keep_ttl"),
+        }
+    }
+}
+
+fn string_key(key: &[u8]) -> Cow<'_, str> {
+    String::from_utf8_lossy(key)
 }

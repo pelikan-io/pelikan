@@ -3,6 +3,8 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use logger::klog;
+use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -11,6 +13,16 @@ pub enum SetMode {
     Add,
     Replace,
     Set,
+}
+impl Display for SetMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            SetMode::Add => "add",
+            SetMode::Replace => "replace",
+            SetMode::Set => "set",
+        };
+        write!(f, "{}", string)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -232,6 +244,26 @@ impl Compose for Set {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
+    }
+}
+
+impl Klog for SetRequest {
+    type Response = Response;
+
+    fn klog(&self, response: &Self::Response) {
+        let code = match response {
+            Message::SimpleString(_) => STORED,
+            _ => NOT_STORED,
+        };
+
+        klog!(
+            "\"set {} {} {} {}\" {}",
+            string_key(self.key()),
+            self.mode(),
+            self.expire_time().unwrap_or(ExpireTime::default()),
+            self.value().len(),
+            code
+        );
     }
 }
 

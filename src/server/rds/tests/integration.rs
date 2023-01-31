@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 //! This test module runs the integration test suite against a single-threaded
-//! instance of Segcache.
+//! instance of Rds.
 
 mod common;
 
@@ -13,13 +13,13 @@ extern crate logger;
 use crate::common::*;
 
 use config::SegcacheConfig;
-use pelikan_segcache_rs::Segcache;
+use pelikan_rds::Rds;
 
 use std::time::Duration;
 
 fn main() {
     debug!("launching server");
-    let server = Segcache::new(SegcacheConfig::default()).expect("failed to launch segcache");
+    let server = Rds::new(SegcacheConfig::default()).expect("failed to launch rds");
 
     // wait for server to startup. duration is chosen to be longer than we'd
     // expect startup to take in a slow ci environment.
