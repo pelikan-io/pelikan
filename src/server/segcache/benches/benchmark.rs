@@ -36,7 +36,7 @@ fn get_benchmark(c: &mut Criterion) {
     let mut buffer = vec![0; 1024 * 1024];
 
     // define a benchmarking group
-    let mut group = c.benchmark_group("request");
+    let mut group = c.benchmark_group("request_seg");
     group.throughput(Throughput::Elements(1));
 
     let mut key_id = 0;

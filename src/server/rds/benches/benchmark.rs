@@ -14,18 +14,19 @@
 
 use config::SegcacheConfig;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use pelikan_segcache_rs::Segcache;
+use pelikan_rds::Rds;
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
-
+const RESP_NIL: &[u8; 5] = b"$-1\r\n";
+const RESP_OK: &[u8;5] = b"+OK\r\n";
 fn get_benchmark(c: &mut Criterion) {
     // use the default config
     let config = SegcacheConfig::default();
 
     // launch the server
-    let server = Segcache::new(config).expect("failed to launch segcache");
+    let server = Rds::new(config).expect("failed to launch rds");
 
     // wait for server to startup. duration is chosen to be longer than we'd
     // expect startup to take in a slow ci environment.
@@ -33,10 +34,16 @@ fn get_benchmark(c: &mut Criterion) {
 
     // connect and initialize an empty buffer
     let mut stream = TcpStream::connect("127.0.0.1:12321").expect("failed to connect");
+    stream
+        .set_read_timeout(Some(Duration::from_millis(250)))
+        .expect("failed to set read timeout");
+    stream
+        .set_write_timeout(Some(Duration::from_millis(250)))
+        .expect("failed to set write timeout");
     let mut buffer = vec![0; 1024 * 1024];
 
     // define a benchmarking group
-    let mut group = c.benchmark_group("request");
+    let mut group = c.benchmark_group("request_rds");
     group.throughput(Throughput::Elements(1));
 
     let mut key_id = 0;
@@ -51,7 +58,7 @@ fn get_benchmark(c: &mut Criterion) {
             b.iter(|| {
                 assert!(stream.write_all(msg.as_bytes()).is_ok());
                 if let Ok(bytes) = stream.read(&mut buffer) {
-                    assert_eq!(&buffer[0..bytes], b"END\r\n", "invalid response");
+                    assert_eq!(&buffer[0..bytes], RESP_NIL, "invalid response");
                 } else {
                     panic!("read error");
                 }
@@ -62,17 +69,17 @@ fn get_benchmark(c: &mut Criterion) {
         for vlen in [1, 64, 1024, 4096].iter() {
             let key = format!("{:01$}", key_id, klen);
             let value = format!("{:A>1$}", 0, vlen);
-            let msg = format!("set {} 0 0 {}\r\n{}\r\n", key, vlen, value);
+            let msg = format!("set {} {}\r\n", key, value);
             assert!(stream.write_all(msg.as_bytes()).is_ok());
             if let Ok(bytes) = stream.read(&mut buffer) {
-                assert_eq!(&buffer[0..bytes], b"STORED\r\n", "invalid response");
+                assert_eq!(&buffer[0..bytes], RESP_OK, "invalid response");
             } else {
                 panic!("read error");
             }
 
             let bench_name = format!("get/{}b/{}b", klen, vlen);
             let msg = format!("get {}\r\n", key);
-            let response = format!("VALUE {} 0 {}\r\n{}\r\nEND\r\n", key, vlen, value);
+            let response = format!("${}\r\n{}\r\n", vlen, value);
             group.bench_function(&bench_name, |b| {
                 b.iter(|| {
                     assert!(stream.write_all(msg.as_bytes()).is_ok());
