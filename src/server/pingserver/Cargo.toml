@@ -1,7 +1,7 @@
 [package]
 name = "pingserver"
 description = "a simple ascii ping/pong server"
-authors = ["Brian Martin <bmartin@twitter.com>"]
+authors = ["Brian Martin <brian@pelikan.io>"]
 
 version = { workspace = true }
 edition = { workspace = true }

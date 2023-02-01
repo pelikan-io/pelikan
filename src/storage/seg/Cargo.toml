@@ -1,7 +1,7 @@
 [package]
 name = "seg"
 description = "segment-structured in-memory storage with eager expiration"
-authors = ["Brian Martin <bmartin@twitter.com>"]
+authors = ["Brian Martin <brian@pelikan.io>"]
 
 version = { workspace = true }
 edition = { workspace = true }

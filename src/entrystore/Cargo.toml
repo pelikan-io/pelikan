@@ -1,7 +1,7 @@
 [package]
 name = "entrystore"
 description = "a collection of entry storage types for use in Pelikan servers"
-authors = ["Brian Martin <bmartin@twitter.com>"]
+authors = ["Brian Martin <brian@pelikan.io>"]
 
 version = { workspace = true }
 edition = { workspace = true }
