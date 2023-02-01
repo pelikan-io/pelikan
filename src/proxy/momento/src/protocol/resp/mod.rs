@@ -16,6 +16,7 @@ mod hlen;
 mod hmget;
 mod hset;
 mod hvals;
+mod sadd;
 mod set;
 
 pub use get::*;
@@ -29,6 +30,7 @@ pub use hlen::*;
 pub use hmget::*;
 pub use hset::*;
 pub use hvals::*;
+pub use sadd::*;
 pub use set::*;
 
 fn momento_error_to_resp_error(buf: &mut Vec<u8>, command: &str, error: MomentoError) {

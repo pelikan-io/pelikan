@@ -22,6 +22,7 @@ mod hlen;
 mod hmget;
 mod hset;
 mod hvals;
+mod sadd;
 mod set;
 
 pub use badd::*;
@@ -36,6 +37,7 @@ pub use hlen::*;
 pub use hmget::*;
 pub use hset::*;
 pub use hvals::*;
+pub use sadd::*;
 pub use set::*;
 
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
@@ -146,6 +148,9 @@ impl Parse<Request> for RequestParser {
                             HashIncrBy::try_from(message).map(Request::from)
                         }
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
+                        Some(b"sadd") | Some(b"SADD") => {
+                            SetAdd::try_from(message).map(Request::from)
+                        }
                         _ => Err(Error::new(ErrorKind::Other, "unknown command")),
                     },
                     _ => {
@@ -179,6 +184,7 @@ impl Compose for Request {
             Self::HashValues(r) => r.compose(buf),
             Self::HashIncrBy(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
+            Self::SetAdd(r) => r.compose(buf),
         }
     }
 }
@@ -198,6 +204,7 @@ pub enum Request {
     HashValues(HashValues),
     HashIncrBy(HashIncrBy),
     Set(Set),
+    SetAdd(SetAdd),
 }
 
 impl Request {
@@ -331,6 +338,12 @@ impl From<HashIncrBy> for Request {
 impl From<Set> for Request {
     fn from(other: Set) -> Self {
         Self::Set(other)
+    }
+}
+
+impl From<SetAdd> for Request {
+    fn from(value: SetAdd) -> Self {
+        Self::SetAdd(value)
     }
 }
 
