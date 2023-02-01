@@ -20,7 +20,7 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 const RESP_NIL: &[u8; 5] = b"$-1\r\n";
-const RESP_OK: &[u8;5] = b"+OK\r\n";
+const RESP_OK: &[u8; 5] = b"+OK\r\n";
 fn get_benchmark(c: &mut Criterion) {
     // use the default config
     let config = SegcacheConfig::default();

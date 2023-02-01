@@ -17,9 +17,7 @@ impl Execute<Request, Response> for Seg {
         match request {
             Request::Get(get) => self.get(get),
             Request::Set(set) => self.set(set),
-            _ => {
-                Response::error("not supported")
-            }
+            _ => Response::error("not supported"),
         }
     }
 }
