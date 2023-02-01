@@ -33,8 +33,6 @@ impl Rds {
 
         // initialize parser
         let parser = Parser::new();
-        // .max_value_size(config.seg().segment_size() as usize)
-        // .time_type(config.time().time_type());
 
         // initialize process
         let process_builder = ProcessBuilder::<Parser, Request, Response, Storage>::new(
