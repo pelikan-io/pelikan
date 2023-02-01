@@ -17,11 +17,13 @@ mod hmget;
 mod hset;
 mod hvals;
 mod lindex;
+mod llen;
 mod sadd;
 mod set;
 mod srem;
 
 pub use self::lindex::*;
+pub use self::llen::*;
 pub use self::srem::*;
 pub use get::*;
 pub use hdel::*;

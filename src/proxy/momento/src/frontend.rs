@@ -182,6 +182,14 @@ pub(crate) async fn handle_resp_client(
                             break;
                         }
                     }
+                    resp::Request::ListLen(r) => {
+                        if resp::llen(&mut client, &cache_name, &mut socket, r)
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
                     resp::Request::Set(r) => {
                         if resp::set(&mut client, &cache_name, &mut socket, &r)
                             .await
