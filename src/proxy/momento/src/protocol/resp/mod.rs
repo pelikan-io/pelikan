@@ -21,11 +21,13 @@ mod hvals;
 mod lindex;
 mod llen;
 mod sadd;
+mod sdiff;
 mod set;
 mod srem;
 
 pub use self::lindex::*;
 pub use self::llen::*;
+pub use self::sdiff::*;
 pub use self::srem::*;
 pub use get::*;
 pub use hdel::*;

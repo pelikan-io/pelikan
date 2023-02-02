@@ -25,11 +25,13 @@ mod hvals;
 mod lindex;
 mod llen;
 mod sadd;
+mod sdiff;
 mod set;
 mod srem;
 
 pub use self::lindex::*;
 pub use self::llen::*;
+pub use self::sdiff::*;
 pub use self::srem::*;
 pub use badd::*;
 pub use get::*;
@@ -162,6 +164,9 @@ impl Parse<Request> for RequestParser {
                             SetAdd::try_from(message).map(Request::from)
                         }
                         Some(b"srem") | Some(b"SREM") => SetRem::try_from(message).map(From::from),
+                        Some(b"sdiff") | Some(b"SDIFF") => {
+                            SetDiff::try_from(message).map(From::from)
+                        }
                         _ => Err(Error::new(ErrorKind::Other, "unknown command")),
                     },
                     _ => {
@@ -199,6 +204,7 @@ impl Compose for Request {
             Self::Set(r) => r.compose(buf),
             Self::SetAdd(r) => r.compose(buf),
             Self::SetRem(r) => r.compose(buf),
+            Self::SetDiff(r) => r.compose(buf),
         }
     }
 }
@@ -222,6 +228,7 @@ pub enum Request {
     Set(Set),
     SetAdd(SetAdd),
     SetRem(SetRem),
+    SetDiff(SetDiff),
 }
 
 impl Request {
@@ -298,6 +305,7 @@ impl Request {
             Self::Set(_) => "set",
             Self::SetAdd(_) => "sadd",
             Self::SetRem(_) => "srem",
+            Self::SetDiff(_) => "sdiff",
         }
     }
 }
@@ -401,6 +409,12 @@ impl From<SetAdd> for Request {
 impl From<SetRem> for Request {
     fn from(value: SetRem) -> Self {
         Self::SetRem(value)
+    }
+}
+
+impl From<SetDiff> for Request {
+    fn from(value: SetDiff) -> Self {
+        Self::SetDiff(value)
     }
 }
 
