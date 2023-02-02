@@ -29,6 +29,7 @@ mod sdiff;
 mod set;
 mod sinter;
 mod smembers;
+mod sismember;
 mod srem;
 mod sunion;
 
@@ -37,6 +38,7 @@ pub use self::llen::*;
 pub use self::sdiff::*;
 pub use self::sinter::*;
 pub use self::smembers::*;
+pub use self::sismember::*;
 pub use self::srem::*;
 pub use self::sunion::*;
 pub use badd::*;
@@ -182,6 +184,9 @@ impl Parse<Request> for RequestParser {
                         Some(b"smembers") | Some(b"SMEMBERS") => {
                             SetMembers::try_from(message).map(Request::from)
                         }
+                        Some(b"sismember") | Some(b"SISMEMBER") => {
+                            SetIsMember::try_from(message).map(From::from)
+                        }
                         _ => Err(Error::new(ErrorKind::Other, "unknown command")),
                     },
                     _ => {
@@ -223,6 +228,7 @@ impl Compose for Request {
             Self::SetUnion(r) => r.compose(buf),
             Self::SetIntersect(r) => r.compose(buf),
             Self::SetMembers(r) => r.compose(buf),
+            Self::SetIsMember(r) => r.compose(buf),
         }
     }
 }
@@ -250,6 +256,7 @@ pub enum Request {
     SetUnion(SetUnion),
     SetIntersect(SetIntersect),
     SetMembers(SetMembers),
+    SetIsMember(SetIsMember),
 }
 
 impl Request {
@@ -330,6 +337,7 @@ impl Request {
             Self::SetUnion(_) => "sunion",
             Self::SetIntersect(_) => "sinter",
             Self::SetMembers(_) => "smembers",
+            Self::SetIsMember(_) => "sismember",
         }
     }
 }
@@ -457,6 +465,12 @@ impl From<SetIntersect> for Request {
 impl From<SetMembers> for Request {
     fn from(value: SetMembers) -> Self {
         Self::SetMembers(value)
+    }
+}
+
+impl From<SetIsMember> for Request {
+    fn from(value: SetIsMember) -> Self {
+        Self::SetIsMember(value)
     }
 }
 

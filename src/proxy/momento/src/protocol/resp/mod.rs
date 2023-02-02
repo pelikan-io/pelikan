@@ -25,6 +25,7 @@ mod sdiff;
 mod set;
 mod sinter;
 mod smembers;
+mod sismember;
 mod srem;
 mod sunion;
 
@@ -33,6 +34,7 @@ pub use self::llen::*;
 pub use self::sdiff::*;
 pub use self::sinter::*;
 pub use self::smembers::*;
+pub use self::sismember::*;
 pub use self::srem::*;
 pub use self::sunion::*;
 pub use get::*;
