@@ -14,7 +14,6 @@ pub async fn get(
 ) -> ProxyResult {
     GET.increment();
     GET_KEY.increment();
-    BACKEND_REQUEST.increment();
 
     let response = timeout(Duration::from_millis(200), client.get(cache_name, key)).await??;
     match response.result {
@@ -45,6 +44,5 @@ pub async fn get(
         }
     }
 
-    SESSION_SEND.increment();
     Ok(())
 }

@@ -99,7 +99,7 @@ pub(crate) async fn handle_resp_client(
 
         let mut response_buf = Vec::<u8>::new();
 
-        let result: ProxyResult<()> = async {
+        let result: ProxyResult = async {
             match &request {
                 resp::Request::Get(r) => {
                     resp::get(&mut client, &cache_name, &mut response_buf, r.key()).await?
@@ -189,6 +189,17 @@ pub(crate) async fn handle_resp_client(
                 }
             }
         };
+
+        // Temporary workaround
+        // ====================
+        // There are a few metrics that are incremented on every request. Before the
+        // refactor, these were incremented within each call. Now, they should be
+        // handled in this function. As an intermediate, we increment only if the request
+        // method put data into response_buf.
+        if !response_buf.is_empty() {
+            BACKEND_REQUEST.increment();
+            SESSION_SEND.increment();
+        }
 
         SESSION_SEND_BYTE.add(response_buf.len() as _);
         TCP_SEND_BYTE.add(response_buf.len() as _);
