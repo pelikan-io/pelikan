@@ -23,11 +23,13 @@ mod hmget;
 mod hset;
 mod hvals;
 mod lindex;
+mod llen;
 mod sadd;
 mod set;
 mod srem;
 
 pub use self::lindex::*;
+pub use self::llen::*;
 pub use self::srem::*;
 pub use badd::*;
 pub use get::*;
@@ -154,6 +156,7 @@ impl Parse<Request> for RequestParser {
                         Some(b"lindex") | Some(b"LINDEX") => {
                             ListIndex::try_from(message).map(Request::from)
                         }
+                        Some(b"llen") | Some(b"LLEN") => ListLen::try_from(message).map(From::from),
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
                         Some(b"sadd") | Some(b"SADD") => {
                             SetAdd::try_from(message).map(Request::from)
@@ -192,6 +195,7 @@ impl Compose for Request {
             Self::HashValues(r) => r.compose(buf),
             Self::HashIncrBy(r) => r.compose(buf),
             Self::ListIndex(r) => r.compose(buf),
+            Self::ListLen(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
             Self::SetAdd(r) => r.compose(buf),
             Self::SetRem(r) => r.compose(buf),
@@ -214,6 +218,7 @@ pub enum Request {
     HashValues(HashValues),
     HashIncrBy(HashIncrBy),
     ListIndex(ListIndex),
+    ListLen(ListLen),
     Set(Set),
     SetAdd(SetAdd),
     SetRem(SetRem),
@@ -350,6 +355,12 @@ impl From<HashIncrBy> for Request {
 impl From<ListIndex> for Request {
     fn from(value: ListIndex) -> Self {
         Self::ListIndex(value)
+    }
+}
+
+impl From<ListLen> for Request {
+    fn from(value: ListLen) -> Self {
+        Self::ListLen(value)
     }
 }
 
