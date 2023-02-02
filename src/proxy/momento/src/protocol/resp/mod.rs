@@ -39,7 +39,7 @@ pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
 
-fn momento_error_to_resp_error(buf: &mut Vec<u8>, command: &str, error: MomentoError) {
+pub(crate) fn momento_error_to_resp_error(buf: &mut Vec<u8>, command: &str, error: MomentoError) {
     use crate::{BACKEND_EX, BACKEND_EX_RATE_LIMITED, BACKEND_EX_TIMEOUT};
 
     BACKEND_EX.increment();

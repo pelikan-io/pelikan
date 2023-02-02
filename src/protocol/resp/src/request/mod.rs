@@ -278,6 +278,25 @@ impl Request {
     ) -> Self {
         Self::Set(Set::new(key, value, expire_time, mode, get_old))
     }
+
+    pub fn command(&self) -> &'static str {
+        match self {
+            Self::BtreeAdd(_) => "badd",
+            Self::Get(_) => "get",
+            Self::HashDelete(_) => "hdel",
+            Self::HashExists(_) => "hexists",
+            Self::HashGet(_) => "hget",
+            Self::HashGetAll(_) => "hgetall",
+            Self::HashKeys(_) => "hkeys",
+            Self::HashLength(_) => "hlen",
+            Self::HashMultiGet(_) => "hmget",
+            Self::HashSet(_) => "hset",
+            Self::HashValues(_) => "hvals",
+            Self::HashIncrBy(_) => "hincrby",
+            Self::Set(_) => "set",
+            Self::SetAdd(_) => "sadd",
+        }
+    }
 }
 
 impl From<BtreeAdd> for Request {

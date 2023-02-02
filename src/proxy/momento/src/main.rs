@@ -34,6 +34,7 @@ const S: u64 = 1_000_000_000; // one second in nanoseconds
 const US: u64 = 1_000; // one microsecond in nanoseconds
 
 mod admin;
+mod error;
 mod frontend;
 mod klog;
 mod listener;

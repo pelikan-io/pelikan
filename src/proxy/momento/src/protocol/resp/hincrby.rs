@@ -22,7 +22,7 @@ pub async fn hincrby(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     socket: &mut TcpStream,
-    req: HashIncrBy,
+    req: &HashIncrBy,
 ) -> std::io::Result<()> {
     HINCRBY.increment();
     BACKEND_REQUEST.increment();
