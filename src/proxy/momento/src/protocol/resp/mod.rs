@@ -16,9 +16,11 @@ mod hlen;
 mod hmget;
 mod hset;
 mod hvals;
+mod lindex;
 mod sadd;
 mod set;
 
+pub use self::lindex::*;
 pub use get::*;
 pub use hdel::*;
 pub use hexists::*;
