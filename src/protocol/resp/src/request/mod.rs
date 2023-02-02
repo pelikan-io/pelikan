@@ -25,8 +25,10 @@ mod hvals;
 mod lindex;
 mod sadd;
 mod set;
+mod srem;
 
 pub use self::lindex::*;
+pub use self::srem::*;
 pub use badd::*;
 pub use get::*;
 pub use hdel::*;
@@ -156,6 +158,7 @@ impl Parse<Request> for RequestParser {
                         Some(b"sadd") | Some(b"SADD") => {
                             SetAdd::try_from(message).map(Request::from)
                         }
+                        Some(b"srem") | Some(b"SREM") => SetRem::try_from(message).map(From::from),
                         _ => Err(Error::new(ErrorKind::Other, "unknown command")),
                     },
                     _ => {
@@ -191,6 +194,7 @@ impl Compose for Request {
             Self::ListIndex(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
             Self::SetAdd(r) => r.compose(buf),
+            Self::SetRem(r) => r.compose(buf),
         }
     }
 }
@@ -212,6 +216,7 @@ pub enum Request {
     ListIndex(ListIndex),
     Set(Set),
     SetAdd(SetAdd),
+    SetRem(SetRem),
 }
 
 impl Request {
@@ -357,6 +362,12 @@ impl From<Set> for Request {
 impl From<SetAdd> for Request {
     fn from(value: SetAdd) -> Self {
         Self::SetAdd(value)
+    }
+}
+
+impl From<SetRem> for Request {
+    fn from(value: SetRem) -> Self {
+        Self::SetRem(value)
     }
 }
 
