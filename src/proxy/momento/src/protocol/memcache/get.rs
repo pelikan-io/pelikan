@@ -59,7 +59,7 @@ pub async fn get(
 
                         let length = response.value.len();
 
-                        let item_header = format!("VALUE {} 0 {}\r\n", key, length);
+                        let item_header = format!("VALUE {key} 0 {length}\r\n");
 
                         klog_1(&"get", &key, Status::Hit, length);
 

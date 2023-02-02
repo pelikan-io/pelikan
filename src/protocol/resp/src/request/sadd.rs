@@ -73,7 +73,7 @@ impl From<&SetAdd> for Message {
             value
                 .members()
                 .iter()
-                .map(|v| Message::BulkString(BulkString::new(&**v))),
+                .map(|v| Message::BulkString(BulkString::new(v))),
         );
 
         Message::Array(Array { inner: Some(vals) })

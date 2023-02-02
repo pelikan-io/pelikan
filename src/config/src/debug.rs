@@ -82,7 +82,7 @@ impl Debug {
     pub fn log_backup(&self) -> Option<String> {
         match &self.log_backup {
             Some(path) => Some(path.clone()),
-            None => self.log_file.as_ref().map(|path| format!("{}.old", path)),
+            None => self.log_file.as_ref().map(|path| format!("{path}.old")),
         }
     }
 

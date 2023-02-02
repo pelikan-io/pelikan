@@ -96,7 +96,7 @@ impl Klog {
     pub fn backup(&self) -> Option<String> {
         match &self.backup {
             Some(path) => Some(path.clone()),
-            None => self.file.as_ref().map(|path| format!("{}.old", path)),
+            None => self.file.as_ref().map(|path| format!("{path}.old")),
         }
     }
 

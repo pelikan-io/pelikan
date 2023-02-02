@@ -123,12 +123,12 @@ where
                 .build(fe_data_queues, worker_session_queues, signal_queue_rx);
 
         let admin = std::thread::Builder::new()
-            .name(format!("{}_admin", THREAD_PREFIX))
+            .name(format!("{THREAD_PREFIX}_admin"))
             .spawn(move || admin.run())
             .unwrap();
 
         let listener = std::thread::Builder::new()
-            .name(format!("{}_listener", THREAD_PREFIX))
+            .name(format!("{THREAD_PREFIX}_listener"))
             .spawn(move || listener.run())
             .unwrap();
 
@@ -137,7 +137,7 @@ where
             .enumerate()
             .map(|(i, mut b)| {
                 std::thread::Builder::new()
-                    .name(format!("{}_be_{}", THREAD_PREFIX, i))
+                    .name(format!("{THREAD_PREFIX}_be_{i}"))
                     .spawn(move || b.run())
                     .unwrap()
             })
@@ -148,7 +148,7 @@ where
             .enumerate()
             .map(|(i, mut f)| {
                 std::thread::Builder::new()
-                    .name(format!("{}_fe_{}", THREAD_PREFIX, i))
+                    .name(format!("{THREAD_PREFIX}_fe_{i}"))
                     .spawn(move || f.run())
                     .unwrap()
             })

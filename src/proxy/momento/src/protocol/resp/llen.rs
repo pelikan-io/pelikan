@@ -31,7 +31,7 @@ pub async fn llen(
 
     match timeout(
         Duration::from_millis(200),
-        client.list_length(&cache_name, req.key()),
+        client.list_length(cache_name, req.key()),
     )
     .await
     {

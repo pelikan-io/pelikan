@@ -94,7 +94,7 @@ impl MomentoProxyConfig {
         match toml::from_str(&content) {
             Ok(t) => Ok(t),
             Err(e) => {
-                eprintln!("{}", e);
+                eprintln!("{e}");
                 Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     "Error parsing config",

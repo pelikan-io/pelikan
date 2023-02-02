@@ -171,7 +171,7 @@ impl Backend {
                 if let Ok(children) = server.get_children(path, true) {
                     for child in children {
                         let data = server
-                            .get_data(&format!("{}/{}", path, child), true)
+                            .get_data(&format!("{path}/{child}"), true)
                             .map(|v| {
                                 std::str::from_utf8(&v.0)
                                     .map_err(|_| {
@@ -200,7 +200,7 @@ impl Backend {
                         let host_parts: Vec<&str> = host.split('"').collect();
                         let port = endpoint["port"].to_string();
                         if let Some(host) = host_parts.get(1) {
-                            let host = format!("{}:{}", host, port);
+                            let host = format!("{host}:{port}");
                             if let Ok(mut addrs) = host.to_socket_addrs() {
                                 if let Some(socket_addr) = addrs.next() {
                                     ret.push(socket_addr);

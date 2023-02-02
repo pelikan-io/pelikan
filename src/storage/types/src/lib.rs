@@ -111,8 +111,8 @@ impl<'a> PartialEq<u64> for Value<'a> {
 impl<'a> core::fmt::Debug for Value<'a> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         match &self {
-            Value::Bytes(v) => write!(f, "{:?}", v),
-            Value::U64(v) => write!(f, "{}", v),
+            Value::Bytes(v) => write!(f, "{v:?}"),
+            Value::U64(v) => write!(f, "{v}"),
         }
     }
 }

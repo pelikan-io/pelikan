@@ -148,7 +148,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         match MomentoProxyConfig::load(file) {
             Ok(c) => c,
             Err(e) => {
-                println!("{}", e);
+                println!("{e}");
                 std::process::exit(1);
             }
         }
@@ -205,7 +205,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else if any.downcast_ref::<Heatmap>().is_some() {
                 for (label, _) in PERCENTILES {
                     let name = format!("{}_{}", metric.name(), label);
-                    metrics.push(format!("{:<31} percentile", name));
+                    metrics.push(format!("{name:<31} percentile"));
                 }
             } else {
                 continue;
@@ -214,7 +214,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         metrics.sort();
         for metric in metrics {
-            println!("{}", metric);
+            println!("{metric}");
         }
         std::process::exit(0);
     }
@@ -224,7 +224,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     runtime.thread_name_fn(|| {
         static ATOMIC_ID: AtomicUsize = AtomicUsize::new(0);
         let id = ATOMIC_ID.fetch_add(1, Ordering::SeqCst);
-        format!("pelikan_wrk_{}", id)
+        format!("pelikan_wrk_{id}")
     });
 
     if let Some(threads) = config.threads() {

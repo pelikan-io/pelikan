@@ -594,7 +594,7 @@ impl Segments {
         for id in 1..=self.cap {
             // this is safe because we start iterating from 1
             let segment = self
-                .get_mut(unsafe { NonZeroU32::new_unchecked(id as u32) })
+                .get_mut(unsafe { NonZeroU32::new_unchecked(id) })
                 .unwrap();
             segment.check_magic();
             let count = segment.live_items();

@@ -190,19 +190,19 @@ impl From<&Set> for Message {
         match other.expire_time {
             Some(ExpireTime::Seconds(s)) => {
                 v.push(Message::bulk_string(b"EX"));
-                v.push(Message::bulk_string(format!("{}", s).as_bytes()));
+                v.push(Message::bulk_string(format!("{s}").as_bytes()));
             }
             Some(ExpireTime::Milliseconds(ms)) => {
                 v.push(Message::bulk_string(b"PX"));
-                v.push(Message::bulk_string(format!("{}", ms).as_bytes()));
+                v.push(Message::bulk_string(format!("{ms}").as_bytes()));
             }
             Some(ExpireTime::UnixSeconds(s)) => {
                 v.push(Message::bulk_string(b"EXAT"));
-                v.push(Message::bulk_string(format!("{}", s).as_bytes()));
+                v.push(Message::bulk_string(format!("{s}").as_bytes()));
             }
             Some(ExpireTime::UnixMilliseconds(ms)) => {
                 v.push(Message::bulk_string(b"PXAT"));
-                v.push(Message::bulk_string(format!("{}", ms).as_bytes()));
+                v.push(Message::bulk_string(format!("{ms}").as_bytes()));
             }
             Some(ExpireTime::KeepTtl) => {
                 v.push(Message::bulk_string(b"KEEPTTL"));

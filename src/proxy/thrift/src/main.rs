@@ -64,7 +64,7 @@ fn main() {
             } else if any.downcast_ref::<Heatmap>().is_some() {
                 for (label, _) in PERCENTILES {
                     let name = format!("{}_{}", metric.name(), label);
-                    metrics.push(format!("{:<31} percentile", name));
+                    metrics.push(format!("{name:<31} percentile"));
                 }
             } else {
                 continue;
@@ -73,7 +73,7 @@ fn main() {
 
         metrics.sort();
         for metric in metrics {
-            println!("{}", metric);
+            println!("{metric}");
         }
         std::process::exit(0);
     }
@@ -83,7 +83,7 @@ fn main() {
         match PingproxyConfig::load(file) {
             Ok(c) => c,
             Err(e) => {
-                println!("{}", e);
+                println!("{e}");
                 std::process::exit(1);
             }
         }
