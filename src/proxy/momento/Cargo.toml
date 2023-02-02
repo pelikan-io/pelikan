@@ -25,5 +25,4 @@ protocol-resp = { path = "../../protocol/resp" }
 session = { path = "../../session" }
 storage-types = { path = "../../storage/types" }
 tokio = { version = "1.24.2", features = ["full"] }
-
-thiserror = "1.0.38"
+thiserror = { workspace = true }
