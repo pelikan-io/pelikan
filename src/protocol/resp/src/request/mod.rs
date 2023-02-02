@@ -402,6 +402,6 @@ mod tests {
     #[test]
     fn it_should_not_panic_on_newline_delimited_get_key() {
         let parser = RequestParser::new();
-        assert!(parser.parse(b"GET test\n").is_ok());
+        assert!(parser.parse(b"GET test\n").is_err());
     }
 }
