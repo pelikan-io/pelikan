@@ -16,8 +16,6 @@ pub async fn hdel(
     req: &HashDelete,
 ) -> ProxyResult {
     update_method_metrics(&HDEL, &HDEL_EX, async move {
-        HDEL.increment();
-
         let fields: Vec<&[u8]> = req.fields().iter().map(|f| &**f).collect();
         timeout(
             Duration::from_millis(200),
