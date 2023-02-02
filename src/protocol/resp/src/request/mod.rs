@@ -28,11 +28,13 @@ mod sadd;
 mod sdiff;
 mod set;
 mod srem;
+mod sunion;
 
 pub use self::lindex::*;
 pub use self::llen::*;
 pub use self::sdiff::*;
 pub use self::srem::*;
+pub use self::sunion::*;
 pub use badd::*;
 pub use get::*;
 pub use hdel::*;
@@ -167,6 +169,9 @@ impl Parse<Request> for RequestParser {
                         Some(b"sdiff") | Some(b"SDIFF") => {
                             SetDiff::try_from(message).map(From::from)
                         }
+                        Some(b"sunion") | Some(b"SUNION") => {
+                            SetUnion::try_from(message).map(From::from)
+                        }
                         _ => Err(Error::new(ErrorKind::Other, "unknown command")),
                     },
                     _ => {
@@ -205,6 +210,7 @@ impl Compose for Request {
             Self::SetAdd(r) => r.compose(buf),
             Self::SetRem(r) => r.compose(buf),
             Self::SetDiff(r) => r.compose(buf),
+            Self::SetUnion(r) => r.compose(buf),
         }
     }
 }
@@ -229,6 +235,7 @@ pub enum Request {
     SetAdd(SetAdd),
     SetRem(SetRem),
     SetDiff(SetDiff),
+    SetUnion(SetUnion),
 }
 
 impl Request {
@@ -306,6 +313,7 @@ impl Request {
             Self::SetAdd(_) => "sadd",
             Self::SetRem(_) => "srem",
             Self::SetDiff(_) => "sdiff",
+            Self::SetUnion(_) => "sunion",
         }
     }
 }
@@ -415,6 +423,12 @@ impl From<SetRem> for Request {
 impl From<SetDiff> for Request {
     fn from(value: SetDiff) -> Self {
         Self::SetDiff(value)
+    }
+}
+
+impl From<SetUnion> for Request {
+    fn from(value: SetUnion) -> Self {
+        Self::SetUnion(value)
     }
 }
 
