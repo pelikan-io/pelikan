@@ -198,6 +198,14 @@ pub(crate) async fn handle_resp_client(
                             break;
                         }
                     }
+                    resp::Request::SetRem(r) => {
+                        if resp::srem(&mut client, &cache_name, &mut socket, &r)
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
                     _ => {
                         println!("bad request");
                         let _ = socket.write_all(b"CLIENT_ERROR\r\n").await;

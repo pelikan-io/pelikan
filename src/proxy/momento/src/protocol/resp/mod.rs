@@ -19,8 +19,10 @@ mod hvals;
 mod lindex;
 mod sadd;
 mod set;
+mod srem;
 
 pub use self::lindex::*;
+pub use self::srem::*;
 pub use get::*;
 pub use hdel::*;
 pub use hexists::*;
