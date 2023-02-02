@@ -87,10 +87,8 @@ impl Parse<Request> for RequestParser {
             }
 
             match &remaining.get(0..2) {
-                Some(slice) if  slice != b"\r\n" => {
-                    return Err(Error::from(ErrorKind::WouldBlock))
-                },
-                _ => ()
+                Some(slice) if slice != b"\r\n" => return Err(Error::from(ErrorKind::WouldBlock)),
+                _ => (),
             };
 
             let message = Message::Array(Array {
