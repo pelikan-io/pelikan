@@ -1,10 +1,10 @@
 use momento::MomentoError;
 use thiserror::Error;
 
-pub(crate) type ProxyResult<T> = Result<T, ProxyError>;
+pub type ProxyResult<T = ()> = Result<T, ProxyError>;
 
 #[derive(Debug, Error)]
-pub(crate) enum ProxyError {
+pub enum ProxyError {
     #[error("momento error: {0}")]
     Momento(#[source] MomentoError),
     #[error("io error: {0}")]

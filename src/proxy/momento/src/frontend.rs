@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use crate::error::{ProxyError, ProxyResult};
 use crate::protocol::*;
 use crate::*;
 use net::TCP_SEND_BYTE;
@@ -103,7 +102,7 @@ pub(crate) async fn handle_resp_client(
         let result: ProxyResult<()> = async {
             match &request {
                 resp::Request::Get(r) => {
-                    resp::get(&mut client, &cache_name, &mut socket, r.key()).await?
+                    resp::get(&mut client, &cache_name, &mut response_buf, r.key()).await?
                 }
                 resp::Request::HashDelete(r) => {
                     resp::hdel(&mut client, &cache_name, &mut socket, r.key(), r.fields()).await?
@@ -164,6 +163,7 @@ pub(crate) async fn handle_resp_client(
 
                 match e {
                     ProxyError::Momento(error) => {
+                        SESSION_SEND.increment();
                         crate::protocol::resp::momento_error_to_resp_error(
                             &mut response_buf,
                             command,
@@ -173,6 +173,7 @@ pub(crate) async fn handle_resp_client(
                         false
                     }
                     ProxyError::Timeout(_) => {
+                        SESSION_SEND.increment();
                         BACKEND_EX.increment();
                         BACKEND_EX_TIMEOUT.increment();
                         response_buf.extend_from_slice(b"-ERR backend timeout\r\n");

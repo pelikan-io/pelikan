@@ -27,6 +27,8 @@ use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::time::timeout;
 
+use crate::error::{ProxyError, ProxyResult};
+
 pub const KB: usize = 1024;
 pub const MB: usize = 1024 * KB;
 
