@@ -86,10 +86,9 @@ impl Parse<Request> for RequestParser {
                 }
             }
 
-            match &remaining.get(0..2) {
-                Some(slice) if slice != b"\r\n" => return Err(Error::from(ErrorKind::WouldBlock)),
-                _ => (),
-            };
+            if !remaining.starts_with(b"\r\n") {
+                return Err(Error::from(ErrorKind::WouldBlock));
+            }
 
             let message = Message::Array(Array {
                 inner: Some(message),
