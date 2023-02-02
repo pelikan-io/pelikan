@@ -6,14 +6,15 @@ use crate::klog::{klog_1, Status};
 use crate::*;
 use protocol_memcache::*;
 
+use super::update_method_metrics;
+
 pub async fn get(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     key: &[u8],
 ) -> ProxyResult {
-    let inner = async move {
-        GET.increment();
+    update_method_metrics(&GET, &GET_EX, async move {
         GET_KEY.increment();
 
         let response = timeout(Duration::from_millis(200), client.get(cache_name, key)).await??;
@@ -46,10 +47,6 @@ pub async fn get(
         }
 
         Ok(())
-    };
-
-    inner.await.map_err(|e| {
-        GET_EX.increment();
-        e
     })
+    .await
 }

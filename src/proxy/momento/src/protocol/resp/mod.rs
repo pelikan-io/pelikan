@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use std::future::Future;
+
 use momento::response::MomentoError;
 pub use protocol_resp::{Request, RequestParser};
 
@@ -58,4 +60,16 @@ pub(crate) fn momento_error_to_resp_error(buf: &mut Vec<u8>, command: &str, erro
             buf.extend_from_slice(b"-ERR backend error\r\n");
         }
     }
+}
+
+async fn update_method_metrics<T, E>(
+    count: &metriken::Counter,
+    count_ex: &metriken::Counter,
+    future: impl Future<Output = Result<T, E>>,
+) -> Result<T, E> {
+    count.increment();
+    future.await.map_err(|e| {
+        count_ex.increment();
+        e
+    })
 }

@@ -7,13 +7,15 @@ use crate::*;
 use protocol_resp::*;
 use std::io::Write;
 
+use super::update_method_metrics;
+
 pub async fn hdel(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &HashDelete,
 ) -> ProxyResult {
-    let inner = async move {
+    update_method_metrics(&HDEL, &HDEL_EX, async move {
         HDEL.increment();
 
         let fields: Vec<&[u8]> = req.fields().iter().map(|f| &**f).collect();
@@ -32,10 +34,6 @@ pub async fn hdel(
         }
 
         Ok(())
-    };
-
-    inner.await.map_err(|e| {
-        HDEL_EX.increment();
-        e
     })
+    .await
 }
