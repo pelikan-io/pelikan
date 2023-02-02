@@ -22,7 +22,7 @@ pub async fn llen(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     socket: &mut TcpStream,
-    req: ListLen,
+    req: &ListLen,
 ) -> std::io::Result<()> {
     LLEN.increment();
     BACKEND_REQUEST.increment();

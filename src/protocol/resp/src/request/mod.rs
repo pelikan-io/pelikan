@@ -293,8 +293,11 @@ impl Request {
             Self::HashSet(_) => "hset",
             Self::HashValues(_) => "hvals",
             Self::HashIncrBy(_) => "hincrby",
+            Self::ListIndex(_) => "lindex",
+            Self::ListLen(_) => "llen",
             Self::Set(_) => "set",
             Self::SetAdd(_) => "sadd",
+            Self::SetRem(_) => "srem",
         }
     }
 }
