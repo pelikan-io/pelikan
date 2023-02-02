@@ -393,3 +393,15 @@ pub enum ExpireTime {
     UnixMilliseconds(u64),
     KeepTtl,
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::RequestParser;
+    use protocol_common::Parse;
+
+    #[test]
+    fn it_should_not_panic_on_newline_delimited_get_key() {
+        let parser = RequestParser::new();
+        assert!(parser.parse(b"GET test\n").is_ok());
+    }
+}
