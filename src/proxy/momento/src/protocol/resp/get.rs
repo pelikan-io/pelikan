@@ -12,37 +12,44 @@ pub async fn get(
     response_buf: &mut Vec<u8>,
     key: &[u8],
 ) -> ProxyResult {
-    GET.increment();
-    GET_KEY.increment();
+    let inner = async move {
+        GET.increment();
+        GET_KEY.increment();
 
-    let response = timeout(Duration::from_millis(200), client.get(cache_name, key)).await??;
-    match response.result {
-        MomentoGetStatus::ERROR => {
-            // we got some error from
-            // the backend.
-            BACKEND_EX.increment();
-            GET_EX.increment();
-            response_buf.extend_from_slice(b"-ERR backend error\r\n");
+        let response = timeout(Duration::from_millis(200), client.get(cache_name, key)).await??;
+        match response.result {
+            MomentoGetStatus::ERROR => {
+                // we got some error from
+                // the backend.
+                BACKEND_EX.increment();
+                GET_EX.increment();
+                response_buf.extend_from_slice(b"-ERR backend error\r\n");
+            }
+            MomentoGetStatus::HIT => {
+                GET_KEY_HIT.increment();
+
+                let item_header = format!("${}\r\n", response.value.len());
+
+                response_buf.extend_from_slice(item_header.as_bytes());
+                response_buf.extend_from_slice(&response.value);
+                response_buf.extend_from_slice(b"\r\n");
+
+                klog_1(&"get", &key, Status::Hit, response.value.len());
+            }
+            MomentoGetStatus::MISS => {
+                GET_KEY_MISS.increment();
+
+                response_buf.extend_from_slice(b"$-1\r\n");
+
+                klog_1(&"get", &key, Status::Miss, 0);
+            }
         }
-        MomentoGetStatus::HIT => {
-            GET_KEY_HIT.increment();
 
-            let item_header = format!("${}\r\n", response.value.len());
+        Ok(())
+    };
 
-            response_buf.extend_from_slice(item_header.as_bytes());
-            response_buf.extend_from_slice(&response.value);
-            response_buf.extend_from_slice(b"\r\n");
-
-            klog_1(&"get", &key, Status::Hit, response.value.len());
-        }
-        MomentoGetStatus::MISS => {
-            GET_KEY_MISS.increment();
-
-            response_buf.extend_from_slice(b"$-1\r\n");
-
-            klog_1(&"get", &key, Status::Miss, 0);
-        }
-    }
-
-    Ok(())
+    inner.await.map_err(|e| {
+        GET_EX.increment();
+        e
+    })
 }
