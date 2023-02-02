@@ -158,6 +158,9 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::SetIntersect(r) => {
                     resp::sinter(&mut client, &cache_name, &mut response_buf, r).await?
                 }
+                resp::Request::SetMembers(r) => {
+                    resp::smembers(&mut client, &cache_name, &mut response_buf, &r).await?
+                }
                 _ => return Err(ProxyError::UnsupportedCommand),
             }
 
