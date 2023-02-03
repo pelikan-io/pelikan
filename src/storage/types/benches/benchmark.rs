@@ -41,6 +41,27 @@ fn parse_redis_benchmark(c: &mut Criterion) {
         })
     });
 
+    let bytes = b"92233720368547758079223372036854775807";
+    group.throughput(Throughput::Elements(1));
+    group.bench_with_input("parse_overflowed_value", &bytes, |b, &bytes| {
+        b.iter(|| {
+            let result = parse_signed_redis(bytes);
+            if (result.is_some()) {
+                println!("failed parse")
+            }
+        })
+    });
+
+    let string = "92233720368547758079223372036854775807";
+    group.bench_with_input("parse_overflowed_value_std_lib", &string, |b, &bytes| {
+        b.iter(|| {
+            let result: Result<i64, ParseIntError> = bytes.parse();
+            if (result.is_ok()) {
+                println!("failed parse")
+            }
+        })
+    });
+
     let bytes = b"-9223372036854775807";
     group.throughput(Throughput::Elements(1));
     group.bench_with_input("parse_min_value", &bytes, |b, &bytes| {
