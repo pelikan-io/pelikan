@@ -26,6 +26,7 @@ mod lindex;
 mod llen;
 mod lpop;
 mod lrange;
+mod lpush;
 mod sadd;
 mod sdiff;
 mod set;
@@ -39,6 +40,7 @@ pub use self::lindex::*;
 pub use self::llen::*;
 pub use self::lpop::*;
 pub use self::lrange::*;
+pub use self::lpush::*;
 pub use self::sdiff::*;
 pub use self::sinter::*;
 pub use self::sismember::*;
@@ -175,6 +177,9 @@ impl Parse<Request> for RequestParser {
                         Some(b"lrange") | Some(b"LRANGE") => {
                             ListRange::try_from(message).map(From::from)
                         }
+                        Some(b"lpush") | Some(b"LPUSH") => {
+                            ListPush::try_from(message).map(From::from)
+                        }
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
                         Some(b"sadd") | Some(b"SADD") => {
                             SetAdd::try_from(message).map(Request::from)
@@ -231,6 +236,7 @@ impl Compose for Request {
             Self::ListLen(r) => r.compose(buf),
             Self::ListPop(r) => r.compose(buf),
             Self::ListRange(r) => r.compose(buf),
+            Self::ListPush(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
             Self::SetAdd(r) => r.compose(buf),
             Self::SetRem(r) => r.compose(buf),
@@ -261,6 +267,7 @@ pub enum Request {
     ListLen(ListLen),
     ListPop(ListPop),
     ListRange(ListRange),
+    ListPush(ListPush),
     Set(Set),
     SetAdd(SetAdd),
     SetRem(SetRem),
@@ -344,6 +351,7 @@ impl Request {
             Self::ListLen(_) => "llen",
             Self::ListPop(_) => "lpop",
             Self::ListRange(_) => "lrange",
+            Self::ListPush(_) => "lpush",
             Self::Set(_) => "set",
             Self::SetAdd(_) => "sadd",
             Self::SetRem(_) => "srem",
@@ -449,6 +457,12 @@ impl From<ListPop> for Request {
 impl From<ListRange> for Request {
     fn from(value: ListRange) -> Self {
         Self::ListRange(value)
+    }
+}
+
+impl From<ListPush> for Request {
+    fn from(value: ListPush) -> Self {
+        Self::ListPush(value)
     }
 }
 
