@@ -71,12 +71,12 @@ where
         let workers = self.workers.build(worker_session_queues, signal_queue_rx);
 
         let admin = std::thread::Builder::new()
-            .name(format!("{}_admin", THREAD_PREFIX))
+            .name(format!("{THREAD_PREFIX}_admin"))
             .spawn(move || admin.run())
             .unwrap();
 
         let listener = std::thread::Builder::new()
-            .name(format!("{}_listener", THREAD_PREFIX))
+            .name(format!("{THREAD_PREFIX}_listener"))
             .spawn(move || listener.run())
             .unwrap();
 

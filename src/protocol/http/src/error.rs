@@ -30,7 +30,7 @@ impl Error {
             Self::Unparseable(e) => Response::builder(400)
                 .should_close(true)
                 .header("Content-Type", b"text/plain")
-                .body(format!("Unable to parse request: {}", e).as_bytes()),
+                .body(format!("Unable to parse request: {e}").as_bytes()),
             Self::BadRequestMethod => Response::builder(405)
                 .should_close(true)
                 .header("Content-Type", b"text/plain")

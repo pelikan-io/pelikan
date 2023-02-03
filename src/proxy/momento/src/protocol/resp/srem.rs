@@ -28,7 +28,7 @@ pub async fn srem(
     BACKEND_REQUEST.increment();
 
     let mut response_buf = Vec::new();
-    let elements = req.members().into_iter().map(|e| &**e).collect();
+    let elements = req.members().iter().map(|e| &**e).collect();
 
     match timeout(
         Duration::from_millis(200),

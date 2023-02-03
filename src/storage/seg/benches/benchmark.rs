@@ -34,7 +34,7 @@ fn get_benchmark(c: &mut Criterion) {
 
         let mut key = 0;
 
-        group.bench_function(&format!("{}b/0b", key_size), |b| {
+        group.bench_function(&format!("{key_size}b/0b"), |b| {
             b.iter(|| {
                 cache.get(&keys[key]);
                 key += 1;
@@ -92,7 +92,7 @@ fn set_benchmark(c: &mut Criterion) {
             let mut key = 0;
             let mut value = 0;
 
-            group.bench_function(&format!("{}b/{}b", key_size, value_size), |b| {
+            group.bench_function(&format!("{key_size}b/{value_size}b"), |b| {
                 b.iter(|| {
                     let _ = cache.insert(&keys[key], &values[value], None, ttl);
                     key += 1;

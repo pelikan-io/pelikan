@@ -296,10 +296,10 @@ mod tests {
                     .expect("failed to write");
             }
             Ok(n) => {
-                panic!("read: {} bytes but expected 6", n);
+                panic!("read: {n} bytes but expected 6");
             }
             Err(e) => {
-                panic!("error reading: {}", e);
+                panic!("error reading: {e}");
             }
         }
 
@@ -310,10 +310,10 @@ mod tests {
                 assert_eq!(&buf[0..6], b"PONG\r\n");
             }
             Ok(n) => {
-                panic!("read: {} bytes but expected 6", n);
+                panic!("read: {n} bytes but expected 6");
             }
             Err(e) => {
-                panic!("error reading: {}", e);
+                panic!("error reading: {e}");
             }
         }
     }

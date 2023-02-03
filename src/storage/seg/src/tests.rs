@@ -76,7 +76,7 @@ fn get() {
     assert!(cache.get(b"coffee").is_some());
 
     let item = cache.get(b"coffee").unwrap();
-    assert_eq!(item.value(), b"strong", "item is: {:?}", item);
+    assert_eq!(item.value(), b"strong", "item is: {item:?}");
 }
 
 #[test]
@@ -131,7 +131,7 @@ fn overwrite() {
     assert!(item.is_some());
     let item = item.unwrap();
     let value = item.value();
-    assert_eq!(value, b"coffee", "item is: {:?}", item);
+    assert_eq!(value, b"coffee", "item is: {item:?}");
 
     println!("==== second insert ====");
     assert!(cache.insert(b"drink", b"espresso", None, ttl).is_ok());
@@ -141,7 +141,7 @@ fn overwrite() {
     assert!(item.is_some());
     let item = item.unwrap();
     let value = item.value();
-    assert_eq!(value, b"espresso", "item is: {:?}", item);
+    assert_eq!(value, b"espresso", "item is: {item:?}");
 
     println!("==== third insert ====");
     assert!(cache.insert(b"drink", b"whisky", None, ttl).is_ok());
@@ -151,7 +151,7 @@ fn overwrite() {
     assert!(item.is_some());
     let item = item.unwrap();
     let value = item.value();
-    assert_eq!(value, b"whisky", "item is: {:?}", item);
+    assert_eq!(value, b"whisky", "item is: {item:?}");
 }
 
 #[test]
@@ -177,9 +177,9 @@ fn delete() {
     assert!(item.is_some());
     let item = item.unwrap();
     let value = item.value();
-    assert_eq!(value, b"coffee", "item is: {:?}", item);
+    assert_eq!(value, b"coffee", "item is: {item:?}");
 
-    assert_eq!(cache.delete(b"drink"), true);
+    assert!(cache.delete(b"drink"));
     assert_eq!(cache.segments.free(), 63);
     assert_eq!(cache.items(), 0);
 }
@@ -205,7 +205,7 @@ fn collisions_2() {
     // collision on the 8th insert.
     for i in 0..1000 {
         let i = i % 3;
-        let v = format!("{:02}", i);
+        let v = format!("{i:02}");
         assert!(cache.insert(v.as_bytes(), v.as_bytes(), None, ttl).is_ok());
         let item = cache.get(v.as_bytes());
         assert!(item.is_some());
@@ -232,7 +232,7 @@ fn collisions() {
     // has 7 slots. since we don't support chaining, we must have a
     // collision on the 8th insert.
     for i in 0..7 {
-        let v = format!("{}", i);
+        let v = format!("{i}");
         assert!(cache.insert(v.as_bytes(), v.as_bytes(), None, ttl).is_ok());
         let item = cache.get(v.as_bytes());
         assert!(item.is_some());
@@ -241,7 +241,7 @@ fn collisions() {
     let v = b"8";
     assert!(cache.insert(v, v, None, ttl).is_err());
     assert_eq!(cache.items(), 7);
-    assert_eq!(cache.delete(b"0"), true);
+    assert!(cache.delete(b"0"));
     assert_eq!(cache.items(), 6);
     assert!(cache.insert(v, v, None, ttl).is_ok());
     assert_eq!(cache.items(), 7);
@@ -401,7 +401,7 @@ fn clear() {
     assert!(cache.get(b"coffee").is_some());
 
     let item = cache.get(b"coffee").unwrap();
-    assert_eq!(item.value(), b"strong", "item is: {:?}", item);
+    assert_eq!(item.value(), b"strong", "item is: {item:?}");
 
     cache.clear();
     assert_eq!(cache.segments.free(), segments);
@@ -429,23 +429,23 @@ fn wrapping_add() {
     assert!(cache.get(b"coffee").is_some());
 
     let item = cache.get(b"coffee").unwrap();
-    assert_eq!(item.value(), 0, "item is: {:?}", item);
+    assert_eq!(item.value(), 0, "item is: {item:?}");
     cache
         .wrapping_add(b"coffee", 1)
         .expect("failed to increment");
-    assert_eq!(item.value(), 1, "item is: {:?}", item);
+    assert_eq!(item.value(), 1, "item is: {item:?}");
     cache
         .wrapping_add(b"coffee", u64::MAX - 1)
         .expect("failed to increment");
-    assert_eq!(item.value(), u64::MAX, "item is: {:?}", item);
+    assert_eq!(item.value(), u64::MAX, "item is: {item:?}");
     cache
         .wrapping_add(b"coffee", 1)
         .expect("failed to increment");
-    assert_eq!(item.value(), 0, "item is: {:?}", item);
+    assert_eq!(item.value(), 0, "item is: {item:?}");
     cache
         .wrapping_add(b"coffee", 2)
         .expect("failed to increment");
-    assert_eq!(item.value(), 2, "item is: {:?}", item);
+    assert_eq!(item.value(), 2, "item is: {item:?}");
 }
 
 #[test]
@@ -468,19 +468,19 @@ fn saturating_sub() {
     assert!(cache.get(b"coffee").is_some());
 
     let item = cache.get(b"coffee").unwrap();
-    assert_eq!(item.value(), 3, "item is: {:?}", item);
+    assert_eq!(item.value(), 3, "item is: {item:?}");
     cache
         .saturating_sub(b"coffee", 2)
         .expect("failed to increment");
-    assert_eq!(item.value(), 1, "item is: {:?}", item);
+    assert_eq!(item.value(), 1, "item is: {item:?}");
     cache
         .saturating_sub(b"coffee", 1)
         .expect("failed to increment");
-    assert_eq!(item.value(), 0, "item is: {:?}", item);
+    assert_eq!(item.value(), 0, "item is: {item:?}");
     cache
         .saturating_sub(b"coffee", 1)
         .expect("failed to increment");
-    assert_eq!(item.value(), 0, "item is: {:?}", item);
+    assert_eq!(item.value(), 0, "item is: {item:?}");
 }
 
 #[test]

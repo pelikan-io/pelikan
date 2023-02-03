@@ -48,7 +48,7 @@ impl Storage for Seg {
                             item.key(),
                             flags,
                             None,
-                            format!("{}", v).as_bytes(),
+                            format!("{v}").as_bytes(),
                         ));
                     }
                 }
@@ -74,7 +74,7 @@ impl Storage for Seg {
                             item.key(),
                             flags,
                             Some(item.cas().into()),
-                            format!("{}", v).as_bytes(),
+                            format!("{v}").as_bytes(),
                         ));
                     }
                 }
