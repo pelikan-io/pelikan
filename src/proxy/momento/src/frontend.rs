@@ -143,6 +143,9 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::ListPop(r) => {
                     resp::lpop(&mut client, &cache_name, &mut response_buf, r).await?
                 }
+                resp::Request::ListRange(r) => {
+                    resp::lrange(&mut client, &cache_name, &mut response_buf, r).await?
+                }
                 resp::Request::Set(r) => {
                     resp::set(&mut client, &cache_name, &mut socket, &r).await?
                 }
