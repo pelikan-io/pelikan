@@ -1490,6 +1490,7 @@ dependencies = [
  "protocol-resp",
  "session",
  "storage-types",
+ "thiserror",
  "tokio",
 ]
 

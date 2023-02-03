@@ -27,6 +27,8 @@ use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::time::timeout;
 
+use crate::error::{ProxyError, ProxyResult};
+
 pub const KB: usize = 1024;
 pub const MB: usize = 1024 * KB;
 
@@ -34,6 +36,7 @@ const S: u64 = 1_000_000_000; // one second in nanoseconds
 const US: u64 = 1_000; // one microsecond in nanoseconds
 
 mod admin;
+mod error;
 mod frontend;
 mod klog;
 mod listener;

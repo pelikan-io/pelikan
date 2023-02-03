@@ -22,7 +22,7 @@ pub async fn lindex(
     client: &mut SimpleCacheClient,
     cache_name: &str,
     socket: &mut TcpStream,
-    req: ListIndex,
+    req: &ListIndex,
 ) -> std::io::Result<()> {
     LINDEX.increment();
     BACKEND_REQUEST.increment();
