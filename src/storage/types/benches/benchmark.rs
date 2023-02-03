@@ -17,12 +17,12 @@ pub fn rng() -> impl RngCore {
 
 fn parse_redis_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_signed_redis");
-    group.measurement_time(Duration::from_secs(30));
+    group.measurement_time(Duration::from_secs(2));
 
 
     let bytes = b"9223372036854775807";
     group.throughput(Throughput::Elements(1));
-    group.bench_with_input("parse_numbers", &bytes, |b, &bytes| {
+    group.bench_with_input("parse_max_value", &bytes, |b, &bytes| {
         b.iter(|| {
             let result = parse_signed_redis(bytes);
             if (result.is_none()) {
@@ -32,7 +32,71 @@ fn parse_redis_benchmark(c: &mut Criterion) {
     });
 
     let string = "9223372036854775807";
-    group.bench_with_input("parse_numbers_std_lib", &string, |b, &bytes| {
+    group.bench_with_input("parse_max_value_stdlib", &string, |b, &bytes| {
+        b.iter(|| {
+            let result: Result<i64, ParseIntError> = bytes.parse();
+            if (result.is_err()) {
+                println!("it's empty!")
+            }
+        })
+    });
+
+    let bytes = b"-9223372036854775807";
+    group.throughput(Throughput::Elements(1));
+    group.bench_with_input("parse_min_value", &bytes, |b, &bytes| {
+        b.iter(|| {
+            let result = parse_signed_redis(bytes);
+            if (result.is_none()) {
+                println!("it's empty!")
+            }
+        })
+    });
+
+    let string = "-9223372036854775807";
+    group.bench_with_input("parse_min_value_std_lib", &string, |b, &bytes| {
+        b.iter(|| {
+            let result: Result<i64, ParseIntError> = bytes.parse();
+            if (result.is_err()) {
+                println!("it's empty!")
+            }
+        })
+    });
+
+    let bytes = b"123456";
+    group.throughput(Throughput::Elements(1));
+    group.bench_with_input("parse_reg_value", &bytes, |b, &bytes| {
+        b.iter(|| {
+            let result = parse_signed_redis(bytes);
+            if (result.is_none()) {
+                println!("it's empty!")
+            }
+        })
+    });
+
+    let string = "123456";
+    group.bench_with_input("parse_reg_value_std_lib", &string, |b, &bytes| {
+        b.iter(|| {
+            let result: Result<i64, ParseIntError> = bytes.parse();
+            if (result.is_err()) {
+                println!("it's empty!")
+            }
+        })
+    });
+
+
+    let bytes = b"0";
+    group.throughput(Throughput::Elements(1));
+    group.bench_with_input("parse_zero", &bytes, |b, &bytes| {
+        b.iter(|| {
+            let result = parse_signed_redis(bytes);
+            if (result.is_none()) {
+                println!("it's empty!")
+            }
+        })
+    });
+
+    let string = "0";
+    group.bench_with_input("parse_zero_std_lib", &string, |b, &bytes| {
         b.iter(|| {
             let result: Result<i64, ParseIntError> = bytes.parse();
             if (result.is_err()) {
