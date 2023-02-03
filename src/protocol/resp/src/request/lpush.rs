@@ -70,7 +70,7 @@ impl From<&ListPush> for Message {
     fn from(value: &ListPush) -> Self {
         let mut vals = Vec::with_capacity(value.elements.len() + 2);
 
-        vals.push(Message::BulkString(BulkString::new(b"SADD")));
+        vals.push(Message::BulkString(BulkString::new(b"LPUSH")));
         vals.push(Message::BulkString(BulkString::new(value.key())));
         vals.extend(value.elements().iter().map(|v| Message::bulk_string(v)));
 
