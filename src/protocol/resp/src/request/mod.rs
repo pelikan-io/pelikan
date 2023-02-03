@@ -24,6 +24,7 @@ mod hset;
 mod hvals;
 mod lindex;
 mod llen;
+mod lpop;
 mod sadd;
 mod sdiff;
 mod set;
@@ -35,6 +36,7 @@ mod sunion;
 
 pub use self::lindex::*;
 pub use self::llen::*;
+pub use self::lpop::*;
 pub use self::sdiff::*;
 pub use self::sinter::*;
 pub use self::sismember::*;
@@ -167,6 +169,7 @@ impl Parse<Request> for RequestParser {
                             ListIndex::try_from(message).map(Request::from)
                         }
                         Some(b"llen") | Some(b"LLEN") => ListLen::try_from(message).map(From::from),
+                        Some(b"lpop") | Some(b"LPOP") => ListPop::try_from(message).map(From::from),
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
                         Some(b"sadd") | Some(b"SADD") => {
                             SetAdd::try_from(message).map(Request::from)
@@ -221,6 +224,7 @@ impl Compose for Request {
             Self::HashIncrBy(r) => r.compose(buf),
             Self::ListIndex(r) => r.compose(buf),
             Self::ListLen(r) => r.compose(buf),
+            Self::ListPop(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
             Self::SetAdd(r) => r.compose(buf),
             Self::SetRem(r) => r.compose(buf),
@@ -249,6 +253,7 @@ pub enum Request {
     HashIncrBy(HashIncrBy),
     ListIndex(ListIndex),
     ListLen(ListLen),
+    ListPop(ListPop),
     Set(Set),
     SetAdd(SetAdd),
     SetRem(SetRem),
@@ -330,6 +335,7 @@ impl Request {
             Self::HashIncrBy(_) => "hincrby",
             Self::ListIndex(_) => "lindex",
             Self::ListLen(_) => "llen",
+            Self::ListPop(_) => "lpop",
             Self::Set(_) => "set",
             Self::SetAdd(_) => "sadd",
             Self::SetRem(_) => "srem",
@@ -423,6 +429,12 @@ impl From<ListIndex> for Request {
 impl From<ListLen> for Request {
     fn from(value: ListLen) -> Self {
         Self::ListLen(value)
+    }
+}
+
+impl From<ListPop> for Request {
+    fn from(value: ListPop) -> Self {
+        Self::ListPop(value)
     }
 }
 

@@ -20,6 +20,7 @@ mod hset;
 mod hvals;
 mod lindex;
 mod llen;
+mod lpop;
 mod sadd;
 mod sdiff;
 mod set;
@@ -31,6 +32,7 @@ mod sunion;
 
 pub use self::lindex::*;
 pub use self::llen::*;
+pub use self::lpop::*;
 pub use self::sdiff::*;
 pub use self::sinter::*;
 pub use self::sismember::*;

@@ -48,7 +48,7 @@ impl From<&ListLen> for Message {
     fn from(value: &ListLen) -> Self {
         Message::Array(Array {
             inner: Some(vec![
-                Message::BulkString(BulkString::new(b"HINCRBY")),
+                Message::BulkString(BulkString::new(b"LLEN")),
                 Message::BulkString(BulkString::new(value.key())),
             ]),
         })
