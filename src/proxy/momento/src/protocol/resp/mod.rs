@@ -23,12 +23,14 @@ mod llen;
 mod sadd;
 mod sdiff;
 mod set;
+mod sinter;
 mod srem;
 mod sunion;
 
 pub use self::lindex::*;
 pub use self::llen::*;
 pub use self::sdiff::*;
+pub use self::sinter::*;
 pub use self::srem::*;
 pub use self::sunion::*;
 pub use get::*;
