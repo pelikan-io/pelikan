@@ -161,6 +161,9 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::SetMembers(r) => {
                     resp::smembers(&mut client, &cache_name, &mut response_buf, &r).await?
                 }
+                resp::Request::SetIsMember(r) => {
+                    resp::sismember(&mut client, &cache_name, &mut response_buf, r).await?
+                }
                 _ => return Err(ProxyError::UnsupportedCommand),
             }
 
