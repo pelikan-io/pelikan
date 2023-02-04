@@ -25,6 +25,7 @@ mod hvals;
 mod lindex;
 mod llen;
 mod lpop;
+mod lrange;
 mod sadd;
 mod sdiff;
 mod set;
@@ -37,6 +38,7 @@ mod sunion;
 pub use self::lindex::*;
 pub use self::llen::*;
 pub use self::lpop::*;
+pub use self::lrange::*;
 pub use self::sdiff::*;
 pub use self::sinter::*;
 pub use self::sismember::*;
@@ -170,6 +172,9 @@ impl Parse<Request> for RequestParser {
                         }
                         Some(b"llen") | Some(b"LLEN") => ListLen::try_from(message).map(From::from),
                         Some(b"lpop") | Some(b"LPOP") => ListPop::try_from(message).map(From::from),
+                        Some(b"lrange") | Some(b"LRANGE") => {
+                            ListRange::try_from(message).map(From::from)
+                        }
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
                         Some(b"sadd") | Some(b"SADD") => {
                             SetAdd::try_from(message).map(Request::from)
@@ -225,6 +230,7 @@ impl Compose for Request {
             Self::ListIndex(r) => r.compose(buf),
             Self::ListLen(r) => r.compose(buf),
             Self::ListPop(r) => r.compose(buf),
+            Self::ListRange(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
             Self::SetAdd(r) => r.compose(buf),
             Self::SetRem(r) => r.compose(buf),
@@ -254,6 +260,7 @@ pub enum Request {
     ListIndex(ListIndex),
     ListLen(ListLen),
     ListPop(ListPop),
+    ListRange(ListRange),
     Set(Set),
     SetAdd(SetAdd),
     SetRem(SetRem),
@@ -336,6 +343,7 @@ impl Request {
             Self::ListIndex(_) => "lindex",
             Self::ListLen(_) => "llen",
             Self::ListPop(_) => "lpop",
+            Self::ListRange(_) => "lrange",
             Self::Set(_) => "set",
             Self::SetAdd(_) => "sadd",
             Self::SetRem(_) => "srem",
@@ -435,6 +443,12 @@ impl From<ListLen> for Request {
 impl From<ListPop> for Request {
     fn from(value: ListPop) -> Self {
         Self::ListPop(value)
+    }
+}
+
+impl From<ListRange> for Request {
+    fn from(value: ListRange) -> Self {
+        Self::ListRange(value)
     }
 }
 
