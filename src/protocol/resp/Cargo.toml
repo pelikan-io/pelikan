@@ -14,3 +14,6 @@ logger = { path = "../../logger" }
 metriken = { workspace = true }
 nom = { workspace = true }
 protocol-common = { path = "../../protocol/common" }
+thiserror = { workspace = true }
+bstr = { workspace = true }
+memchr = "2.5.0"
