@@ -82,7 +82,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parses text not containing CR or LF followed by CRLF
-    fn parse_delimited_text(&mut self) -> ParseResult<'a, &'a [u8]> {
+    pub(crate) fn parse_delimited_text(&mut self) -> ParseResult<'a, &'a [u8]> {
         self.try_parse(|p| {
             let text = match memchr::memchr2(b'\r', b'\n', p.data) {
                 Some(offset) => p.parse_bytes(offset)?,
@@ -163,7 +163,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    pub fn parse_array<'p>(&'p mut self) -> ParseResult<'a, Option<ArrayVisitor<'a, 'p>>> {
+    pub fn parse_array<'p>(&'p mut self) -> ParseResult<'a, Option<ArrayParser<'a, 'p>>> {
         let len = self.try_parse(|p| {
             p.parse_literal(b"*")?;
 
@@ -177,7 +177,7 @@ impl<'a> Parser<'a> {
             })
         })?;
 
-        Ok(len.map(|len| ArrayVisitor {
+        Ok(len.map(|len| ArrayParser {
             parser: self,
             remaining: len,
         }))
@@ -242,10 +242,7 @@ pub trait Visitor<'a>: Sized {
         })
     }
 
-    fn visit_array(
-        self,
-        value: Option<&mut ArrayVisitor<'a, '_>>,
-    ) -> ParseResult<'a, Self::Output> {
+    fn visit_array(self, value: Option<&mut ArrayParser<'a, '_>>) -> ParseResult<'a, Self::Output> {
         Err(ParseError::Custom {
             expected: self.expected(),
             found: "an array",
@@ -253,42 +250,38 @@ pub trait Visitor<'a>: Sized {
     }
 }
 
-pub struct ArrayVisitor<'a, 'p> {
+pub struct ArrayParser<'a, 'p> {
     parser: &'p mut Parser<'a>,
     remaining: usize,
 }
 
-impl<'a, 'p> ArrayVisitor<'a, 'p> {
+impl<'a, 'p> ArrayParser<'a, 'p> {
     pub fn remaining(&self) -> usize {
         self.remaining
     }
 
     pub fn parse_simple_string(&mut self) -> ParseResult<'a, &'a [u8]> {
-        self.check_remaining()?;
-        let text = self.parser.parse_simple_string()?;
-        self.remaining -= 1;
-        Ok(text)
+        self.try_parse(|p| p.parse_simple_string())
     }
 
     pub fn parse_bulk_string(&mut self) -> ParseResult<'a, Option<&'a [u8]>> {
-        self.check_remaining()?;
-        let text = self.parser.parse_bulk_string()?;
-        self.remaining -= 1;
-        Ok(text)
+        self.try_parse(|p| p.parse_bulk_string())
+    }
+
+    pub fn parse_string(&mut self) -> ParseResult<'a, Option<&'a [u8]>> {
+        self.try_parse(|p| p.parse_string())
+    }
+
+    pub fn parse_error(&mut self) -> ParseResult<'a, &'a [u8]> {
+        self.try_parse(|p| p.parse_error())
     }
 
     pub fn parse_literal_u64(&mut self) -> ParseResult<'a, u64> {
-        self.check_remaining()?;
-        let value = self.parser.parse_literal_u64()?;
-        self.remaining -= 1;
-        Ok(value)
+        self.try_parse(|p| p.parse_literal_u64())
     }
 
     pub fn parse_literal_i64(&mut self) -> ParseResult<'a, i64> {
-        self.check_remaining()?;
-        let value = self.parser.parse_literal_i64()?;
-        self.remaining -= 1;
-        Ok(value)
+        self.try_parse(|p| p.parse_literal_i64())
     }
 
     pub fn finish(self) -> ParseResult<'a, ()> {
@@ -303,6 +296,17 @@ impl<'a, 'p> ArrayVisitor<'a, 'p> {
             0 => Err(ParseError::ExpectedArrayElement),
             _ => Ok(()),
         }
+    }
+
+    fn try_parse<F, R>(&mut self, func: F) -> ParseResult<'a, R>
+    where
+        F: FnOnce(&mut Parser<'a>) -> ParseResult<'a, R>,
+        R: 'a,
+    {
+        self.check_remaining()?;
+        let value = self.parser.try_parse(func)?;
+        self.remaining -= 1;
+        Ok(value)
     }
 }
 

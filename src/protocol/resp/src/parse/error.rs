@@ -16,6 +16,8 @@ pub enum ParseError<'a> {
     InvalidNumber(&'a [u8]),
     #[error("expected a non-negative number, got {:?} instead", BStr::new(.0))]
     UnexpectedNegativeNumber(&'a [u8]),
+    #[error("expected a non-nil string, got a nil one instead")]
+    UnexpectedNilString,
 
     #[error("expected an array element, but array was too short")]
     ExpectedArrayElement,
@@ -49,6 +51,7 @@ impl<'a> fmt::Debug for ParseError<'a> {
                 .debug_tuple("UnexpectedNegativeNumber")
                 .field(&BStr::new(val))
                 .finish(),
+            Self::UnexpectedNilString => f.write_str("UnexpectedNilString"),
             Self::ExpectedArrayElement => f.write_str("ExpectedArrayElement"),
             Self::UnexpectedArrayElement => f.write_str("UnexpectedArrayElement"),
             Self::UnexpectedCharacter { expected, found } => f
