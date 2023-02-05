@@ -59,18 +59,18 @@ time_type = "Delta"
 # choose from: error, warn, info, debug, trace
 log_level = "info"
 # optionally, log to the file below instead of standard out
-# log_file = "segcache.log"
+# log_file = "rds.log"
 # backup file name for use with log rotation
-log_backup = "segcache.log.old"
+log_backup = "rds.log.old"
 # trigger log rotation when the file grows beyond this size (in bytes). Set this
 # option to '0' to disable log rotation.
 log_max_size = 1073741824
 
 [klog]
 # optionally, log commands to the file below
-# file = "segcache.cmd"
+# file = "rds.cmd"
 # backup file name for use with log rotation
-backup = "segcache.cmd.old"
+backup = "rds.cmd.old"
 # trigger log rotation when the file grows beyond this size (in bytes). Set this
 # option to '0' to disable log rotation.
 max_size = 1073741824
