@@ -486,9 +486,9 @@ impl HashTable {
     ///
     /// A failure indicates that the CAS value did not match or there was no
     /// matching item for that key.
-    pub fn try_update_cas<'a>(
+    pub fn try_update_cas(
         &mut self,
-        key: &'a [u8],
+        key: &[u8],
         cas: u32,
         segments: &mut Segments,
     ) -> Result<(), SegError> {

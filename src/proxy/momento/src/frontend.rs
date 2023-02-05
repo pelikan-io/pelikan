@@ -4,6 +4,7 @@
 
 use crate::protocol::*;
 use crate::*;
+use net::TCP_SEND_BYTE;
 use session::Buf;
 
 pub(crate) async fn handle_memcache_client(
@@ -80,124 +81,159 @@ pub(crate) async fn handle_resp_client(
             break;
         }
 
-        match parser.parse(buf.borrow()) {
-            Ok(request) => {
-                let consumed = request.consumed();
-                let request = request.into_inner();
-
-                match request {
-                    resp::Request::Get(r) => {
-                        if resp::get(&mut client, &cache_name, &mut socket, r.key())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashDelete(r) => {
-                        if resp::hdel(&mut client, &cache_name, &mut socket, r.key(), r.fields())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashExists(r) => {
-                        if resp::hexists(&mut client, &cache_name, &mut socket, r.key(), r.field())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashGet(r) => {
-                        if resp::hget(&mut client, &cache_name, &mut socket, r.key(), r.field())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashGetAll(r) => {
-                        if resp::hgetall(&mut client, &cache_name, &mut socket, r.key())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashIncrBy(r) => {
-                        if resp::hincrby(&mut client, &cache_name, &mut socket, r)
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashKeys(r) => {
-                        if resp::hkeys(&mut client, &cache_name, &mut socket, r.key())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashLength(r) => {
-                        if resp::hlen(&mut client, &cache_name, &mut socket, r.key())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashMultiGet(r) => {
-                        if resp::hmget(&mut client, &cache_name, &mut socket, r.key(), r.fields())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashSet(r) => {
-                        if resp::hset(&mut client, &cache_name, &mut socket, r.key(), r.data())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::HashValues(r) => {
-                        if resp::hvals(&mut client, &cache_name, &mut socket, r.key())
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    resp::Request::Set(r) => {
-                        if resp::set(&mut client, &cache_name, &mut socket, &r)
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    _ => {
-                        println!("bad request");
-                        let _ = socket.write_all(b"CLIENT_ERROR\r\n").await;
-                        break;
-                    }
-                }
-                buf.advance(consumed);
-            }
+        let request = match parser.parse(buf.borrow()) {
+            Ok(request) => request,
             Err(e) => match e.kind() {
-                ErrorKind::WouldBlock => {}
+                ErrorKind::WouldBlock => continue,
                 _ => {
                     println!("bad request");
                     let _ = socket.write_all(b"CLIENT_ERROR\r\n").await;
                     break;
                 }
             },
+        };
+
+        let consumed = request.consumed();
+        let request = request.into_inner();
+        let command = request.command();
+
+        let mut response_buf = Vec::<u8>::new();
+
+        let result: ProxyResult = async {
+            match &request {
+                resp::Request::Get(r) => {
+                    resp::get(&mut client, &cache_name, &mut response_buf, r.key()).await?
+                }
+                resp::Request::HashDelete(r) => {
+                    resp::hdel(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::HashExists(r) => {
+                    resp::hexists(&mut client, &cache_name, &mut socket, r.key(), r.field()).await?
+                }
+                resp::Request::HashGet(r) => {
+                    resp::hget(&mut client, &cache_name, &mut socket, r.key(), r.field()).await?
+                }
+                resp::Request::HashGetAll(r) => {
+                    resp::hgetall(&mut client, &cache_name, &mut socket, r.key()).await?
+                }
+                resp::Request::HashIncrBy(r) => {
+                    resp::hincrby(&mut client, &cache_name, &mut socket, r).await?
+                }
+                resp::Request::HashKeys(r) => {
+                    resp::hkeys(&mut client, &cache_name, &mut socket, r.key()).await?
+                }
+                resp::Request::HashLength(r) => {
+                    resp::hlen(&mut client, &cache_name, &mut socket, r.key()).await?
+                }
+                resp::Request::HashMultiGet(r) => {
+                    resp::hmget(&mut client, &cache_name, &mut socket, r.key(), r.fields()).await?
+                }
+                resp::Request::HashSet(r) => {
+                    resp::hset(&mut client, &cache_name, &mut socket, r.key(), r.data()).await?
+                }
+                resp::Request::HashValues(r) => {
+                    resp::hvals(&mut client, &cache_name, &mut socket, r.key()).await?
+                }
+                resp::Request::ListIndex(r) => {
+                    resp::lindex(&mut client, &cache_name, &mut socket, r).await?
+                }
+                resp::Request::ListLen(r) => {
+                    resp::llen(&mut client, &cache_name, &mut socket, r).await?
+                }
+                resp::Request::ListPop(r) => {
+                    resp::lpop(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::ListRange(r) => {
+                    resp::lrange(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::Set(r) => {
+                    resp::set(&mut client, &cache_name, &mut socket, &r).await?
+                }
+                resp::Request::SetAdd(r) => {
+                    resp::sadd(&mut client, &cache_name, &mut socket, &r).await?
+                }
+                resp::Request::SetRem(r) => {
+                    resp::srem(&mut client, &cache_name, &mut socket, &r).await?
+                }
+                resp::Request::SetDiff(r) => {
+                    resp::sdiff(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::SetUnion(r) => {
+                    resp::sunion(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::SetIntersect(r) => {
+                    resp::sinter(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::SetMembers(r) => {
+                    resp::smembers(&mut client, &cache_name, &mut response_buf, &r).await?
+                }
+                resp::Request::SetIsMember(r) => {
+                    resp::sismember(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                _ => return Err(ProxyError::UnsupportedCommand),
+            }
+
+            Ok(())
         }
+        .await;
+
+        let fatal = match result {
+            Ok(()) => false,
+            Err(e) => {
+                response_buf.clear();
+
+                match e {
+                    ProxyError::Momento(error) => {
+                        SESSION_SEND.increment();
+                        crate::protocol::resp::momento_error_to_resp_error(
+                            &mut response_buf,
+                            command,
+                            error,
+                        );
+
+                        false
+                    }
+                    ProxyError::Timeout(_) => {
+                        SESSION_SEND.increment();
+                        BACKEND_EX.increment();
+                        BACKEND_EX_TIMEOUT.increment();
+                        response_buf.extend_from_slice(b"-ERR backend timeout\r\n");
+
+                        false
+                    }
+                    ProxyError::Io(_) => true,
+                    ProxyError::UnsupportedCommand => {
+                        println!("bad request");
+                        response_buf.extend_from_slice(b"CLIENT_ERROR\r\n");
+                        true
+                    }
+                }
+            }
+        };
+
+        // Temporary workaround
+        // ====================
+        // There are a few metrics that are incremented on every request. Before the
+        // refactor, these were incremented within each call. Now, they should be
+        // handled in this function. As an intermediate, we increment only if the request
+        // method put data into response_buf.
+        if !response_buf.is_empty() {
+            BACKEND_REQUEST.increment();
+            SESSION_SEND.increment();
+        }
+
+        SESSION_SEND_BYTE.add(response_buf.len() as _);
+        TCP_SEND_BYTE.add(response_buf.len() as _);
+
+        if let Err(_) = socket.write_all(&response_buf).await {
+            SESSION_SEND_EX.increment();
+            break;
+        }
+
+        if fatal {
+            break;
+        }
+
+        buf.advance(consumed);
     }
 }

@@ -73,7 +73,7 @@ impl SegcacheConfig {
         match toml::from_str(&content) {
             Ok(t) => Ok(t),
             Err(e) => {
-                eprintln!("{}", e);
+                eprintln!("{e}");
                 Err(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     "Error parsing config",
@@ -97,7 +97,7 @@ impl SegcacheConfig {
     /// Prints the configuration
     pub fn print(&self) {
         let config_toml = self.render_config();
-        println!("Segcache configuration:\n\n{}", config_toml);
+        println!("Segcache configuration:\n\n{config_toml}");
     }
 
     /// Renders the configuration as a printable string

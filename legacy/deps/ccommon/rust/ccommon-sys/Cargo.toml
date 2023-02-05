@@ -2,7 +2,7 @@
 name = "ccommon-sys"
 version = "0.1.0"
 authors = [
-	"Brian Martin <bmartin@twitter.com>",
+	"Brian Martin <brian@pelikan.io>",
 	"Jonathan Simms <jsimms@twitter.com>",
 	"Sean Lynch <slynch@twitter.com>"
 ]

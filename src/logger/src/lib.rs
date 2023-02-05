@@ -62,7 +62,7 @@ pub fn configure_logging<T: DebugConfig + KlogConfig>(config: &T) -> Box<dyn Dra
     let debug_config = config.debug();
 
     let debug_output: Box<dyn Output> = if let Some(file) = debug_config.log_file() {
-        let backup = debug_config.log_backup().unwrap_or(format!("{}.old", file));
+        let backup = debug_config.log_backup().unwrap_or(format!("{file}.old"));
         Box::new(
             File::new(&file, &backup, debug_config.log_max_size())
                 .expect("failed to open debug log file"),
@@ -81,7 +81,7 @@ pub fn configure_logging<T: DebugConfig + KlogConfig>(config: &T) -> Box<dyn Dra
     let klog_config = config.klog();
 
     let klog = if let Some(file) = klog_config.file() {
-        let backup = klog_config.backup().unwrap_or(format!("{}.old", file));
+        let backup = klog_config.backup().unwrap_or(format!("{file}.old"));
         let output = Box::new(
             File::new(&file, &backup, klog_config.max_size()).expect("failed to open klog file"),
         );

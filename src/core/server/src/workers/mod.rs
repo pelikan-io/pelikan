@@ -63,7 +63,7 @@ where
         match self {
             Self::Single { mut worker } => {
                 vec![std::thread::Builder::new()
-                    .name(format!("{}_work", THREAD_PREFIX))
+                    .name(format!("{THREAD_PREFIX}_work"))
                     .spawn(move || worker.run())
                     .unwrap()]
             }
@@ -72,14 +72,14 @@ where
                 mut storage,
             } => {
                 let mut join_handles = vec![std::thread::Builder::new()
-                    .name(format!("{}_storage", THREAD_PREFIX))
+                    .name(format!("{THREAD_PREFIX}_storage"))
                     .spawn(move || storage.run())
                     .unwrap()];
 
                 for (id, mut worker) in workers.drain(..).enumerate() {
                     join_handles.push(
                         std::thread::Builder::new()
-                            .name(format!("{}_work_{}", THREAD_PREFIX, id))
+                            .name(format!("{THREAD_PREFIX}_work_{id}"))
                             .spawn(move || worker.run())
                             .unwrap(),
                     )

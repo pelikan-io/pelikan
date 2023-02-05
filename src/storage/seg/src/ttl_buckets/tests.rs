@@ -26,14 +26,12 @@ fn bucket_index() {
         assert_eq!(
             ttl_buckets.get_bucket_index(start) as u32,
             bucket,
-            "ttl: {:?}",
-            start
+            "ttl: {start:?}"
         );
         assert_eq!(
             ttl_buckets.get_bucket_index(end) as u32,
             bucket,
-            "ttl: {:?}",
-            end
+            "ttl: {end:?}"
         );
     }
 
@@ -44,14 +42,12 @@ fn bucket_index() {
         assert_eq!(
             ttl_buckets.get_bucket_index(start) as u32,
             bucket + 256,
-            "ttl: {:?}",
-            start
+            "ttl: {start:?}"
         );
         assert_eq!(
             ttl_buckets.get_bucket_index(end) as u32,
             bucket + 256,
-            "ttl: {:?}",
-            end
+            "ttl: {end:?}"
         );
     }
 
@@ -62,14 +58,12 @@ fn bucket_index() {
         assert_eq!(
             ttl_buckets.get_bucket_index(start) as u32,
             bucket + 512,
-            "ttl: {:?}",
-            start
+            "ttl: {start:?}"
         );
         assert_eq!(
             ttl_buckets.get_bucket_index(end) as u32,
             bucket + 512,
-            "ttl: {:?}",
-            end
+            "ttl: {end:?}"
         );
     }
 
@@ -80,14 +74,12 @@ fn bucket_index() {
         assert_eq!(
             ttl_buckets.get_bucket_index(start) as u32,
             bucket + 768,
-            "ttl: {:?}",
-            start
+            "ttl: {start:?}"
         );
         assert_eq!(
             ttl_buckets.get_bucket_index(end) as u32,
             bucket + 768,
-            "ttl: {:?}",
-            end
+            "ttl: {end:?}"
         );
     }
 

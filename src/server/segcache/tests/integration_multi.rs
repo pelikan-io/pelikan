@@ -33,7 +33,7 @@ fn main() {
 
     // shutdown server and join
     info!("shutdown...");
-    let _ = server.shutdown();
+    server.shutdown();
 
     info!("passed!");
 }

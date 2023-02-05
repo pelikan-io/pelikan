@@ -37,7 +37,7 @@ fn main() {
 
     // shutdown server and join
     info!("shutdown...");
-    let _ = server.shutdown();
+    server.shutdown();
     info!("passed!");
 }
 
@@ -77,7 +77,7 @@ fn test(name: &str, data: &[(&str, Option<&str>)]) {
         if let Some(response) = response {
             match stream.read(&mut buf) {
                 Err(e) => {
-                    panic!("error reading response: {}", e);
+                    panic!("error reading response: {e}");
                 }
                 Ok(_) => {
                     if response.as_bytes() != &buf[0..response.len()] {

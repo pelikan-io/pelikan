@@ -91,8 +91,8 @@ impl Drop for Stream {
 impl Debug for Stream {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match &self.inner {
-            StreamType::Tcp(s) => write!(f, "{:?}", s),
-            StreamType::TlsTcp(s) => write!(f, "{:?}", s),
+            StreamType::Tcp(s) => write!(f, "{s:?}"),
+            StreamType::TlsTcp(s) => write!(f, "{s:?}"),
         }
     }
 }

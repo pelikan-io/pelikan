@@ -17,7 +17,7 @@ config = { path = "../../config" }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-momento = "0.21.0"
+momento = "0.21.9"
 net = { path = "../../net" }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-memcache = { path = "../../protocol/memcache" }
@@ -25,3 +25,4 @@ protocol-resp = { path = "../../protocol/resp" }
 session = { path = "../../session" }
 storage-types = { path = "../../storage/types" }
 tokio = { version = "1.24.2", features = ["full"] }
+thiserror = { workspace = true }

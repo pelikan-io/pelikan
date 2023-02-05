@@ -25,8 +25,29 @@ mod hlen;
 mod hmget;
 mod hset;
 mod hvals;
+mod lindex;
+mod llen;
+mod lpop;
+mod lrange;
+mod sadd;
+mod sdiff;
 mod set;
+mod sinter;
+mod sismember;
+mod smembers;
+mod srem;
+mod sunion;
 
+pub use self::lindex::*;
+pub use self::llen::*;
+pub use self::lpop::*;
+pub use self::lrange::*;
+pub use self::sdiff::*;
+pub use self::sinter::*;
+pub use self::sismember::*;
+pub use self::smembers::*;
+pub use self::srem::*;
+pub use self::sunion::*;
 pub use badd::*;
 pub use get::*;
 pub use hdel::*;
@@ -39,6 +60,7 @@ pub use hlen::*;
 pub use hmget::*;
 pub use hset::*;
 pub use hvals::*;
+pub use sadd::*;
 pub use set::*;
 // response codes for klog
 const MISS: u8 = 0;
@@ -92,7 +114,7 @@ impl Parse<Request> for RequestParser {
                 }
             }
 
-            if &remaining[0..2] != b"\r\n" {
+            if !remaining.starts_with(b"\r\n") {
                 return Err(Error::from(ErrorKind::WouldBlock));
             }
 
@@ -153,7 +175,34 @@ impl Parse<Request> for RequestParser {
                         Some(b"hincrby") | Some(b"HINCRBY") => {
                             HashIncrBy::try_from(message).map(Request::from)
                         }
+                        Some(b"lindex") | Some(b"LINDEX") => {
+                            ListIndex::try_from(message).map(Request::from)
+                        }
+                        Some(b"llen") | Some(b"LLEN") => ListLen::try_from(message).map(From::from),
+                        Some(b"lpop") | Some(b"LPOP") => ListPop::try_from(message).map(From::from),
+                        Some(b"lrange") | Some(b"LRANGE") => {
+                            ListRange::try_from(message).map(From::from)
+                        }
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
+                        Some(b"sadd") | Some(b"SADD") => {
+                            SetAdd::try_from(message).map(Request::from)
+                        }
+                        Some(b"srem") | Some(b"SREM") => SetRem::try_from(message).map(From::from),
+                        Some(b"sdiff") | Some(b"SDIFF") => {
+                            SetDiff::try_from(message).map(From::from)
+                        }
+                        Some(b"sunion") | Some(b"SUNION") => {
+                            SetUnion::try_from(message).map(From::from)
+                        }
+                        Some(b"sinter") | Some(b"SINTER") => {
+                            SetIntersect::try_from(message).map(From::from)
+                        }
+                        Some(b"smembers") | Some(b"SMEMBERS") => {
+                            SetMembers::try_from(message).map(Request::from)
+                        }
+                        Some(b"sismember") | Some(b"SISMEMBER") => {
+                            SetIsMember::try_from(message).map(From::from)
+                        }
                         _ => Err(Error::new(ErrorKind::Other, "unknown command")),
                     },
                     _ => {
@@ -186,7 +235,18 @@ impl Compose for Request {
             Self::HashSet(r) => r.compose(buf),
             Self::HashValues(r) => r.compose(buf),
             Self::HashIncrBy(r) => r.compose(buf),
+            Self::ListIndex(r) => r.compose(buf),
+            Self::ListLen(r) => r.compose(buf),
+            Self::ListPop(r) => r.compose(buf),
+            Self::ListRange(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
+            Self::SetAdd(r) => r.compose(buf),
+            Self::SetRem(r) => r.compose(buf),
+            Self::SetDiff(r) => r.compose(buf),
+            Self::SetUnion(r) => r.compose(buf),
+            Self::SetIntersect(r) => r.compose(buf),
+            Self::SetMembers(r) => r.compose(buf),
+            Self::SetIsMember(r) => r.compose(buf),
         }
     }
 }
@@ -205,7 +265,18 @@ pub enum Request {
     HashSet(HashSet),
     HashValues(HashValues),
     HashIncrBy(HashIncrBy),
+    ListIndex(ListIndex),
+    ListLen(ListLen),
+    ListPop(ListPop),
+    ListRange(ListRange),
     Set(Set),
+    SetAdd(SetAdd),
+    SetRem(SetRem),
+    SetDiff(SetDiff),
+    SetUnion(SetUnion),
+    SetIntersect(SetIntersect),
+    SetMembers(SetMembers),
+    SetIsMember(SetIsMember),
 }
 
 impl Klog for Request {
@@ -273,6 +344,35 @@ impl Request {
         get_old: bool,
     ) -> Self {
         Self::Set(Set::new(key, value, expire_time, mode, get_old))
+    }
+
+    pub fn command(&self) -> &'static str {
+        match self {
+            Self::BtreeAdd(_) => "badd",
+            Self::Get(_) => "get",
+            Self::HashDelete(_) => "hdel",
+            Self::HashExists(_) => "hexists",
+            Self::HashGet(_) => "hget",
+            Self::HashGetAll(_) => "hgetall",
+            Self::HashKeys(_) => "hkeys",
+            Self::HashLength(_) => "hlen",
+            Self::HashMultiGet(_) => "hmget",
+            Self::HashSet(_) => "hset",
+            Self::HashValues(_) => "hvals",
+            Self::HashIncrBy(_) => "hincrby",
+            Self::ListIndex(_) => "lindex",
+            Self::ListLen(_) => "llen",
+            Self::ListPop(_) => "lpop",
+            Self::ListRange(_) => "lrange",
+            Self::Set(_) => "set",
+            Self::SetAdd(_) => "sadd",
+            Self::SetRem(_) => "srem",
+            Self::SetDiff(_) => "sdiff",
+            Self::SetUnion(_) => "sunion",
+            Self::SetIntersect(_) => "sinter",
+            Self::SetMembers(_) => "smembers",
+            Self::SetIsMember(_) => "sismember",
+        }
     }
 }
 
@@ -348,9 +448,75 @@ impl From<HashIncrBy> for Request {
     }
 }
 
+impl From<ListIndex> for Request {
+    fn from(value: ListIndex) -> Self {
+        Self::ListIndex(value)
+    }
+}
+
+impl From<ListLen> for Request {
+    fn from(value: ListLen) -> Self {
+        Self::ListLen(value)
+    }
+}
+
+impl From<ListPop> for Request {
+    fn from(value: ListPop) -> Self {
+        Self::ListPop(value)
+    }
+}
+
+impl From<ListRange> for Request {
+    fn from(value: ListRange) -> Self {
+        Self::ListRange(value)
+    }
+}
+
 impl From<Set> for Request {
     fn from(other: Set) -> Self {
         Self::Set(other)
+    }
+}
+
+impl From<SetAdd> for Request {
+    fn from(value: SetAdd) -> Self {
+        Self::SetAdd(value)
+    }
+}
+
+impl From<SetRem> for Request {
+    fn from(value: SetRem) -> Self {
+        Self::SetRem(value)
+    }
+}
+
+impl From<SetDiff> for Request {
+    fn from(value: SetDiff) -> Self {
+        Self::SetDiff(value)
+    }
+}
+
+impl From<SetUnion> for Request {
+    fn from(value: SetUnion) -> Self {
+        Self::SetUnion(value)
+    }
+}
+
+impl From<SetIntersect> for Request {
+    fn from(value: SetIntersect) -> Self {
+        Self::SetIntersect(value)
+    }
+}
+
+impl From<SetMembers> for Request {
+    fn from(value: SetMembers) -> Self {
+        Self::SetMembers(value)
+    }
+}
+
+impl From<SetIsMember> for Request {
+    fn from(value: SetIsMember) -> Self {
+        Self::SetIsMember(value)
     }
 }
 
@@ -400,6 +566,7 @@ pub enum ExpireTime {
     UnixMilliseconds(u64),
     KeepTtl,
 }
+
 impl Default for ExpireTime {
     fn default() -> Self {
         ExpireTime::Seconds(0)
@@ -419,4 +586,16 @@ impl Display for ExpireTime {
 
 fn string_key(key: &[u8]) -> Cow<'_, str> {
     String::from_utf8_lossy(key)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::RequestParser;
+    use protocol_common::Parse;
+
+    #[test]
+    fn it_should_not_panic_on_newline_delimited_get_key() {
+        let parser = RequestParser::new();
+        assert!(parser.parse(b"GET test\n").is_err());
+    }
 }

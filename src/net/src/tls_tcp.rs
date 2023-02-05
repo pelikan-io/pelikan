@@ -445,7 +445,7 @@ impl TlsTcpConnectorBuilder {
         // load the CA file, if provided
         if let Some(f) = self.ca_file {
             self.inner.set_ca_file(f).map_err(|e| {
-                Error::new(ErrorKind::Other, format!("failed to load CA file: {}", e))
+                Error::new(ErrorKind::Other, format!("failed to load CA file: {e}"))
             })?;
         }
 
@@ -456,7 +456,7 @@ impl TlsTcpConnectorBuilder {
                 .map_err(|e| {
                     Error::new(
                         ErrorKind::Other,
-                        format!("failed to load private key file: {}", e),
+                        format!("failed to load private key file: {e}"),
                     )
                 })?;
         } else {
@@ -475,7 +475,7 @@ impl TlsTcpConnectorBuilder {
                     .map_err(|e| {
                         Error::new(
                             ErrorKind::Other,
-                            format!("failed to load certificate file: {}", e),
+                            format!("failed to load certificate file: {e}"),
                         )
                     })?;
 
@@ -483,20 +483,20 @@ impl TlsTcpConnectorBuilder {
                 let pem = std::fs::read(chain).map_err(|e| {
                     Error::new(
                         ErrorKind::Other,
-                        format!("failed to load certificate chain file: {}", e),
+                        format!("failed to load certificate chain file: {e}"),
                     )
                 })?;
                 let chain = X509::stack_from_pem(&pem).map_err(|e| {
                     Error::new(
                         ErrorKind::Other,
-                        format!("failed to load certificate chain file: {}", e),
+                        format!("failed to load certificate chain file: {e}"),
                     )
                 })?;
                 for cert in chain {
                     self.inner.add_extra_chain_cert(cert).map_err(|e| {
                         Error::new(
                             ErrorKind::Other,
-                            format!("bad certificate in certificate chain file: {}", e),
+                            format!("bad certificate in certificate chain file: {e}"),
                         )
                     })?;
                 }
@@ -509,7 +509,7 @@ impl TlsTcpConnectorBuilder {
                 self.inner.set_certificate_chain_file(chain).map_err(|e| {
                     Error::new(
                         ErrorKind::Other,
-                        format!("failed to load certificate chain file: {}", e),
+                        format!("failed to load certificate chain file: {e}"),
                     )
                 })?;
             }
@@ -520,7 +520,7 @@ impl TlsTcpConnectorBuilder {
                     .map_err(|e| {
                         Error::new(
                             ErrorKind::Other,
-                            format!("failed to load certificate file: {}", e),
+                            format!("failed to load certificate file: {e}"),
                         )
                     })?;
             }
