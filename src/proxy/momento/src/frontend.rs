@@ -123,7 +123,7 @@ pub(crate) async fn handle_resp_client(
                     resp::hkeys(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashLength(r) => {
-                    resp::hlen(&mut client, &cache_name, &mut socket, r.key()).await?
+                    resp::hlen(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashMultiGet(r) => {
                     resp::hmget(&mut client, &cache_name, &mut socket, r.key(), r.fields()).await?
