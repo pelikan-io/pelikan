@@ -114,7 +114,7 @@ pub(crate) async fn handle_resp_client(
                     resp::hget(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashGetAll(r) => {
-                    resp::hgetall(&mut client, &cache_name, &mut socket, r.key()).await?
+                    resp::hgetall(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashIncrBy(r) => {
                     resp::hincrby(&mut client, &cache_name, &mut socket, r).await?
