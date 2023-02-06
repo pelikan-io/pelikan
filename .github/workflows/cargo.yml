@@ -63,7 +63,7 @@ jobs:
         name: clippy-sarif
     - uses: github/codeql-action/upload-sarif@v2
       with:
-        sarif_file: results.sarif
+        sarif_file: clippy.sarif
 
   audit:
     runs-on: ubuntu-latest
