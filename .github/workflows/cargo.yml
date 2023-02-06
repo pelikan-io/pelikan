@@ -113,6 +113,7 @@ jobs:
   bench-check:
     name: build-${{ matrix.os }}-bench
     runs-on: ${{ matrix.os }}
+    needs: [ check ]
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-12 ]
