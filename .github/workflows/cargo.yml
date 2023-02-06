@@ -279,3 +279,24 @@ jobs:
           tls: false   
       - name: Validate
         run: sleep 60 && curl -s http://localhost:9998/vars.json | jq '.' > /dev/null
+
+  check-success:
+    name: verify all tests pass
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - bench-check
+      - check
+      - rustfmt
+      - clippy
+      - audit
+      - smoketest-pingserver
+      - smoketest-pingserver-tls
+      - smoketest-pingproxy
+      - smoketest-pingproxy-tls-terminating
+      - smoketest-exposition
+
+    steps:
+      - name: no-op
+        run: |
+          echo "All checks passed!"

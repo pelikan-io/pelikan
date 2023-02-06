@@ -27,6 +27,7 @@ mod llen;
 mod lpop;
 mod lpush;
 mod lrange;
+mod ltrim;
 mod rpush;
 mod sadd;
 mod sdiff;
@@ -42,6 +43,7 @@ pub use self::llen::*;
 pub use self::lpop::*;
 pub use self::lpush::*;
 pub use self::lrange::*;
+pub use self::ltrim::*;
 pub use self::rpush::*;
 pub use self::sdiff::*;
 pub use self::sinter::*;
@@ -185,6 +187,9 @@ impl Parse<Request> for RequestParser {
                         Some(b"rpush") | Some(b"RPUSH") => {
                             ListPushBack::try_from(message).map(From::from)
                         }
+                        Some(b"ltrim") | Some(b"LTRIM") => {
+                            ListTrim::try_from(message).map(From::from)
+                        }
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
                         Some(b"sadd") | Some(b"SADD") => {
                             SetAdd::try_from(message).map(Request::from)
@@ -243,6 +248,7 @@ impl Compose for Request {
             Self::ListRange(r) => r.compose(buf),
             Self::ListPush(r) => r.compose(buf),
             Self::ListPushBack(r) => r.compose(buf),
+            Self::ListTrim(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
             Self::SetAdd(r) => r.compose(buf),
             Self::SetRem(r) => r.compose(buf),
@@ -275,6 +281,7 @@ pub enum Request {
     ListRange(ListRange),
     ListPush(ListPush),
     ListPushBack(ListPushBack),
+    ListTrim(ListTrim),
     Set(Set),
     SetAdd(SetAdd),
     SetRem(SetRem),
@@ -360,6 +367,7 @@ impl Request {
             Self::ListRange(_) => "lrange",
             Self::ListPush(_) => "lpush",
             Self::ListPushBack(_) => "rpush",
+            Self::ListTrim(_) => "ltrim",
             Self::Set(_) => "set",
             Self::SetAdd(_) => "sadd",
             Self::SetRem(_) => "srem",
@@ -477,6 +485,12 @@ impl From<ListPush> for Request {
 impl From<ListPushBack> for Request {
     fn from(value: ListPushBack) -> Self {
         Self::ListPushBack(value)
+    }
+}
+
+impl From<ListTrim> for Request {
+    fn from(value: ListTrim) -> Self {
+        Self::ListTrim(value)
     }
 }
 
