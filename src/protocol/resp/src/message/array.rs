@@ -10,6 +10,12 @@ pub struct Array {
     pub(crate) inner: Option<Vec<Message>>,
 }
 
+impl Array {
+    pub fn nil() -> Self {
+        Self { inner: None }
+    }
+}
+
 impl Compose for Array {
     fn compose(&self, session: &mut dyn BufMut) -> usize {
         let mut len = 0;
