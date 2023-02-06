@@ -10,6 +10,22 @@ env:
   RUSTFLAGS: "--cfg=CI"
 
 jobs:
+  # First stage: these are quick jobs htat give immediate feedback on a PR.
+  check:
+    name: check-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-12 ]
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-protoc
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions-rs/cargo@v1
+        with:
+          command: check
+
   build:
     strategy:
       matrix:
