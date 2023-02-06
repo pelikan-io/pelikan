@@ -28,7 +28,6 @@ mod lpop;
 mod lpush;
 mod lrange;
 mod ltrim;
-mod ltrim;
 mod rpop;
 mod rpush;
 mod sadd;
