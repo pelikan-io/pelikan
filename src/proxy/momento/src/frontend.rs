@@ -108,7 +108,7 @@ pub(crate) async fn handle_resp_client(
                     resp::hdel(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashExists(r) => {
-                    resp::hexists(&mut client, &cache_name, &mut socket, r.key(), r.field()).await?
+                    resp::hexists(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashGet(r) => {
                     resp::hget(&mut client, &cache_name, &mut socket, r.key(), r.field()).await?
