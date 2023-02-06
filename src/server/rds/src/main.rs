@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 //! Rds is an implementation of a cache backend that implements a subset of
-//! the Redis ASCII protocol and is currently backed with segment based storage. By
+//! Redis commands and is currently backed with segment based storage. By
 //! grouping items with a similar TTL, it is able to provide efficient eager
 //! expiration.
 //!
