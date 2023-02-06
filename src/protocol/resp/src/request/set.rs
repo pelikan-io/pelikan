@@ -247,22 +247,28 @@ impl Compose for Set {
     }
 }
 
+
+/// In order to match memcached klog we need a flag value, but this isn't something in the RESP
+/// protocol, so we just use zero.
+const FLAG: u8 = 0;
+
 impl Klog for Set {
     type Response = Response;
 
     fn klog(&self, response: &Self::Response) {
-        let code = match response {
-            Message::SimpleString(_) => STORED,
-            _ => NOT_STORED,
+        let (code, len) = match response {
+            Message::SimpleString(s) => (ResponseCode::Stored, s.len()),
+            _ => (ResponseCode::NotFound, 0),
         };
 
         klog!(
-            "\"set {} {} {} {}\" {}",
+            "\"set {} {} {} {}\" {} {}",
             string_key(self.key()),
-            self.mode(),
+            FLAG,
             self.expire_time().unwrap_or(ExpireTime::default()),
             self.value().len(),
-            code
+            code as u32,
+            len
         );
     }
 }

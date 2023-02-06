@@ -62,11 +62,19 @@ pub use hset::*;
 pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
-// response codes for klog
-const MISS: u8 = 0;
-const HIT: u8 = 4;
-const STORED: u8 = 5;
-const NOT_STORED: u8 = 9;
+
+/// response codes for klog
+/// matches Memcache protocol response codes for compatibility with existing tools
+/// [crate::memcache::MISS]
+enum ResponseCode {
+    Miss = 0,
+    Hit = 4,
+    Stored = 5,
+    Exists = 6,
+    Deleted = 7,
+    NotFound = 8,
+    NotStored = 9
+}
 
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
 

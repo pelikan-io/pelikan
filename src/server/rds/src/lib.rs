@@ -20,7 +20,7 @@ pub struct Rds {
 }
 
 impl Rds {
-    /// Creates a new `Rds` process from the given `SegcacheConfig`.
+    /// Creates a new [Rds] process from the given [SegcacheConfig].
     pub fn new(config: SegcacheConfig) -> Result<Self, std::io::Error> {
         // initialize logging
         let log_drain = configure_logging(&config);

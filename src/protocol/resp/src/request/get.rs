@@ -82,13 +82,13 @@ impl Klog for Get {
     type Response = Response;
 
     fn klog(&self, response: &Self::Response) {
-        let code = match response {
-            Message::BulkString(_) if *response == Response::null() => MISS,
-            Message::BulkString(_) => HIT,
-            _ => MISS,
+        let (code, len) = match response {
+            Message::BulkString(_) if *response == Response::null() => (ResponseCode::Miss, 0),
+            Message::BulkString(s) => (ResponseCode::Hit, s.len()) ,
+            _ => (ResponseCode::Miss, 0),
         };
 
-        klog!("\"get {}\" {}", string_key(self.key()), code);
+        klog!("\"get {}\" {} {}", string_key(self.key()), code as u32, len);
     }
 }
 #[cfg(test)]
