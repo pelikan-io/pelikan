@@ -257,7 +257,7 @@ impl Klog for Set {
     fn klog(&self, response: &Self::Response) {
         let (code, len) = match response {
             Message::SimpleString(s) => (ResponseCode::Stored, s.len()),
-            _ => (ResponseCode::NotFound, 0),
+            _ => (ResponseCode::NotStored, 0),
         };
 
         klog!(
