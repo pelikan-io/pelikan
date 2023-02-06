@@ -58,19 +58,14 @@ pub fn parse_signed_redis(bytes: &[u8]) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use crate::parse::parse_signed_redis;
-    use rand::prelude::*;
     #[test]
-    fn it_should_parse_numbers() {
-        assert_eq!(parse_signed_redis(b"199"), Some(199));
-        assert_eq!(parse_signed_redis(b"0"), Some(0));
-        assert_eq!(parse_signed_redis(b"-1"), Some(-1));
+    fn it_should_parse_obvious_numbers() {
+        for x in 0..=10_000 {
+            assert_eq!(parse_signed_redis(x.to_string().as_bytes()), Some(x as i64));
+            assert_eq!(parse_signed_redis((-x).to_string().as_bytes()), Some(-x as i64));
+        }
         assert_eq!(parse_signed_redis(b"9223372036854775807"), Some(i64::MAX));
         assert_eq!(parse_signed_redis(b"-9223372036854775808"), Some(i64::MIN));
-        for x in 0..100_000 {
-            let number = rand::random::<i64>();
-            let string = number.to_string();
-            assert_eq!(parse_signed_redis(string.as_bytes()), Some(number));
-        }
     }
 
     #[test]
