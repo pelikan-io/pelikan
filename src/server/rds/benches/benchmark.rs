@@ -10,7 +10,7 @@
 //!
 //! For formal performance testing, it is recommended to use
 //! [rpc-perf](https://github.com/twitter/rpc-perf) or another cache
-//! benchmarking tool which supports the Memcache ASCII protocol.
+//! benchmarking tool which supports the RESP protocol.
 
 use config::SegcacheConfig;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};

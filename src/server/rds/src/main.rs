@@ -22,7 +22,7 @@ use metriken::*;
 use pelikan_rds::Rds;
 use server::PERCENTILES;
 
-/// The entry point into the running Segcache instance. This function parses the
+/// The entry point into the running [Rds] instance. This function parses the
 /// command line options, loads the configuration, and launches the core
 /// threads.
 fn main() {
