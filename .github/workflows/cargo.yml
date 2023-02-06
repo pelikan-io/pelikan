@@ -40,7 +40,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: run clippy
         run: |
-          cargo clippy --all-targets --all-features --message-format \
+          cargo clippy --all-targets --all-features --message-format json \
             | clippy-sarif \
             | tee results.sarif \
             | sarif-fmt
