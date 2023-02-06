@@ -49,6 +49,16 @@ jobs:
         with:
           sarif_file: results.sarif
 
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+      - run: |
+          cargo audit
+
   build:
     strategy:
       matrix:
@@ -155,16 +165,6 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
-
-  audit:
-    name: audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: cargo audit
-        run: |
-          cargo install cargo-audit
-          cargo audit
 
   smoketest-pingserver:
     name: smoketest-pingserver
