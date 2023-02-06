@@ -17,7 +17,7 @@ use pelikan_segcache_rs::Segcache;
 
 use std::time::Duration;
 
-#[cfg_attr(target_os = "macos", ignore = "test is flaky on macos")]
+#[cfg_attr(all(CI, target_os = "macos"), ignore = "test is flaky on macos")]
 fn main() {
     debug!("launching server");
     let server = Segcache::new(SegcacheConfig::default()).expect("failed to launch segcache");
