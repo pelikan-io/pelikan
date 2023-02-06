@@ -1,5 +1,7 @@
 use std::str::FromStr;
 
+use crate::message::Message;
+
 use super::{ArrayParser, ParseError, ParseResult, Parser};
 
 enum Detail<'a, 'p> {
@@ -102,5 +104,21 @@ impl<'a, 'p> CommandParser<'a, 'p> {
             }
             Detail::Inline { .. } => Err(ParseError::UnexpectedArrayElement),
         }
+    }
+
+    pub fn parse_message(mut self) -> ParseResult<'a, Message> {
+        use crate::message::Array;
+
+        let mut elements = Vec::with_capacity(self.remaining());
+
+        for _ in 0..self.remaining() {
+            elements.push(Message::bulk_string(self.parse_string_nonnil()?));
+        }
+
+        self.finish()?;
+
+        Ok(Message::Array(Array {
+            inner: Some(elements),
+        }))
     }
 }
