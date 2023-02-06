@@ -26,6 +26,29 @@ jobs:
         with:
           command: check
 
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-protoc
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: clippy-sarif,sarif-fmt
+      - uses: Swatinem/rust-cache@v2
+      - name: run clippy
+        run: |
+          cargo clippy --all-targets --all-features --message-format \
+            | clippy-sarif \
+            | tee results.sarif \
+            | sarif-fmt
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v1
+        with:
+          sarif_file: results.sarif
+
   build:
     strategy:
       matrix:
@@ -132,24 +155,6 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
-
-  # Note: We could run these using the pull_request_target trigger. I haven't
-  #       done this since I'm not sure if it would be secure.
-  #
-  # See this link for more details on this
-  # https://securitylab.github.com/research/github-actions-preventing-pwn-requests/
-  clippy:
-    name: clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: ./.github/actions/setup-protoc
-      - uses: Swatinem/rust-cache@v1
-        with:
-          key: clippy
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
 
   audit:
     name: audit
