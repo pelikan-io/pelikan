@@ -12,14 +12,14 @@ extern crate logger;
 
 use crate::common::*;
 
-use config::SegcacheConfig;
 use pelikan_rds::Rds;
 
+use config::RdsConfig;
 use std::time::Duration;
 
 fn main() {
     debug!("launching server");
-    let server = Rds::new(SegcacheConfig::default()).expect("failed to launch rds");
+    let server = Rds::new(RdsConfig::default()).expect("failed to launch rds");
 
     // wait for server to startup. duration is chosen to be longer than we'd
     // expect startup to take in a slow ci environment.

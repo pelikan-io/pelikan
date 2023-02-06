@@ -17,7 +17,7 @@ extern crate logger;
 
 use backtrace::Backtrace;
 use clap::{Arg, Command};
-use config::SegcacheConfig;
+use config::RdsConfig;
 use metriken::*;
 use pelikan_rds::Rds;
 use server::PERCENTILES;
@@ -102,7 +102,7 @@ fn main() {
     // load config from file
     let config = if let Some(file) = matches.get_one::<String>("CONFIG") {
         debug!("loading config: {}", file);
-        match SegcacheConfig::load(file) {
+        match RdsConfig::load(file) {
             Ok(c) => c,
             Err(error) => {
                 eprintln!("error loading config file: {file}\n{error}");

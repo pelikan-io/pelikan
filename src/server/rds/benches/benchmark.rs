@@ -12,7 +12,7 @@
 //! [rpc-perf](https://github.com/twitter/rpc-perf) or another cache
 //! benchmarking tool which supports the RESP protocol.
 
-use config::SegcacheConfig;
+use config::RdsConfig;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use pelikan_rds::Rds;
 
@@ -23,7 +23,7 @@ const RESP_NIL: &[u8; 5] = b"$-1\r\n";
 const RESP_OK: &[u8; 5] = b"+OK\r\n";
 fn get_benchmark(c: &mut Criterion) {
     // use the default config
-    let config = SegcacheConfig::default();
+    let config = RdsConfig::default();
 
     // launch the server
     let server = Rds::new(config).expect("failed to launch rds");

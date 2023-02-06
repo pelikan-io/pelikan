@@ -73,7 +73,7 @@ enum ResponseCode {
     Exists = 6,
     Deleted = 7,
     NotFound = 8,
-    NotStored = 9
+    NotStored = 9,
 }
 
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);

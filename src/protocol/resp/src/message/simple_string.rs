@@ -10,7 +10,7 @@ pub struct SimpleString {
 }
 
 impl SimpleString {
-    pub fn len(&self) -> usize  {
+    pub fn len(&self) -> usize {
         self.inner.len()
     }
 }

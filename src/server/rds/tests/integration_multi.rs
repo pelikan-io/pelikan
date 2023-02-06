@@ -12,14 +12,14 @@ mod common;
 
 use crate::common::*;
 
-use config::{SegcacheConfig, WorkerConfig};
+use config::{RdsConfig, WorkerConfig};
 use pelikan_rds::Rds;
 
 use std::time::Duration;
 
 fn main() {
     debug!("launching multi-worker server");
-    let mut config = SegcacheConfig::default();
+    let mut config = RdsConfig::default();
     config.worker_mut().set_threads(2);
     let server = Rds::new(config).expect("failed to launch rds");
 

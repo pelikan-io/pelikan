@@ -84,7 +84,7 @@ impl Klog for Get {
     fn klog(&self, response: &Self::Response) {
         let (code, len) = match response {
             Message::BulkString(_) if *response == Response::null() => (ResponseCode::Miss, 0),
-            Message::BulkString(s) => (ResponseCode::Hit, s.len()) ,
+            Message::BulkString(s) => (ResponseCode::Hit, s.len()),
             _ => (ResponseCode::Miss, 0),
         };
 

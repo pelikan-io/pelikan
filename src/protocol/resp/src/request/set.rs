@@ -247,7 +247,6 @@ impl Compose for Set {
     }
 }
 
-
 /// In order to match memcached klog we need a flag value, but this isn't something in the RESP
 /// protocol, so we just use zero.
 const FLAG: u8 = 0;
