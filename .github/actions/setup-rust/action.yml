@@ -14,8 +14,9 @@ runs:
       env:
         CONFIG: |
           [target.x86_64-unknown-linux-gnu]
-          rustflags = [
-            "-C", "link-arg=-fuse-ld=lld"
-          ]
+          rustflags = [ "-C", "link-arg=-fuse-ld=lld" ]
+
+          [target.x86_64-apple-darwin]
+          rustflags = [ "-C", "link-arg=-fuse-ld=lld" ]
       run: |
-        echo "$CONFIG" > .cargo/config
+        echo "$CONFIG" >> ~/.cargo/config.toml
