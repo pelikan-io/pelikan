@@ -112,13 +112,16 @@ jobs:
         shell: bash
 
       - name: build
+        shell: bash
         run: |
           cargo test --workspace --all-features --all-targets --no-run ${{ env.CARGO_FLAGS }}
       - name: test
+        shell: bash
         run: |
           cargo test --workspace --all-features --tests --lib --bins --examples ${{ env.CARGO_FLAGS }}
       - name: doctests
         if: ${{ matrix.profile == 'debug' }}
+        shell: bash
         run: |
           cargo test --workspace --all-features --doc -- --test-threads 16
 
@@ -134,11 +137,10 @@ jobs:
       - uses: ./.github/actions/setup-protoc
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v1
-      - uses: actions-rs/cargo@v1
-        name: build
-        with:
-          command: bench
-          args: --workspace --no-run
+      - name: build
+        shel: bash
+        run: |
+          cargo bench --workspace --no-run
 
   smoketest-pingserver:
     name: smoketest-pingserver
