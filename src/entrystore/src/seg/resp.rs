@@ -10,13 +10,16 @@ use protocol_common::*;
 
 use protocol_resp::*;
 
+use seg::Value::{Bytes, U64};
 use std::time::Duration;
+use storage_types::parse_signed_redis;
 
 impl Execute<Request, Response> for Seg {
     fn execute(&mut self, request: &Request) -> Response {
         match request {
             Request::Get(get) => self.get(get),
             Request::Set(set) => self.set(set),
+            Request::Incr(incr) => self.incr(incr),
             _ => Response::error("not supported"),
         }
     }
@@ -39,15 +42,45 @@ impl Storage for Seg {
             ExpireTime::Seconds(n) => n,
             _ => 0,
         };
+        let value = match parse_signed_redis(set.value()) {
+            Some(integer) => U64(integer as u64),
+            None => Bytes(set.value()),
+        };
 
         if self
             .data
-            .insert(set.key(), set.value(), None, Duration::from_secs(ttl))
+            .insert(set.key(), value, None, Duration::from_secs(ttl))
             .is_ok()
         {
             Response::simple_string("OK")
         } else {
             Response::error("not stored")
+        }
+    }
+
+    fn incr(&mut self, incr: &Incr) -> Response {
+        if let Some(mut item) = self.data.get(incr.key()) {
+            match item.value() {
+                seg::Value::Bytes(b) => Response::error("wrong data type"),
+                seg::Value::U64(uint) => {
+                    if let Some(incremented) = (uint as i64).checked_add(1) {
+                        item.wrapping_add(1);
+                        Response::integer(incremented)
+                    } else {
+                        Response::error("increment or decrement would overflow")
+                    }
+                }
+            }
+        } else {
+            if self
+                .data
+                .insert(incr.key(), 1 as u64, None, Duration::from_secs(0))
+                .is_ok()
+            {
+                Response::integer(1)
+            } else {
+                Response::error("not stored")
+            }
         }
     }
 }
