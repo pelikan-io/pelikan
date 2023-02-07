@@ -25,6 +25,7 @@ mod hlen;
 mod hmget;
 mod hset;
 mod hvals;
+mod incr;
 mod lindex;
 mod llen;
 mod lpop;
@@ -68,6 +69,7 @@ pub use hlen::*;
 pub use hmget::*;
 pub use hset::*;
 pub use hvals::*;
+pub use incr::*;
 pub use sadd::*;
 pub use set::*;
 
@@ -191,6 +193,7 @@ impl Parse<Request> for RequestParser {
                         Some(b"hincrby") | Some(b"HINCRBY") => {
                             HashIncrBy::try_from(message).map(Request::from)
                         }
+                        Some(b"incr") | Some(b"INCR") => Incr::try_from(message).map(Request::from),
                         Some(b"lindex") | Some(b"LINDEX") => {
                             ListIndex::try_from(message).map(Request::from)
                         }
@@ -263,6 +266,7 @@ impl Compose for Request {
             Self::HashSet(r) => r.compose(buf),
             Self::HashValues(r) => r.compose(buf),
             Self::HashIncrBy(r) => r.compose(buf),
+            Self::Incr(r) => r.compose(buf),
             Self::ListIndex(r) => r.compose(buf),
             Self::ListLen(r) => r.compose(buf),
             Self::ListPop(r) => r.compose(buf),
@@ -297,6 +301,7 @@ pub enum Request {
     HashSet(HashSet),
     HashValues(HashValues),
     HashIncrBy(HashIncrBy),
+    Incr(Incr),
     ListIndex(ListIndex),
     ListLen(ListLen),
     ListPop(ListPop),
@@ -396,6 +401,7 @@ impl Request {
             Self::HashSet(_) => "hset",
             Self::HashValues(_) => "hvals",
             Self::HashIncrBy(_) => "hincrby",
+            Self::Incr(_) => "incr",
             Self::ListIndex(_) => "lindex",
             Self::ListLen(_) => "llen",
             Self::ListPop(_) => "lpop",
@@ -485,6 +491,12 @@ impl From<HashValues> for Request {
 impl From<HashIncrBy> for Request {
     fn from(value: HashIncrBy) -> Self {
         Self::HashIncrBy(value)
+    }
+}
+
+impl From<Incr> for Request {
+    fn from(value: Incr) -> Self {
+        Self::Incr(value)
     }
 }
 

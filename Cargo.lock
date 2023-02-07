@@ -774,6 +774,7 @@ dependencies = [
  "protocol-ping",
  "protocol-resp",
  "seg",
+ "storage-types",
 ]
 
 [[package]]

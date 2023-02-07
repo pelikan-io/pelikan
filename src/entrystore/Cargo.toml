@@ -20,3 +20,4 @@ protocol-memcache = { path = "../protocol/memcache" }
 protocol-ping = { path = "../protocol/ping" }
 protocol-resp = { path = "../protocol/resp" }
 seg = { path = "../storage/seg" }
+storage-types = { path = "../storage/types" }
