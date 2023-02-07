@@ -114,7 +114,7 @@ jobs:
       - name: build
         shell: bash
         run: |
-          cargo test --workspace --all-features --all-targets --no-run ${{ env.CARGO_FLAGS }}
+          cargo build --workspace --all-features --all-targets ${{ env.CARGO_FLAGS }}
       - name: test
         shell: bash
         run: |
@@ -124,6 +124,19 @@ jobs:
         shell: bash
         run: |
           cargo test --workspace --all-features --doc -- --test-threads 16
+
+      - name: generate bin artifact
+        if: ${{ matrix.profile == 'release' && matrix.os == 'ubuntu-latest' }}
+        shell: bash
+        run: |
+          mkdir install
+          cargo install --path . -p pingserver --root install
+          cargo install --path . -p pingproxy  --root install
+      - uses: actions/upload-artifact@v3
+        if: ${{ matrix.profile == 'release' && matrix.os == 'ubuntu-latest' }}
+        with:
+          name: binaries
+          path: install
 
   bench-check:
     name: build-${{ matrix.os }}-bench
