@@ -26,7 +26,11 @@ jobs:
       - name: cargo build
         shell: bash
         run: |
-          cargo fuzz build
+          for target in protocol/admin protocol/memcache protocol/ping protocol/thrift storage/seg; do
+            cd src/$target
+            cargo fuzz build
+            cd -
+          done
 
   fuzz:
     strategy:
