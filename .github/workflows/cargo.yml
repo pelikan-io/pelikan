@@ -167,6 +167,7 @@ jobs:
           cargo bench --workspace --no-run
 
   smoketest-pingserver:
+    name: ${{ matrix.tls && 'smoketest-pingserver-tls' || 'smoketest-pingserver' }}
     runs-on: ubuntu-latest
     needs: [ build ]
     strategy:
