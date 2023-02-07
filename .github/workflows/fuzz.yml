@@ -21,11 +21,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: fuzz
+          prefix-key: v1-rust
       - uses: dtolnay/install@cargo-fuzz
 
       - name: cargo build
         shell: bash
         run: |
+          CARGO_TARGET_DIR=$(pwd)/target
+
           for target in protocol/admin protocol/memcache protocol/ping protocol/thrift storage/seg; do
             cd src/$target
             cargo fuzz build
@@ -54,11 +57,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: fuzz
+          prefix-key: v1-rust
           save-if: false
       - uses: dtolnay/install@cargo-fuzz
 
       - name: fuzz ${{ matrix.target }}
         run: |
+          CARGO_TARGET_DIR=$(pwd)/target
+
           cd src/${{ matrix.target }}
           for FUZZ_TARGET in `cargo fuzz list`; do
             cargo fuzz run ${FUZZ_TARGET} --jobs ${{ env.FUZZ_JOBS }} -- \
