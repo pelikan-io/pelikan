@@ -108,6 +108,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
+          prefix-key: v1-rust
           shared-key: build-${{ matrix.os }}-${{ matrix.profile }}
 
       - name: Update cargo flags
@@ -159,6 +160,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
+          prefix-key: v1-rust
           shared-key: build-${{ matrix.os }}-release
           save-if: false
       - name: build
