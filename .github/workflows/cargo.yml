@@ -19,8 +19,7 @@ jobs:
         os: [ ubuntu-latest, macos-12 ]
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/setup-protoc
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/setup-rust
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: check-${{ matrix.os }}
@@ -32,10 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/setup-protoc
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
+      - uses: ./.github/actions/setup-rust
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
         with:
@@ -103,8 +99,7 @@ jobs:
         profile: [ release, debug ]
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/setup-protoc
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/setup-rust
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: v1-rust
@@ -155,8 +150,7 @@ jobs:
         os: [ ubuntu-latest, macos-12 ]
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/actions/setup-protoc
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/setup-rust
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: v1-rust
