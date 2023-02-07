@@ -14,8 +14,9 @@ runs:
 
     - uses: actions/cache@v3
       id: rpc-perf-cache
-      key: rpc-perf-${{ steps.rpc-perf-hash.outputs.sha }}
-      path: ~/.cargo/bin/rpc-perf
+      with:
+        key: rpc-perf-${{ steps.rpc-perf-hash.outputs.sha }}
+        path: ~/.cargo/bin/rpc-perf
 
     - name: install rpc-perf
       if: ${{ !steps.rpc-perf-cache.outputs.cache-hit }}
