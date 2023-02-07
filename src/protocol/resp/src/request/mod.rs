@@ -28,6 +28,7 @@ mod lpop;
 mod lpush;
 mod lrange;
 mod ltrim;
+mod rpop;
 mod rpush;
 mod sadd;
 mod sdiff;
@@ -44,6 +45,7 @@ pub use self::lpop::*;
 pub use self::lpush::*;
 pub use self::lrange::*;
 pub use self::ltrim::*;
+pub use self::rpop::*;
 pub use self::rpush::*;
 pub use self::sdiff::*;
 pub use self::sinter::*;
@@ -190,6 +192,9 @@ impl Parse<Request> for RequestParser {
                         Some(b"ltrim") | Some(b"LTRIM") => {
                             ListTrim::try_from(message).map(From::from)
                         }
+                        Some(b"rpop") | Some(b"RPOP") => {
+                            ListPopBack::try_from(message).map(From::from)
+                        }
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
                         Some(b"sadd") | Some(b"SADD") => {
                             SetAdd::try_from(message).map(Request::from)
@@ -249,6 +254,7 @@ impl Compose for Request {
             Self::ListPush(r) => r.compose(buf),
             Self::ListPushBack(r) => r.compose(buf),
             Self::ListTrim(r) => r.compose(buf),
+            Self::ListPopBack(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
             Self::SetAdd(r) => r.compose(buf),
             Self::SetRem(r) => r.compose(buf),
@@ -282,6 +288,7 @@ pub enum Request {
     ListPush(ListPush),
     ListPushBack(ListPushBack),
     ListTrim(ListTrim),
+    ListPopBack(ListPopBack),
     Set(Set),
     SetAdd(SetAdd),
     SetRem(SetRem),
@@ -368,6 +375,7 @@ impl Request {
             Self::ListPush(_) => "lpush",
             Self::ListPushBack(_) => "rpush",
             Self::ListTrim(_) => "ltrim",
+            Self::ListPopBack(_) => "rpop",
             Self::Set(_) => "set",
             Self::SetAdd(_) => "sadd",
             Self::SetRem(_) => "srem",
@@ -491,6 +499,12 @@ impl From<ListPushBack> for Request {
 impl From<ListTrim> for Request {
     fn from(value: ListTrim) -> Self {
         Self::ListTrim(value)
+    }
+}
+
+impl From<ListPopBack> for Request {
+    fn from(value: ListPopBack) -> Self {
+        Self::ListPopBack(value)
     }
 }
 
