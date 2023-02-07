@@ -171,26 +171,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: [ build ]
     steps:
-      - uses: actions/checkout@v2
-        with:
-          path: pelikan
-      - uses: ./pelikan/.github/actions/setup-protoc
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Build Cache for Pelikan
-        uses: Swatinem/rust-cache@v1
-        with:
-          key: pelikan
-          working-directory: pelikan
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - uses: ./pelikan/.github/actions/ca
-      - uses: ./pelikan/.github/actions/pingserver
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-smoketest
+      - uses: ./.github/actions/ca
+      - uses: ./.github/actions/pingserver
         with:
           tls: false
-      - uses: ./pelikan/.github/actions/rpc-perf
+      - uses: ./.github/actions/rpc-perf
         with:
           protocol: ping
           port: 12321

@@ -1,0 +1,33 @@
+name: setup-smoketest
+description: common setup for pelikan smoketests
+
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/install@stable
+
+    - name: get rpc-perf head commit
+      id: rpc-perf-hash
+      shell: bash
+      run: |
+        echo "sha=$(git ls-remote https://github.com/twitter/rpc-perf master | cut -f1)" > $GITHUB_OUTPUT
+
+    - uses: actions/cache@v3
+      id: rpc-perf-cache
+      key: rpc-perf-${{ steps.rpc-perf-hash.outputs.sha }}
+      path: ~/.cargo/bin/rpc-perf
+
+    - name: install rpc-perf
+      if: ${{ !steps.rpc-perf-cache.outputs.cache-hit }}
+      shell: bash
+      run: |
+        cargo install --git https://github.com/twitter/rpc-perf --locked
+
+    - uses: actions/download-artifact@v3
+      with:
+        name: binaries
+
+    - name: install pelikan binaries
+      shell: bash
+      run: |
+        cp ./install/* ~/.cargo/bin
