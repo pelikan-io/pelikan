@@ -10,7 +10,7 @@ env:
   RUSTFLAGS: "--cfg=CI"
 
 jobs:
-  # First stage: these are quick jobs htat give immediate feedback on a PR.
+  # First stage: these are quick jobs that give immediate feedback on a PR.
   check:
     name: check-${{ matrix.os }}
     runs-on: ${{ matrix.os }}
