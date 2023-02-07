@@ -97,7 +97,6 @@ jobs:
   build:
     name: build-${{ matrix.os }}-${{ matrix.profile }}
     runs-on: ${{ matrix.os }}
-    needs: [ check ]
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-12 ]
