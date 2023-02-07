@@ -22,7 +22,9 @@ runs:
       if: ${{ !steps.rpc-perf-cache.outputs.cache-hit }}
       shell: bash
       run: |
+        echo "::group::build rpc-perf"
         cargo install --git https://github.com/twitter/rpc-perf --locked
+        echo "::endgroup"
 
     - uses: actions/download-artifact@v3
       with:
@@ -31,4 +33,5 @@ runs:
     - name: install pelikan binaries
       shell: bash
       run: |
-        cp ./install/* ~/.cargo/bin
+        ls -l
+    #     cp ./install/* ~/.cargo/bin
