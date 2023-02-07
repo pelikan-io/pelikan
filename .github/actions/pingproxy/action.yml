@@ -36,5 +36,5 @@ runs:
     - name: Run pingproxy
       run: |
         pelikan_pingproxy_rs proxy.toml &
-        sleep 1
+        sleep 60
       shell: bash
