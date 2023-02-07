@@ -4,7 +4,7 @@ description: common setup for pelikan smoketests
 runs:
   using: composite
   steps:
-    - uses: dtolnay/install@stable
+    - uses: dtolnay/rust-toolchain@stable
 
     - name: get rpc-perf head commit
       id: rpc-perf-hash
