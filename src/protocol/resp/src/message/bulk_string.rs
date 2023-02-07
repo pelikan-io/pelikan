@@ -18,7 +18,7 @@ impl BulkString {
             inner: Some(bytes.into()),
         }
     }
-    
+
     pub fn len(&self) -> usize {
         self.inner.as_ref().map(|i| i.len()).unwrap_or(0)
     }
