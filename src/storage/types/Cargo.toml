@@ -16,5 +16,4 @@ harness = false
 
 [dev-dependencies]
 criterion = "0.3.4"
-rand_xoshiro = { workspace = true }
-rand = { workspace = true , features = ["small_rng", "getrandom"] }
+

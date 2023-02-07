@@ -2500,8 +2500,6 @@ name = "storage-types"
 version = "0.3.1"
 dependencies = [
  "criterion 0.3.6",
- "rand",
- "rand_xoshiro",
 ]
 
 [[package]]
