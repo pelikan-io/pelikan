@@ -33,12 +33,8 @@ runs:
           certificate = "proxy.crt"
           private_key = "proxy.key"
       shell: bash
-    - name: Build pingproxy
-      run: |
-        cd pelikan && cargo build --release --bin pelikan_pingproxy_rs
-      shell: bash
     - name: Run pingproxy
       run: |
-        ./pelikan/target/release/pelikan_pingproxy_rs proxy.toml &
+        pelikan_pingproxy_rs proxy.toml &
         sleep 10
       shell: bash
