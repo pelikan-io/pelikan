@@ -74,6 +74,7 @@ pub use set::*;
 /// response codes for klog
 /// matches Memcache protocol response codes for compatibility with existing tools
 /// [crate::memcache::MISS]
+#[allow(dead_code)]
 enum ResponseCode {
     Miss = 0,
     Hit = 4,
