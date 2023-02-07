@@ -4,9 +4,12 @@
 
 use crate::message::*;
 use crate::*;
+use logger::Klog;
 use protocol_common::BufMut;
 use protocol_common::Parse;
 use protocol_common::ParseOk;
+use std::borrow::Cow;
+use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -68,9 +71,22 @@ pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
 
+/// response codes for klog
+/// matches Memcache protocol response codes for compatibility with existing tools
+/// [crate::memcache::MISS]
+enum ResponseCode {
+    Miss = 0,
+    Hit = 4,
+    Stored = 5,
+    Exists = 6,
+    Deleted = 7,
+    NotFound = 8,
+    NotStored = 9,
+}
+
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RequestParser {
     message_parser: MessageParser,
 }
@@ -297,6 +313,18 @@ pub enum Request {
     SetIntersect(SetIntersect),
     SetMembers(SetMembers),
     SetIsMember(SetIsMember),
+}
+
+impl Klog for Request {
+    type Response = Response;
+
+    fn klog(&self, response: &Self::Response) {
+        match self {
+            Request::Get(r) => r.klog(response),
+            Request::Set(r) => r.klog(response),
+            _ => (),
+        }
+    }
 }
 
 impl Request {
@@ -601,6 +629,27 @@ pub enum ExpireTime {
     UnixSeconds(u64),
     UnixMilliseconds(u64),
     KeepTtl,
+}
+
+impl Default for ExpireTime {
+    fn default() -> Self {
+        ExpireTime::Seconds(0)
+    }
+}
+impl Display for ExpireTime {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpireTime::Seconds(s) => write!(f, "{}s", s),
+            ExpireTime::Milliseconds(ms) => write!(f, "{}ms", ms),
+            ExpireTime::UnixSeconds(s) => write!(f, "{}unix_secs", s),
+            ExpireTime::UnixMilliseconds(ms) => write!(f, "{}unix_ms", ms),
+            ExpireTime::KeepTtl => write!(f, "keep_ttl"),
+        }
+    }
+}
+
+fn string_key(key: &[u8]) -> Cow<'_, str> {
+    String::from_utf8_lossy(key)
 }
 
 #[cfg(test)]

@@ -3,6 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use logger::klog;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -77,6 +78,19 @@ impl Compose for Get {
     }
 }
 
+impl Klog for Get {
+    type Response = Response;
+
+    fn klog(&self, response: &Self::Response) {
+        let (code, len) = match response {
+            Message::BulkString(_) if *response == Response::null() => (ResponseCode::Miss, 0),
+            Message::BulkString(s) => (ResponseCode::Hit, s.len()),
+            _ => (ResponseCode::Miss, 0),
+        };
+
+        klog!("\"get {}\" {} {}", string_key(self.key()), code as u32, len);
+    }
+}
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -3,6 +3,8 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use logger::klog;
+use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -11,6 +13,16 @@ pub enum SetMode {
     Add,
     Replace,
     Set,
+}
+impl Display for SetMode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let string = match self {
+            SetMode::Add => "add",
+            SetMode::Replace => "replace",
+            SetMode::Set => "set",
+        };
+        write!(f, "{}", string)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -232,6 +244,31 @@ impl Compose for Set {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let message = Message::from(self);
         message.compose(buf)
+    }
+}
+
+/// In order to match memcached klog we need a flag value, but this isn't something in the RESP
+/// protocol, so we just use zero.
+const FLAG: u8 = 0;
+
+impl Klog for Set {
+    type Response = Response;
+
+    fn klog(&self, response: &Self::Response) {
+        let (code, len) = match response {
+            Message::SimpleString(s) => (ResponseCode::Stored, s.len()),
+            _ => (ResponseCode::NotStored, 0),
+        };
+
+        klog!(
+            "\"set {} {} {} {}\" {} {}",
+            string_key(self.key()),
+            FLAG,
+            self.expire_time().unwrap_or(ExpireTime::default()),
+            self.value().len(),
+            code as u32,
+            len
+        );
     }
 }
 

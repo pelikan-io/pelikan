@@ -1,0 +1,52 @@
+[package]
+name = "rds"
+description = "a RESP protocol server"
+authors = ["Brian Martin <brian@pelikan.io>"]
+
+version = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[lib]
+name = "pelikan_rds"
+path = "src/lib.rs"
+doc = true
+
+[[bin]]
+name = "pelikan_rds"
+path = "src/main.rs"
+doc = false
+
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+harness = false
+
+[[test]]
+name = "integration_multi"
+path = "tests/integration_multi.rs"
+harness = false
+
+[[bench]]
+name = "benchmark"
+path = "benches/benchmark.rs"
+harness = false
+
+[features]
+debug = ["entrystore/debug"]
+
+[dependencies]
+backtrace = { workspace = true }
+clap = { workspace = true }
+common = { path = "../../common" }
+config = { path = "../../config" }
+entrystore = { path = "../../entrystore" }
+logger = { path = "../../logger" }
+metriken = { workspace = true }
+protocol-resp = { path = "../../protocol/resp" }
+server = { path = "../../core/server" }
+
+[dev-dependencies]
+criterion = "0.3"

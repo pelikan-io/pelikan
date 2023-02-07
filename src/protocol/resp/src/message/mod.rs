@@ -73,7 +73,7 @@ pub enum MessageType {
     Array,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct MessageParser {}
 
 pub(crate) fn message_type(input: &[u8]) -> IResult<&[u8], MessageType> {
