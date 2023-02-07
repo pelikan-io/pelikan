@@ -111,20 +111,16 @@ jobs:
         run: echo 'CARGO_FLAGS=' >> $GITHUB_ENV
         shell: bash
 
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: ${{ env.CARGO_FLAGS }} --workspace --all-features --all-targets --no-run
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: ${{ env.CARGO_FLAGS }} --workspace --all-features --tests --lib --bins --examples
-      - uses: actions-rs/cargo@v1
+      - name: build
+        run: |
+          cargo test --workspace --all-features --all-targets --no-run ${{ env.CARGO_FLAGS }}
+      - name: test
+        run: |
+          cargo test --workspace --all-features --tests --lib --bins --examples ${{ env.CARGO_FLAGS }}
+      - name: doctests
         if: ${{ matrix.profile == 'debug' }}
-        name: doctests
-        with:
-          command: test
-          args: ${{ env.CARGO_FLAGS }} --workspace --all-features --doc -- --test-threads 16
+        run: |
+          cargo test --workspace --all-features --doc -- --test-threads 16
 
   bench-check:
     name: build-${{ matrix.os }}-bench
