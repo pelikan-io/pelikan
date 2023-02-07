@@ -113,21 +113,21 @@ jobs:
 
       - name: Update cargo flags
         if: ${{ matrix.profile == 'release' }}
-        run: echo 'CARGO_FLAGS=--release' >> $GITHUB_ENV
+        run: echo 'FLAGS=--release' >> $GITHUB_ENV
         shell: bash
       - name: Update cargo flags
         if: ${{ matrix.profile == 'debug' }}
-        run: echo 'CARGO_FLAGS=' >> $GITHUB_ENV
+        run: echo 'FLAGS=' >> $GITHUB_ENV
         shell: bash
 
       - name: build
         shell: bash
         run: |
-          cargo build --workspace --all-features --all-targets ${{ env.CARGO_FLAGS }}
+          cargo build --workspace --all-features --all-targets ${{ env.FLAGS }}
       - name: test
         shell: bash
         run: |
-          cargo test --workspace --all-features --tests --lib --bins --examples ${{ env.CARGO_FLAGS }}
+          cargo test --workspace --all-features --tests --lib --bins --examples ${{ env.FLAGS }}
       - name: doctests
         if: ${{ matrix.profile == 'debug' }}
         shell: bash
