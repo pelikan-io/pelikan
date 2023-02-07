@@ -89,7 +89,7 @@ pub fn take_bulk_string_as_i64(array: &mut Vec<Message>) -> Result<Option<i64>, 
         return Ok(None);
     }
 
-    match dbg!(array.remove(0)) {
+    match array.remove(0) {
         Message::BulkString(value) => {
             let text = value
                 .inner

@@ -140,6 +140,24 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::ListLen(r) => {
                     resp::llen(&mut client, &cache_name, &mut socket, r).await?
                 }
+                resp::Request::ListPop(r) => {
+                    resp::lpop(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::ListRange(r) => {
+                    resp::lrange(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::ListPush(r) => {
+                    resp::lpush(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::ListPushBack(r) => {
+                    resp::rpush(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::ListTrim(r) => {
+                    resp::ltrim(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::ListPopBack(r) => {
+                    resp::rpop(&mut client, &cache_name, &mut response_buf, r).await?
+                }
                 resp::Request::Set(r) => {
                     resp::set(&mut client, &cache_name, &mut socket, &r).await?
                 }
@@ -157,6 +175,12 @@ pub(crate) async fn handle_resp_client(
                 }
                 resp::Request::SetIntersect(r) => {
                     resp::sinter(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::SetMembers(r) => {
+                    resp::smembers(&mut client, &cache_name, &mut response_buf, &r).await?
+                }
+                resp::Request::SetIsMember(r) => {
+                    resp::sismember(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 _ => return Err(ProxyError::UnsupportedCommand),
             }

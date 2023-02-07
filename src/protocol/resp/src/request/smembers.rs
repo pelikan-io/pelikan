@@ -3,30 +3,32 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use std::io::{Error, ErrorKind};
+use std::sync::Arc;
 
-counter!(LLEN);
-counter!(LLEN_EX);
+counter!(SMEMBERS);
+counter!(SMEMBERS_EX);
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct ListLen {
+pub struct SetMembers {
     key: Arc<[u8]>,
 }
 
-impl TryFrom<Message> for ListLen {
+impl TryFrom<Message> for SetMembers {
     type Error = Error;
 
-    fn try_from(value: Message) -> Result<Self, Self::Error> {
+    fn try_from(value: Message) -> Result<Self, Error> {
         let array = match value {
             Message::Array(array) => array,
             _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
         };
 
         let mut array = array.inner.unwrap();
-        if array.len() != 2 {
+        if array.len() < 2 {
             return Err(Error::new(ErrorKind::Other, "malformed command"));
         }
 
-        let _command = take_bulk_string(&mut array);
+        let _command = take_bulk_string(&mut array)?;
         let key = take_bulk_string(&mut array)?
             .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
 
@@ -34,7 +36,7 @@ impl TryFrom<Message> for ListLen {
     }
 }
 
-impl ListLen {
+impl SetMembers {
     pub fn new(key: &[u8]) -> Self {
         Self { key: key.into() }
     }
@@ -44,20 +46,20 @@ impl ListLen {
     }
 }
 
-impl From<&ListLen> for Message {
-    fn from(value: &ListLen) -> Self {
+impl From<&SetMembers> for Message {
+    fn from(value: &SetMembers) -> Message {
         Message::Array(Array {
             inner: Some(vec![
-                Message::BulkString(BulkString::new(b"LLEN")),
+                Message::BulkString(BulkString::new(b"GET")),
                 Message::BulkString(BulkString::new(value.key())),
             ]),
         })
     }
 }
 
-impl Compose for ListLen {
-    fn compose(&self, dst: &mut dyn BufMut) -> usize {
-        Message::from(self).compose(dst)
+impl Compose for SetMembers {
+    fn compose(&self, buf: &mut dyn BufMut) -> usize {
+        Message::from(self).compose(buf)
     }
 }
 
@@ -69,16 +71,24 @@ mod tests {
     fn parser() {
         let parser = RequestParser::new();
         assert_eq!(
-            parser.parse(b"llen a\r\n").unwrap().into_inner(),
-            Request::ListLen(ListLen::new(b"a"))
+            parser.parse(b"smembers 0\r\n").unwrap().into_inner(),
+            Request::SetMembers(SetMembers::new(b"0"))
         );
 
         assert_eq!(
             parser
-                .parse(b"*2\r\n$4\r\nllen\r\n$1\r\nb\r\n")
+                .parse(b"smembers \"\0\r\n key\"\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::ListLen(ListLen::new(b"b"))
+            Request::SetMembers(SetMembers::new(b"\0\r\n key"))
+        );
+
+        assert_eq!(
+            parser
+                .parse(b"*2\r\n$8\r\nsmembers\r\n$1\r\n0\r\n")
+                .unwrap()
+                .into_inner(),
+            Request::SetMembers(SetMembers::new(b"0"))
         );
     }
 }

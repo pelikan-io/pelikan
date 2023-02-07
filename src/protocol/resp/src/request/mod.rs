@@ -4,9 +4,12 @@
 
 use crate::message::*;
 use crate::*;
+use logger::Klog;
 use protocol_common::BufMut;
 use protocol_common::Parse;
 use protocol_common::ParseOk;
+use std::borrow::Cow;
+use std::fmt::{Display, Formatter};
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
@@ -24,17 +27,33 @@ mod hset;
 mod hvals;
 mod lindex;
 mod llen;
+mod lpop;
+mod lpush;
+mod lrange;
+mod ltrim;
+mod rpop;
+mod rpush;
 mod sadd;
 mod sdiff;
 mod set;
 mod sinter;
+mod sismember;
+mod smembers;
 mod srem;
 mod sunion;
 
 pub use self::lindex::*;
 pub use self::llen::*;
+pub use self::lpop::*;
+pub use self::lpush::*;
+pub use self::lrange::*;
+pub use self::ltrim::*;
+pub use self::rpop::*;
+pub use self::rpush::*;
 pub use self::sdiff::*;
 pub use self::sinter::*;
+pub use self::sismember::*;
+pub use self::smembers::*;
 pub use self::srem::*;
 pub use self::sunion::*;
 pub use badd::*;
@@ -52,9 +71,22 @@ pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
 
+/// response codes for klog
+/// matches Memcache protocol response codes for compatibility with existing tools
+/// [crate::memcache::MISS]
+enum ResponseCode {
+    Miss = 0,
+    Hit = 4,
+    Stored = 5,
+    Exists = 6,
+    Deleted = 7,
+    NotFound = 8,
+    NotStored = 9,
+}
+
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct RequestParser {
     message_parser: MessageParser,
 }
@@ -163,6 +195,22 @@ impl Parse<Request> for RequestParser {
                             ListIndex::try_from(message).map(Request::from)
                         }
                         Some(b"llen") | Some(b"LLEN") => ListLen::try_from(message).map(From::from),
+                        Some(b"lpop") | Some(b"LPOP") => ListPop::try_from(message).map(From::from),
+                        Some(b"lrange") | Some(b"LRANGE") => {
+                            ListRange::try_from(message).map(From::from)
+                        }
+                        Some(b"lpush") | Some(b"LPUSH") => {
+                            ListPush::try_from(message).map(From::from)
+                        }
+                        Some(b"rpush") | Some(b"RPUSH") => {
+                            ListPushBack::try_from(message).map(From::from)
+                        }
+                        Some(b"ltrim") | Some(b"LTRIM") => {
+                            ListTrim::try_from(message).map(From::from)
+                        }
+                        Some(b"rpop") | Some(b"RPOP") => {
+                            ListPopBack::try_from(message).map(From::from)
+                        }
                         Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
                         Some(b"sadd") | Some(b"SADD") => {
                             SetAdd::try_from(message).map(Request::from)
@@ -176,6 +224,12 @@ impl Parse<Request> for RequestParser {
                         }
                         Some(b"sinter") | Some(b"SINTER") => {
                             SetIntersect::try_from(message).map(From::from)
+                        }
+                        Some(b"smembers") | Some(b"SMEMBERS") => {
+                            SetMembers::try_from(message).map(Request::from)
+                        }
+                        Some(b"sismember") | Some(b"SISMEMBER") => {
+                            SetIsMember::try_from(message).map(From::from)
                         }
                         _ => Err(Error::new(ErrorKind::Other, "unknown command")),
                     },
@@ -211,12 +265,20 @@ impl Compose for Request {
             Self::HashIncrBy(r) => r.compose(buf),
             Self::ListIndex(r) => r.compose(buf),
             Self::ListLen(r) => r.compose(buf),
+            Self::ListPop(r) => r.compose(buf),
+            Self::ListRange(r) => r.compose(buf),
+            Self::ListPush(r) => r.compose(buf),
+            Self::ListPushBack(r) => r.compose(buf),
+            Self::ListTrim(r) => r.compose(buf),
+            Self::ListPopBack(r) => r.compose(buf),
             Self::Set(r) => r.compose(buf),
             Self::SetAdd(r) => r.compose(buf),
             Self::SetRem(r) => r.compose(buf),
             Self::SetDiff(r) => r.compose(buf),
             Self::SetUnion(r) => r.compose(buf),
             Self::SetIntersect(r) => r.compose(buf),
+            Self::SetMembers(r) => r.compose(buf),
+            Self::SetIsMember(r) => r.compose(buf),
         }
     }
 }
@@ -237,12 +299,32 @@ pub enum Request {
     HashIncrBy(HashIncrBy),
     ListIndex(ListIndex),
     ListLen(ListLen),
+    ListPop(ListPop),
+    ListRange(ListRange),
+    ListPush(ListPush),
+    ListPushBack(ListPushBack),
+    ListTrim(ListTrim),
+    ListPopBack(ListPopBack),
     Set(Set),
     SetAdd(SetAdd),
     SetRem(SetRem),
     SetDiff(SetDiff),
     SetUnion(SetUnion),
     SetIntersect(SetIntersect),
+    SetMembers(SetMembers),
+    SetIsMember(SetIsMember),
+}
+
+impl Klog for Request {
+    type Response = Response;
+
+    fn klog(&self, response: &Self::Response) {
+        match self {
+            Request::Get(r) => r.klog(response),
+            Request::Set(r) => r.klog(response),
+            _ => (),
+        }
+    }
 }
 
 impl Request {
@@ -316,12 +398,20 @@ impl Request {
             Self::HashIncrBy(_) => "hincrby",
             Self::ListIndex(_) => "lindex",
             Self::ListLen(_) => "llen",
+            Self::ListPop(_) => "lpop",
+            Self::ListRange(_) => "lrange",
+            Self::ListPush(_) => "lpush",
+            Self::ListPushBack(_) => "rpush",
+            Self::ListTrim(_) => "ltrim",
+            Self::ListPopBack(_) => "rpop",
             Self::Set(_) => "set",
             Self::SetAdd(_) => "sadd",
             Self::SetRem(_) => "srem",
             Self::SetDiff(_) => "sdiff",
             Self::SetUnion(_) => "sunion",
             Self::SetIntersect(_) => "sinter",
+            Self::SetMembers(_) => "smembers",
+            Self::SetIsMember(_) => "sismember",
         }
     }
 }
@@ -410,6 +500,42 @@ impl From<ListLen> for Request {
     }
 }
 
+impl From<ListPop> for Request {
+    fn from(value: ListPop) -> Self {
+        Self::ListPop(value)
+    }
+}
+
+impl From<ListRange> for Request {
+    fn from(value: ListRange) -> Self {
+        Self::ListRange(value)
+    }
+}
+
+impl From<ListPush> for Request {
+    fn from(value: ListPush) -> Self {
+        Self::ListPush(value)
+    }
+}
+
+impl From<ListPushBack> for Request {
+    fn from(value: ListPushBack) -> Self {
+        Self::ListPushBack(value)
+    }
+}
+
+impl From<ListTrim> for Request {
+    fn from(value: ListTrim) -> Self {
+        Self::ListTrim(value)
+    }
+}
+
+impl From<ListPopBack> for Request {
+    fn from(value: ListPopBack) -> Self {
+        Self::ListPopBack(value)
+    }
+}
+
 impl From<Set> for Request {
     fn from(other: Set) -> Self {
         Self::Set(other)
@@ -443,6 +569,18 @@ impl From<SetUnion> for Request {
 impl From<SetIntersect> for Request {
     fn from(value: SetIntersect) -> Self {
         Self::SetIntersect(value)
+    }
+}
+
+impl From<SetMembers> for Request {
+    fn from(value: SetMembers) -> Self {
+        Self::SetMembers(value)
+    }
+}
+
+impl From<SetIsMember> for Request {
+    fn from(value: SetIsMember) -> Self {
+        Self::SetIsMember(value)
     }
 }
 
@@ -491,6 +629,27 @@ pub enum ExpireTime {
     UnixSeconds(u64),
     UnixMilliseconds(u64),
     KeepTtl,
+}
+
+impl Default for ExpireTime {
+    fn default() -> Self {
+        ExpireTime::Seconds(0)
+    }
+}
+impl Display for ExpireTime {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExpireTime::Seconds(s) => write!(f, "{}s", s),
+            ExpireTime::Milliseconds(ms) => write!(f, "{}ms", ms),
+            ExpireTime::UnixSeconds(s) => write!(f, "{}unix_secs", s),
+            ExpireTime::UnixMilliseconds(ms) => write!(f, "{}unix_ms", ms),
+            ExpireTime::KeepTtl => write!(f, "keep_ttl"),
+        }
+    }
+}
+
+fn string_key(key: &[u8]) -> Cow<'_, str> {
+    String::from_utf8_lossy(key)
 }
 
 #[cfg(test)]

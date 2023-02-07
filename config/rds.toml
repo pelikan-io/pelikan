@@ -1,0 +1,93 @@
+daemonize = false
+
+[admin]
+# interfaces listening on
+host = "0.0.0.0"
+# port listening on
+port = "9999"
+
+# enable the http admin port?
+http_enabled = true
+# http listening interface
+http_host = "0.0.0.0"
+# http listening port
+http_port = "9998"
+
+[server]
+# interfaces listening on
+host = "0.0.0.0"
+# port listening on
+port = "6379"
+# epoll timeout in milliseconds
+timeout = 100
+# epoll max events returned
+nevent = 1024
+
+[worker]
+# epoll timeout in milliseconds
+timeout = 100
+# epoll max events returned
+nevent = 1024
+# number of worker threads
+threads = 1
+
+# storage configuration
+[seg]
+# hash power adjusts how many items can be held in the hashtable
+hash_power = 22
+# total bytes to use for item storage - 4GiB
+heap_size = 4294967296
+# size of each segment in bytes - 1MiB
+segment_size = 1048576
+# number of segments for a non-evict compaction
+compact_target = 2
+# number of segments to merge in one merge eviction pass
+merge_target = 4
+# max number of segments to merge in one pass
+merge_max = 8
+# use merge based eviction
+eviction = "Merge"
+# optionally, set a file path to back the datapool
+# datapool_path = "/path/to/fast/storage/filename"
+
+[time]
+time_type = "Delta"
+
+[buf]
+
+[debug]
+# choose from: error, warn, info, debug, trace
+log_level = "info"
+# optionally, log to the file below instead of standard out
+# log_file = "rds.log"
+# backup file name for use with log rotation
+log_backup = "rds.log.old"
+# trigger log rotation when the file grows beyond this size (in bytes). Set this
+# option to '0' to disable log rotation.
+log_max_size = 1073741824
+
+[klog]
+# optionally, log commands to the file below
+# file = "rds.cmd"
+# backup file name for use with log rotation
+backup = "rds.cmd.old"
+# trigger log rotation when the file grows beyond this size (in bytes). Set this
+# option to '0' to disable log rotation.
+max_size = 1073741824
+# specify the sampling ratio, 1 in N commands will be logged. Setting to '0'
+# will disable command logging.
+sample = 100
+
+[sockio]
+
+[tcp]
+
+[tls]
+# certificate chain used to validate client certificate
+# certificate_chain = "client.chain"
+# server certificate
+# certificate = "server.crt"
+# server private key
+# private_key = "server.key"
+# ca certificate file used as the root of trust
+# ca_file = "ca.crt"
