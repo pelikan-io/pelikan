@@ -78,7 +78,7 @@ jobs:
           done
 
   check-success:
-    name: verify all tests pass
+    name: verify all fuzz tests pass
     runs-on: ubuntu-latest
     needs:
       - build
