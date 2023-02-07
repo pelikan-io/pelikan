@@ -4,7 +4,6 @@
 
 //! Common, performance-oriented mechanisms of parsing byte strings into various types
 
-
 /// maximum length of a string that could be stored as a u64 in Redis
 /// comment from redis/util.h
 /// > Bytes needed for long -> str + '\0'
@@ -14,12 +13,12 @@ const REDIS_LONG_STR_SIZE: usize = 22;
 /// implementation inspired by Redis
 pub fn parse_signed_redis(bytes: &[u8]) -> Option<i64> {
     if bytes.is_empty() || bytes.len() >= REDIS_LONG_STR_SIZE {
-        return None
+        return None;
     }
 
     // Special case: first and only digit is 0.
-    if bytes.len() == 1 && bytes[0] == b'0'  {
-        return Some(0)
+    if bytes.len() == 1 && bytes[0] == b'0' {
+        return Some(0);
     }
     ///parses the remainder of the byte string as a number, returning None if at any point
     /// it is determined it isn't a canonical integer
@@ -45,13 +44,11 @@ pub fn parse_signed_redis(bytes: &[u8]) -> Option<i64> {
             let first_digit = convert_digit(bytes[1])?;
             parse_rest((first_digit as i64) * -1, &bytes[2..], -1)
         }
-        other if (b'1'..=b'9').contains(other)  => {
+        other if (b'1'..=b'9').contains(other) => {
             let digit = convert_digit(*other)?;
-            parse_rest( digit as i64,  &bytes[1..], 1)
+            parse_rest(digit as i64, &bytes[1..], 1)
         }
-        _ => {
-            None
-        }
+        _ => None,
     }
 }
 
@@ -62,7 +59,10 @@ mod tests {
     fn it_should_parse_obvious_numbers() {
         for x in 0..=10_000 {
             assert_eq!(parse_signed_redis(x.to_string().as_bytes()), Some(x as i64));
-            assert_eq!(parse_signed_redis((-x).to_string().as_bytes()), Some(-x as i64));
+            assert_eq!(
+                parse_signed_redis((-x).to_string().as_bytes()),
+                Some(-x as i64)
+            );
         }
         assert_eq!(parse_signed_redis(b"9223372036854775807"), Some(i64::MAX));
         assert_eq!(parse_signed_redis(b"-9223372036854775808"), Some(i64::MIN));
@@ -101,6 +101,5 @@ mod tests {
         assert_eq!(parse_signed_redis(b"8&"), None);
         assert_eq!(parse_signed_redis(b"&$@!@#@0"), None);
         assert_eq!(parse_signed_redis(b"42-42"), None);
-
     }
 }

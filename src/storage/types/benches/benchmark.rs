@@ -2,10 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::num::ParseIntError;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
 use rand::RngCore;
 use rand::SeedableRng;
+use std::num::ParseIntError;
 use storage_types::*;
 
 use std::time::Duration;
@@ -18,7 +18,6 @@ pub fn rng() -> impl RngCore {
 fn parse_redis_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_signed_redis");
     group.measurement_time(Duration::from_secs(2));
-
 
     let bytes = b"9223372036854775807";
     group.throughput(Throughput::Elements(1));
@@ -104,7 +103,6 @@ fn parse_redis_benchmark(c: &mut Criterion) {
         })
     });
 
-
     let bytes = b"0";
     group.throughput(Throughput::Elements(1));
     group.bench_with_input("parse_zero", &bytes, |b, &bytes| {
@@ -126,7 +124,6 @@ fn parse_redis_benchmark(c: &mut Criterion) {
         })
     });
 }
-
 
 criterion_group!(benches, parse_redis_benchmark);
 criterion_main!(benches);
