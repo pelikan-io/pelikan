@@ -21,9 +21,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: fuzz
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-fuzz
+      - uses: dtolnay/install@cargo-fuzz
 
       - name: cargo build
         shell: bash
@@ -53,9 +51,7 @@ jobs:
         with:
           shared-key: fuzz
           save-if: false
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-fuzz
+      - uses: dtolnay/install@cargo-fuzz
 
       - name: fuzz ${{ matrix.target }}
         run: |
