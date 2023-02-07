@@ -33,4 +33,7 @@ runs:
     - name: install pelikan binaries
       shell: bash
       run: |
-        mv pelikan_* ~/.cargo/bin
+        for binary in pelikan_*; do
+          chmod +x $binary
+          mv $binary ~/.cargo/bin
+        done
