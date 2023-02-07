@@ -208,7 +208,11 @@ decl_request! {
         ListIndex(ListIndex) => "lindex",
         ListLen(ListLen) => "llen",
         ListPop(ListPop) => "lpop",
+        ListPopBack(ListPopBack) => "rpop",
         ListRange(ListRange) => "lrange",
+        ListPush(ListPush) => "lpush",
+        ListPushBack(ListPushBack) => "rpush",
+        ListTrim(ListTrim) => "ltrim",
         Set(Set) => "set",
         SetAdd(SetAdd) => "sadd",
         SetRem(SetRem) => "srem",
@@ -220,7 +224,7 @@ decl_request! {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct RequestParser {
     message_parser: MessageParser,
 }
