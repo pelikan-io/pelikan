@@ -42,5 +42,5 @@ runs:
     - name: Run pingserver
       run: |
         pelikan_pingserver_rs server.toml &
-        sleep 10
+        sleep 1
       shell: bash
