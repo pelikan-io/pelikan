@@ -151,7 +151,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v1
       - name: build
-        shel: bash
+        shell: bash
         run: |
           cargo bench --workspace --no-run
 
