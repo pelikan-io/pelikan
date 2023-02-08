@@ -162,7 +162,7 @@ pub(crate) async fn handle_resp_client(
                     resp::set(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::SetAdd(r) => {
-                    resp::sadd(&mut client, &cache_name, &mut socket, r).await?
+                    resp::sadd(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::SetRem(r) => {
                     resp::srem(&mut client, &cache_name, &mut socket, r).await?
