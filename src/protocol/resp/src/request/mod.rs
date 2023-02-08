@@ -609,6 +609,7 @@ pub enum Command {
     HashMultiGet,
     HashSet,
     HashValues,
+    Incr,
     Set,
 }
 
@@ -628,6 +629,7 @@ impl TryFrom<&[u8]> for Command {
             b"hmget" | b"HMGET" => Ok(Command::HashMultiGet),
             b"hset" | b"HSET" => Ok(Command::HashSet),
             b"hvals" | b"HVALS" => Ok(Command::HashValues),
+            b"incr" | b"INCR" => Ok(Command::Incr),
             b"set" | b"SET" => Ok(Command::Set),
             _ => Err(()),
         }
