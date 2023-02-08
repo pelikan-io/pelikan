@@ -219,6 +219,15 @@ pub(crate) async fn handle_resp_client(
                         response_buf.extend_from_slice(b"CLIENT_ERROR\r\n");
                         true
                     }
+                    ProxyError::Custom(message) => {
+                        SESSION_SEND.increment();
+                        BACKEND_EX.increment();
+                        response_buf.extend_from_slice(b"-ERR ");
+                        response_buf.extend_from_slice(message.as_bytes());
+                        response_buf.extend_from_slice(b"\r\n");
+
+                        true
+                    }
                 }
             }
         };

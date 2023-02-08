@@ -15,8 +15,18 @@ pub enum ProxyError {
     Io(#[source] std::io::Error),
     #[error("timeout: {0}")]
     Timeout(#[source] tokio::time::error::Elapsed),
+    #[error("{0}")]
+    Custom(&'static str),
     #[error("unsupported resp command")]
     UnsupportedCommand,
+}
+
+impl ProxyError {
+    pub fn custom(message: &'static str) -> Self {
+        assert!(!message.contains("\r\n"));
+
+        Self::Custom(message)
+    }
 }
 
 impl From<MomentoError> for ProxyError {
