@@ -159,13 +159,13 @@ pub(crate) async fn handle_resp_client(
                     resp::rpop(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::Set(r) => {
-                    resp::set(&mut client, &cache_name, &mut socket, &r).await?
+                    resp::set(&mut client, &cache_name, &mut socket, r).await?
                 }
                 resp::Request::SetAdd(r) => {
-                    resp::sadd(&mut client, &cache_name, &mut socket, &r).await?
+                    resp::sadd(&mut client, &cache_name, &mut socket, r).await?
                 }
                 resp::Request::SetRem(r) => {
-                    resp::srem(&mut client, &cache_name, &mut socket, &r).await?
+                    resp::srem(&mut client, &cache_name, &mut socket, r).await?
                 }
                 resp::Request::SetDiff(r) => {
                     resp::sdiff(&mut client, &cache_name, &mut response_buf, r).await?
@@ -177,7 +177,7 @@ pub(crate) async fn handle_resp_client(
                     resp::sinter(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::SetMembers(r) => {
-                    resp::smembers(&mut client, &cache_name, &mut response_buf, &r).await?
+                    resp::smembers(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::SetIsMember(r) => {
                     resp::sismember(&mut client, &cache_name, &mut response_buf, r).await?
@@ -237,7 +237,7 @@ pub(crate) async fn handle_resp_client(
         SESSION_SEND_BYTE.add(response_buf.len() as _);
         TCP_SEND_BYTE.add(response_buf.len() as _);
 
-        if let Err(_) = socket.write_all(&response_buf).await {
+        if socket.write_all(&response_buf).await.is_err() {
             SESSION_SEND_EX.increment();
             break;
         }
