@@ -165,7 +165,7 @@ pub(crate) async fn handle_resp_client(
                     resp::sadd(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::SetRem(r) => {
-                    resp::srem(&mut client, &cache_name, &mut socket, r).await?
+                    resp::srem(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::SetDiff(r) => {
                     resp::sdiff(&mut client, &cache_name, &mut response_buf, r).await?
