@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use std::borrow::Cow;
 use std::fmt;
 
 use bstr::BStr;
@@ -14,12 +15,12 @@ pub enum ParseError<'a> {
     #[error("expected {:?}, got {:?} instead", BStr::new(.expected), BStr::new(.found))]
     InvalidLiteral {
         expected: &'static [u8],
-        found: &'a [u8],
+        found: Cow<'a, [u8]>,
     },
     #[error("expected a number, got {:?} instead", BStr::new(.0))]
-    InvalidNumber(&'a [u8]),
+    InvalidNumber(Cow<'a, [u8]>),
     #[error("expected a non-negative number, got {:?} instead", BStr::new(.0))]
-    UnexpectedNegativeNumber(&'a [u8]),
+    UnexpectedNegativeNumber(Cow<'a, [u8]>),
     #[error("expected a non-nil string, got a nil one instead")]
     UnexpectedNilString,
 
@@ -36,6 +37,27 @@ pub enum ParseError<'a> {
         expected: &'static str,
         found: &'static str,
     },
+}
+
+impl<'a> ParseError<'a> {
+    pub fn incomplete() -> Self {
+        Self::Incomplete
+    }
+
+    pub fn invalid_literal(expected: &'static [u8], found: impl Into<Cow<'a, [u8]>>) -> Self {
+        Self::InvalidLiteral {
+            expected,
+            found: found.into(),
+        }
+    }
+
+    pub fn invalid_number(value: impl Into<Cow<'a, [u8]>>) -> Self {
+        Self::InvalidNumber(value.into())
+    }
+
+    pub fn unexpected_negative_number(value: impl Into<Cow<'a, [u8]>>) -> Self {
+        Self::UnexpectedNegativeNumber(value.into())
+    }
 }
 
 impl<'a> fmt::Debug for ParseError<'a> {

@@ -48,10 +48,7 @@ impl<'a> Parser<'a> {
         let (head, rest) = self.data.split_at(lit.len());
 
         if head != lit {
-            return Err(ParseError::InvalidLiteral {
-                expected: lit,
-                found: head,
-            });
+            return Err(ParseError::invalid_literal(lit, head));
         }
 
         self.data = rest;
@@ -75,9 +72,9 @@ impl<'a> Parser<'a> {
     fn parse_len(&mut self) -> ParseResult<'a, usize> {
         self.try_parse(|p| {
             let text = p.parse_delimited_text()?;
-            let text = std::str::from_utf8(text).map_err(|_| ParseError::InvalidNumber(text))?;
+            let text = std::str::from_utf8(text).map_err(|_| ParseError::invalid_number(text))?;
             text.parse()
-                .map_err(|_| ParseError::InvalidNumber(text.as_bytes()))
+                .map_err(|_| ParseError::invalid_number(text.as_bytes()))
         })
     }
 
@@ -91,6 +88,50 @@ impl<'a> Parser<'a> {
 
             p.parse_crlf()?;
 
+            Ok(text)
+        })
+    }
+
+    /// Helper for [`CommandParser`].
+    ///
+    /// The inline format allows for quoting strings so we need to handle that.
+    pub(crate) fn parse_command_line(&mut self) -> ParseResult<'a, &'a [u8]> {
+        self.try_parse(|p| {
+            let mut copy = p.clone();
+            copy.try_parse(|p| {
+                loop {
+                    match memchr::memchr3(b'\r', b'\n', b'"', p.data) {
+                        Some(index) => p.parse_bytes(index)?,
+                        None => return Err(ParseError::Incomplete),
+                    };
+
+                    match p.peek() {
+                        Some(b'\r' | b'\n') => break,
+                        Some(b'"') => p.parse_literal(b"\"")?,
+                        None => return Err(ParseError::Incomplete),
+                        _ => unreachable!(),
+                    };
+
+                    // Found an escaped section, parse to the escape
+                    loop {
+                        match memchr::memchr2(b'\\', b'"', p.data) {
+                            Some(index) => p.parse_bytes(index)?,
+                            None => return Err(ParseError::Incomplete),
+                        };
+
+                        if p.parse_literal(b"\\\"").is_err() {
+                            p.parse_literal(b"\"")?;
+                            break;
+                        }
+                    }
+                }
+
+                Ok(())
+            })?;
+
+            let len = (copy.remaining().as_ptr() as usize) - (p.remaining().as_ptr() as usize);
+            let text = p.parse_bytes(len)?;
+            p.parse_crlf()?;
             Ok(text)
         })
     }
@@ -143,11 +184,11 @@ impl<'a> Parser<'a> {
         self.try_parse(|p| {
             p.parse_literal(b":")?;
             let text = p.parse_delimited_text()?;
-            let text = std::str::from_utf8(text).map_err(|_| ParseError::InvalidNumber(text))?;
+            let text = std::str::from_utf8(text).map_err(|_| ParseError::invalid_number(text))?;
             text.parse()
                 .map_err(|_| match <i64 as FromStr>::from_str(text) {
-                    Ok(_) => ParseError::UnexpectedNegativeNumber(text.as_bytes()),
-                    Err(_) => ParseError::InvalidNumber(text.as_bytes()),
+                    Ok(_) => ParseError::unexpected_negative_number(text.as_bytes()),
+                    Err(_) => ParseError::invalid_number(text.as_bytes()),
                 })
         })
     }
@@ -157,9 +198,9 @@ impl<'a> Parser<'a> {
             p.parse_literal(b":")?;
             let text = p.parse_delimited_text()?;
             std::str::from_utf8(text)
-                .map_err(|_| ParseError::InvalidNumber(text))?
+                .map_err(|_| ParseError::invalid_number(text))?
                 .parse()
-                .map_err(|_| ParseError::InvalidNumber(text))
+                .map_err(|_| ParseError::invalid_number(text))
         })
     }
 
@@ -316,6 +357,7 @@ mod tests {
 
     use super::*;
 
+    use std::borrow::Cow;
     use std::fmt;
 
     struct Test<T>(T);
@@ -358,7 +400,7 @@ mod tests {
         parse_simple_string("+A\rB\r\n"),
         Err(ParseError::InvalidLiteral {
             expected: b"\r\n",
-            found: b"\rB"
+            found: Cow::Borrowed(b"\rB")
         })
     );
 
@@ -379,7 +421,7 @@ mod tests {
     parse_test!(
         bulk_string_invalid_len,
         parse_bulk_string("$aaa\r\nTEST\r\n"),
-        Err(ParseError::InvalidNumber(b"aaa"))
+        Err(ParseError::InvalidNumber(Cow::Borrowed(b"aaa")))
     );
 
     parse_test!(
@@ -387,8 +429,26 @@ mod tests {
         parse_bulk_string("$-2\r\n"),
         Err(ParseError::InvalidLiteral {
             expected: b"-1",
-            found: b"-2"
+            found: Cow::Borrowed(b"-2")
         })
+    );
+
+    parse_test!(
+        command_line_basic,
+        parse_command_line("test a b\r\nababab"),
+        Ok(b"test a b")
+    );
+
+    parse_test!(
+        command_line_escaped,
+        parse_command_line("test \"a\r\nb\" c\r\n"),
+        Ok(b"test \"a\r\nb\" c")
+    );
+
+    parse_test!(
+        command_line_escaped_quote,
+        parse_command_line("test \"a\\\" \r\nb\"\r\n"),
+        Ok(b"test \"a\\\" \r\nb\"")
     );
 
     // Helper trait for formatting byte strings in a reasonable manner.
