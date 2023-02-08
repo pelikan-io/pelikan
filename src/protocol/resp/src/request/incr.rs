@@ -118,7 +118,7 @@ mod tests {
 
         assert_eq!(
             parser
-                .parse(b"*2\r\n$3\r\nincr\r\n$1\r\n0\r\n")
+                .parse(b"*2\r\n$4\r\nincr\r\n$1\r\n0\r\n")
                 .unwrap()
                 .into_inner(),
             Request::Incr(Incr::new(b"0"))
