@@ -16,19 +16,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Checkout rpc-perf
-      uses: actions/checkout@v2
-      with:
-        repository: twitter/rpc-perf
-        path: rpc-perf
-    - name: Build Cache for rpc-perf
-      uses: Swatinem/rust-cache@v1
-      with:
-        key: rpc-perf
-        working-directory: rpc-perf
-    - name: Build rpc-perf
-      run: cd rpc-perf && cargo build --release
-      shell: bash
     - name: Configure
       run: echo "$BASE_CONFIG" >> client.toml
       env:
@@ -87,5 +74,5 @@ runs:
           private_key = "client.key"
       shell: bash
     - name: Run rpc-perf
-      run: rpc-perf/target/release/rpc-perf client.toml
+      run: rpc-perf client.toml
       shell: bash

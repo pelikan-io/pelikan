@@ -39,12 +39,8 @@ runs:
           certificate = "server.crt"
           private_key = "server.key"
       shell: bash
-    - name: Build pingserver
-      run: |
-        cd pelikan && cargo build --release --bin pelikan_pingserver_rs
-      shell: bash
     - name: Run pingserver
       run: |
-        ./pelikan/target/release/pelikan_pingserver_rs server.toml &
+        pelikan_pingserver_rs server.toml &
         sleep 10
       shell: bash
