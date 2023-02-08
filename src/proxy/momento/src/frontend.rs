@@ -126,7 +126,7 @@ pub(crate) async fn handle_resp_client(
                     resp::hlen(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashMultiGet(r) => {
-                    resp::hmget(&mut client, &cache_name, &mut socket, r.key(), r.fields()).await?
+                    resp::hmget(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashSet(r) => {
                     resp::hset(&mut client, &cache_name, &mut socket, r.key(), r.data()).await?
