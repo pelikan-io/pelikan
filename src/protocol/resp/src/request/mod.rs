@@ -207,6 +207,7 @@ decl_request! {
         HashSet(HashSet) => "hset",
         HashValues(HashValues) => "hvals",
         HashIncrBy(HashIncrBy) => "hincrby",
+        Incr(Incr) => "incr",
         ListIndex(ListIndex) => "lindex",
         ListLen(ListLen) => "llen",
         ListPop(ListPop) => "lpop",
