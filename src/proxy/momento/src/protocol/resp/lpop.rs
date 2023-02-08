@@ -55,7 +55,7 @@ pub async fn lpop(
                 }
 
                 // We got no elements, the list does not exist.
-                if items.len() == 0 {
+                if items.is_empty() {
                     response_buf.extend_from_slice(b"*-1\r\n");
                 } else {
                     write!(response_buf, "*{}\r\n", items.len())?;

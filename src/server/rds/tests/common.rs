@@ -189,5 +189,5 @@ const RESP_OK: &str = "+OK\r\n";
 
 fn bulk_string(str: &str) -> String {
     let length = str.as_bytes().len();
-    format!("${}\r\n{}\r\n", length, str)
+    format!("${length}\r\n{str}\r\n")
 }

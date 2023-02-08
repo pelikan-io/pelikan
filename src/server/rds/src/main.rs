@@ -28,7 +28,7 @@ use server::PERCENTILES;
 fn main() {
     // custom panic hook to terminate whole process after unwinding
     std::panic::set_hook(Box::new(|s| {
-        eprintln!("{}", s);
+        eprintln!("{s}");
         eprintln!("{:?}", Backtrace::new());
         std::process::exit(101);
     }));
@@ -85,7 +85,7 @@ fn main() {
             } else if any.downcast_ref::<Heatmap>().is_some() {
                 for (label, _) in PERCENTILES {
                     let name = format!("{}_{}", metric.name(), label);
-                    metrics.push(format!("{:<31} percentile", name));
+                    metrics.push(format!("{name:<31} percentile"));
                 }
             } else {
                 continue;
@@ -94,7 +94,7 @@ fn main() {
 
         metrics.sort();
         for metric in metrics {
-            println!("{}", metric);
+            println!("{metric}");
         }
         std::process::exit(0);
     }
@@ -122,7 +122,7 @@ fn main() {
     match Rds::new(config) {
         Ok(rds) => rds.wait(),
         Err(e) => {
-            eprintln!("error launching rds: {}", e);
+            eprintln!("error launching rds: {e}");
             std::process::exit(1);
         }
     }

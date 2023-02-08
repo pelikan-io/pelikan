@@ -21,7 +21,7 @@ impl Display for SetMode {
             SetMode::Replace => "replace",
             SetMode::Set => "set",
         };
-        write!(f, "{}", string)
+        write!(f, "{string}")
     }
 }
 
