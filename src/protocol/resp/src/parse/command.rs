@@ -22,7 +22,7 @@ impl<'a, 'p> CommandParser<'a, 'p> {
     pub fn new(parser: &'p mut Parser<'a>) -> ParseResult<'a, Self> {
         match parser.peek() {
             Some(b'+' | b'-' | b':' | b'$' | b'*') => Ok(Self {
-                detail: Detail::Resp(parser.parse_array()?.ok_or_else(|| ParseError::Custom {
+                detail: Detail::Resp(parser.parse_array()?.ok_or(ParseError::Custom {
                     expected: "a non-nil array",
                     found: "a nil array",
                 })?),
@@ -111,7 +111,7 @@ impl<'a, 'p> CommandParser<'a, 'p> {
         let mut elements = Vec::with_capacity(self.remaining().min(64));
 
         for _ in 0..self.remaining() {
-            elements.push(Message::bulk_string(&*self.parse_string_nonnil()?));
+            elements.push(Message::bulk_string(&self.parse_string_nonnil()?));
         }
 
         self.finish()?;
@@ -171,12 +171,12 @@ impl<'a> InlineParser<'a> {
                     memchr::memchr3(b'\\', b'"', b' ', self.data).unwrap_or(self.data.len());
                 output.extend_from_slice(self.parse_bytes(index));
 
-                match self.data {
-                    &[] => break 'outer,
-                    &[b' ', ..] => break 'outer,
-                    &[b'"', ..] => state = State::Quoted,
-                    &[b'\\'] => output.push(b'\\'),
-                    &[b'\\', c, ..] => {
+                match *self.data {
+                    [] => break 'outer,
+                    [b' ', ..] => break 'outer,
+                    [b'"', ..] => state = State::Quoted,
+                    [b'\\'] => output.push(b'\\'),
+                    [b'\\', c, ..] => {
                         output.push(c);
                         self.advance(1);
                     }
@@ -188,11 +188,11 @@ impl<'a> InlineParser<'a> {
                 let index = memchr::memchr2(b'\\', b'"', self.data).unwrap_or(self.data.len());
                 output.extend_from_slice(self.parse_bytes(index));
 
-                match self.data {
-                    &[] => break 'outer,
-                    &[b'"', ..] => state = State::Unquoted,
-                    &[b'\\'] => output.push(b'\\'),
-                    &[b'\\', c, ..] => {
+                match *self.data {
+                    [] => break 'outer,
+                    [b'"', ..] => state = State::Unquoted,
+                    [b'\\'] => output.push(b'\\'),
+                    [b'\\', c, ..] => {
                         output.push(c);
                         self.advance(1);
                     }
