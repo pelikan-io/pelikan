@@ -135,7 +135,7 @@ pub(crate) async fn handle_resp_client(
                     resp::hvals(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::ListIndex(r) => {
-                    resp::lindex(&mut client, &cache_name, &mut socket, r).await?
+                    resp::lindex(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::ListLen(r) => {
                     resp::llen(&mut client, &cache_name, &mut socket, r).await?
