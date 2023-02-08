@@ -76,6 +76,7 @@ pub use set::*;
 /// response codes for klog
 /// matches Memcache protocol response codes for compatibility with existing tools
 /// [crate::memcache::MISS]
+#[allow(dead_code)]
 enum ResponseCode {
     Miss = 0,
     Hit = 4,
@@ -88,7 +89,144 @@ enum ResponseCode {
 
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
 
-#[derive(Default, Clone)]
+/// Macro to deal with the boilerplate around the Request enum.
+macro_rules! decl_request {
+    {
+        $vis:vis enum $name:ident {
+            $(
+                $variant:ident($type:ty) => $command:literal
+            ),* $(,)?
+        }
+    } => {
+        #[derive(Debug, PartialEq, Eq)]
+        $vis enum $name {
+            $( $variant($type), )*
+        }
+
+        impl Parse<$name> for RequestParser {
+            fn parse(&self, buffer: &[u8]) -> Result<ParseOk<$name>, Error> {
+                // we have two different parsers, one for RESP and one for inline
+                // both require that there's at least one character in the buffer
+                if buffer.is_empty() {
+                    return Err(Error::from(ErrorKind::WouldBlock));
+                }
+
+                let (message, consumed) = if matches!(buffer[0], b'*' | b'+' | b'-' | b':' | b'$') {
+                    self.message_parser.parse(buffer).map(|v| {
+                        let c = v.consumed();
+                        (v.into_inner(), c)
+                    })?
+                } else {
+                    let mut remaining = buffer;
+
+                    let mut message = Vec::new();
+
+                    while let Ok((r, string)) = string(remaining) {
+                        message.push(Message::BulkString(BulkString {
+                            inner: Some(string.into()),
+                        }));
+                        remaining = r;
+
+                        if let Ok((r, _)) = space1(remaining) {
+                            remaining = r;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if !remaining.starts_with(b"\r\n") {
+                        return Err(Error::from(ErrorKind::WouldBlock));
+                    }
+
+                    let message = Message::Array(Array {
+                        inner: Some(message),
+                    });
+
+                    let consumed = (buffer.len() - remaining.len()) + 2;
+
+                    (message, consumed)
+                };
+
+                let array = match &message {
+                    Message::Array(Array { inner: Some(array)}) if !array.is_empty() => array,
+                    _ => return Err(Error::new(ErrorKind::Other, "malformed command"))
+                };
+
+                let command = match &array[0] {
+                    Message::BulkString(BulkString { inner: Some(command) }) => command,
+                    // all valid commands are encoded as a bulk string
+                    _ => return Err(Error::new(ErrorKind::Other, "malformed command"))
+                };
+
+                let response = match command {
+                    $( _ if command.eq_ignore_ascii_case($command.as_bytes()) => <$type>::try_from(message)?.into(), )*
+                    _ => return Err(Error::new(ErrorKind::Other, "unknown command"))
+                };
+
+                Ok(ParseOk::new(response, consumed))
+            }
+        }
+
+        impl $name {
+            pub fn command(&self) -> &'static str {
+                match self {
+                    $( Self::$variant(_) => $command, )*
+                }
+            }
+        }
+
+        impl Compose for $name {
+            fn compose(&self, buf: &mut dyn BufMut) -> usize {
+                match self {
+                    $( Self::$variant(v) => v.compose(buf), )*
+                }
+            }
+        }
+
+        $(
+            impl From<$type> for $name {
+                fn from(value: $type) -> Self {
+                    Self::$variant(value)
+                }
+            }
+        )*
+    }
+}
+
+decl_request! {
+    pub enum Request {
+        BtreeAdd(BtreeAdd) => "badd",
+        Get(Get) => "get",
+        HashDelete(HashDelete) => "hdel",
+        HashExists(HashExists) => "hexists",
+        HashGet(HashGet) => "hget",
+        HashGetAll(HashGetAll) => "hgetall",
+        HashKeys(HashKeys) => "hkeys",
+        HashLength(HashLength) => "hlen",
+        HashMultiGet(HashMultiGet) => "hmget",
+        HashSet(HashSet) => "hset",
+        HashValues(HashValues) => "hvals",
+        HashIncrBy(HashIncrBy) => "hincrby",
+        ListIndex(ListIndex) => "lindex",
+        ListLen(ListLen) => "llen",
+        ListPop(ListPop) => "lpop",
+        ListPopBack(ListPopBack) => "rpop",
+        ListRange(ListRange) => "lrange",
+        ListPush(ListPush) => "lpush",
+        ListPushBack(ListPushBack) => "rpush",
+        ListTrim(ListTrim) => "ltrim",
+        Set(Set) => "set",
+        SetAdd(SetAdd) => "sadd",
+        SetRem(SetRem) => "srem",
+        SetDiff(SetDiff) => "sdiff",
+        SetUnion(SetUnion) => "sunion",
+        SetIntersect(SetIntersect) => "sinter",
+        SetMembers(SetMembers) => "smembers",
+        SetIsMember(SetIsMember) => "sismember",
+    }
+}
+
+#[derive(Clone, Default)]
 pub struct RequestParser {
     message_parser: MessageParser,
 }
@@ -99,225 +237,6 @@ impl RequestParser {
             message_parser: MessageParser {},
         }
     }
-}
-
-impl Parse<Request> for RequestParser {
-    fn parse(&self, buffer: &[u8]) -> Result<ParseOk<Request>, Error> {
-        // we have two different parsers, one for RESP and one for inline
-        // both require that there's at least one character in the buffer
-        if buffer.is_empty() {
-            return Err(Error::from(ErrorKind::WouldBlock));
-        }
-
-        let (message, consumed) = if matches!(buffer[0], b'*' | b'+' | b'-' | b':' | b'$') {
-            self.message_parser.parse(buffer).map(|v| {
-                let c = v.consumed();
-                (v.into_inner(), c)
-            })?
-        } else {
-            let mut remaining = buffer;
-
-            let mut message = Vec::new();
-
-            while let Ok((r, string)) = string(remaining) {
-                message.push(Message::BulkString(BulkString {
-                    inner: Some(string.into()),
-                }));
-                remaining = r;
-
-                if let Ok((r, _)) = space1(remaining) {
-                    remaining = r;
-                } else {
-                    break;
-                }
-            }
-
-            if !remaining.starts_with(b"\r\n") {
-                return Err(Error::from(ErrorKind::WouldBlock));
-            }
-
-            let message = Message::Array(Array {
-                inner: Some(message),
-            });
-
-            let consumed = (buffer.len() - remaining.len()) + 2;
-
-            (message, consumed)
-        };
-
-        match &message {
-            Message::Array(array) => {
-                if array.inner.is_none() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
-
-                let array = array.inner.as_ref().unwrap();
-
-                if array.is_empty() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
-                }
-
-                match &array[0] {
-                    Message::BulkString(c) => match c.inner.as_ref().map(|v| v.as_ref()) {
-                        Some(b"badd") | Some(b"BADD") => {
-                            BtreeAdd::try_from(message).map(Request::from)
-                        }
-                        Some(b"get") | Some(b"GET") => Get::try_from(message).map(Request::from),
-                        Some(b"hdel") | Some(b"HDEL") => {
-                            HashDelete::try_from(message).map(Request::from)
-                        }
-                        Some(b"hexists") | Some(b"HEXISTS") => {
-                            HashExists::try_from(message).map(Request::from)
-                        }
-                        Some(b"hget") | Some(b"HGET") => {
-                            HashGet::try_from(message).map(Request::from)
-                        }
-                        Some(b"hgetall") | Some(b"HGETALL") => {
-                            HashGetAll::try_from(message).map(Request::from)
-                        }
-                        Some(b"hkeys") | Some(b"HKEYS") => {
-                            HashKeys::try_from(message).map(Request::from)
-                        }
-                        Some(b"hlen") | Some(b"HLEN") => {
-                            HashLength::try_from(message).map(Request::from)
-                        }
-                        Some(b"hmget") | Some(b"HMGET") => {
-                            HashMultiGet::try_from(message).map(Request::from)
-                        }
-                        Some(b"hset") | Some(b"HSET") => {
-                            HashSet::try_from(message).map(Request::from)
-                        }
-                        Some(b"hvals") | Some(b"HVALS") => {
-                            HashValues::try_from(message).map(Request::from)
-                        }
-                        Some(b"hincrby") | Some(b"HINCRBY") => {
-                            HashIncrBy::try_from(message).map(Request::from)
-                        }
-                        Some(b"incr") | Some(b"INCR") => Incr::try_from(message).map(Request::from),
-                        Some(b"lindex") | Some(b"LINDEX") => {
-                            ListIndex::try_from(message).map(Request::from)
-                        }
-                        Some(b"llen") | Some(b"LLEN") => ListLen::try_from(message).map(From::from),
-                        Some(b"lpop") | Some(b"LPOP") => ListPop::try_from(message).map(From::from),
-                        Some(b"lrange") | Some(b"LRANGE") => {
-                            ListRange::try_from(message).map(From::from)
-                        }
-                        Some(b"lpush") | Some(b"LPUSH") => {
-                            ListPush::try_from(message).map(From::from)
-                        }
-                        Some(b"rpush") | Some(b"RPUSH") => {
-                            ListPushBack::try_from(message).map(From::from)
-                        }
-                        Some(b"ltrim") | Some(b"LTRIM") => {
-                            ListTrim::try_from(message).map(From::from)
-                        }
-                        Some(b"rpop") | Some(b"RPOP") => {
-                            ListPopBack::try_from(message).map(From::from)
-                        }
-                        Some(b"set") | Some(b"SET") => Set::try_from(message).map(Request::from),
-                        Some(b"sadd") | Some(b"SADD") => {
-                            SetAdd::try_from(message).map(Request::from)
-                        }
-                        Some(b"srem") | Some(b"SREM") => SetRem::try_from(message).map(From::from),
-                        Some(b"sdiff") | Some(b"SDIFF") => {
-                            SetDiff::try_from(message).map(From::from)
-                        }
-                        Some(b"sunion") | Some(b"SUNION") => {
-                            SetUnion::try_from(message).map(From::from)
-                        }
-                        Some(b"sinter") | Some(b"SINTER") => {
-                            SetIntersect::try_from(message).map(From::from)
-                        }
-                        Some(b"smembers") | Some(b"SMEMBERS") => {
-                            SetMembers::try_from(message).map(Request::from)
-                        }
-                        Some(b"sismember") | Some(b"SISMEMBER") => {
-                            SetIsMember::try_from(message).map(From::from)
-                        }
-                        _ => Err(Error::new(ErrorKind::Other, "unknown command")),
-                    },
-                    _ => {
-                        // all valid commands are encoded as a bulk string
-                        Err(Error::new(ErrorKind::Other, "malformed command"))
-                    }
-                }
-            }
-            _ => {
-                // all valid requests are arrays
-                Err(Error::new(ErrorKind::Other, "malformed command"))
-            }
-        }
-        .map(|v| ParseOk::new(v, consumed))
-    }
-}
-
-impl Compose for Request {
-    fn compose(&self, buf: &mut dyn BufMut) -> usize {
-        match self {
-            Self::BtreeAdd(r) => r.compose(buf),
-            Self::Get(r) => r.compose(buf),
-            Self::HashDelete(r) => r.compose(buf),
-            Self::HashExists(r) => r.compose(buf),
-            Self::HashGet(r) => r.compose(buf),
-            Self::HashGetAll(r) => r.compose(buf),
-            Self::HashKeys(r) => r.compose(buf),
-            Self::HashLength(r) => r.compose(buf),
-            Self::HashMultiGet(r) => r.compose(buf),
-            Self::HashSet(r) => r.compose(buf),
-            Self::HashValues(r) => r.compose(buf),
-            Self::HashIncrBy(r) => r.compose(buf),
-            Self::Incr(r) => r.compose(buf),
-            Self::ListIndex(r) => r.compose(buf),
-            Self::ListLen(r) => r.compose(buf),
-            Self::ListPop(r) => r.compose(buf),
-            Self::ListRange(r) => r.compose(buf),
-            Self::ListPush(r) => r.compose(buf),
-            Self::ListPushBack(r) => r.compose(buf),
-            Self::ListTrim(r) => r.compose(buf),
-            Self::ListPopBack(r) => r.compose(buf),
-            Self::Set(r) => r.compose(buf),
-            Self::SetAdd(r) => r.compose(buf),
-            Self::SetRem(r) => r.compose(buf),
-            Self::SetDiff(r) => r.compose(buf),
-            Self::SetUnion(r) => r.compose(buf),
-            Self::SetIntersect(r) => r.compose(buf),
-            Self::SetMembers(r) => r.compose(buf),
-            Self::SetIsMember(r) => r.compose(buf),
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Request {
-    BtreeAdd(BtreeAdd),
-    Get(Get),
-    HashDelete(HashDelete),
-    HashExists(HashExists),
-    HashGet(HashGet),
-    HashGetAll(HashGetAll),
-    HashKeys(HashKeys),
-    HashLength(HashLength),
-    HashMultiGet(HashMultiGet),
-    HashSet(HashSet),
-    HashValues(HashValues),
-    HashIncrBy(HashIncrBy),
-    Incr(Incr),
-    ListIndex(ListIndex),
-    ListLen(ListLen),
-    ListPop(ListPop),
-    ListRange(ListRange),
-    ListPush(ListPush),
-    ListPushBack(ListPushBack),
-    ListTrim(ListTrim),
-    ListPopBack(ListPopBack),
-    Set(Set),
-    SetAdd(SetAdd),
-    SetRem(SetRem),
-    SetDiff(SetDiff),
-    SetUnion(SetUnion),
-    SetIntersect(SetIntersect),
-    SetMembers(SetMembers),
-    SetIsMember(SetIsMember),
 }
 
 impl Klog for Request {
@@ -385,254 +304,6 @@ impl Request {
         get_old: bool,
     ) -> Self {
         Self::Set(Set::new(key, value, expire_time, mode, get_old))
-    }
-
-    pub fn command(&self) -> &'static str {
-        match self {
-            Self::BtreeAdd(_) => "badd",
-            Self::Get(_) => "get",
-            Self::HashDelete(_) => "hdel",
-            Self::HashExists(_) => "hexists",
-            Self::HashGet(_) => "hget",
-            Self::HashGetAll(_) => "hgetall",
-            Self::HashKeys(_) => "hkeys",
-            Self::HashLength(_) => "hlen",
-            Self::HashMultiGet(_) => "hmget",
-            Self::HashSet(_) => "hset",
-            Self::HashValues(_) => "hvals",
-            Self::HashIncrBy(_) => "hincrby",
-            Self::Incr(_) => "incr",
-            Self::ListIndex(_) => "lindex",
-            Self::ListLen(_) => "llen",
-            Self::ListPop(_) => "lpop",
-            Self::ListRange(_) => "lrange",
-            Self::ListPush(_) => "lpush",
-            Self::ListPushBack(_) => "rpush",
-            Self::ListTrim(_) => "ltrim",
-            Self::ListPopBack(_) => "rpop",
-            Self::Set(_) => "set",
-            Self::SetAdd(_) => "sadd",
-            Self::SetRem(_) => "srem",
-            Self::SetDiff(_) => "sdiff",
-            Self::SetUnion(_) => "sunion",
-            Self::SetIntersect(_) => "sinter",
-            Self::SetMembers(_) => "smembers",
-            Self::SetIsMember(_) => "sismember",
-        }
-    }
-}
-
-impl From<BtreeAdd> for Request {
-    fn from(other: BtreeAdd) -> Self {
-        Self::BtreeAdd(other)
-    }
-}
-
-impl From<Get> for Request {
-    fn from(other: Get) -> Self {
-        Self::Get(other)
-    }
-}
-
-impl From<HashDelete> for Request {
-    fn from(other: HashDelete) -> Self {
-        Self::HashDelete(other)
-    }
-}
-
-impl From<HashExists> for Request {
-    fn from(other: HashExists) -> Self {
-        Self::HashExists(other)
-    }
-}
-
-impl From<HashGet> for Request {
-    fn from(other: HashGet) -> Self {
-        Self::HashGet(other)
-    }
-}
-
-impl From<HashGetAll> for Request {
-    fn from(other: HashGetAll) -> Self {
-        Self::HashGetAll(other)
-    }
-}
-
-impl From<HashKeys> for Request {
-    fn from(other: HashKeys) -> Self {
-        Self::HashKeys(other)
-    }
-}
-
-impl From<HashLength> for Request {
-    fn from(other: HashLength) -> Self {
-        Self::HashLength(other)
-    }
-}
-
-impl From<HashMultiGet> for Request {
-    fn from(other: HashMultiGet) -> Self {
-        Self::HashMultiGet(other)
-    }
-}
-
-impl From<HashSet> for Request {
-    fn from(other: HashSet) -> Self {
-        Self::HashSet(other)
-    }
-}
-
-impl From<HashValues> for Request {
-    fn from(other: HashValues) -> Self {
-        Self::HashValues(other)
-    }
-}
-
-impl From<HashIncrBy> for Request {
-    fn from(value: HashIncrBy) -> Self {
-        Self::HashIncrBy(value)
-    }
-}
-
-impl From<Incr> for Request {
-    fn from(value: Incr) -> Self {
-        Self::Incr(value)
-    }
-}
-
-impl From<ListIndex> for Request {
-    fn from(value: ListIndex) -> Self {
-        Self::ListIndex(value)
-    }
-}
-
-impl From<ListLen> for Request {
-    fn from(value: ListLen) -> Self {
-        Self::ListLen(value)
-    }
-}
-
-impl From<ListPop> for Request {
-    fn from(value: ListPop) -> Self {
-        Self::ListPop(value)
-    }
-}
-
-impl From<ListRange> for Request {
-    fn from(value: ListRange) -> Self {
-        Self::ListRange(value)
-    }
-}
-
-impl From<ListPush> for Request {
-    fn from(value: ListPush) -> Self {
-        Self::ListPush(value)
-    }
-}
-
-impl From<ListPushBack> for Request {
-    fn from(value: ListPushBack) -> Self {
-        Self::ListPushBack(value)
-    }
-}
-
-impl From<ListTrim> for Request {
-    fn from(value: ListTrim) -> Self {
-        Self::ListTrim(value)
-    }
-}
-
-impl From<ListPopBack> for Request {
-    fn from(value: ListPopBack) -> Self {
-        Self::ListPopBack(value)
-    }
-}
-
-impl From<Set> for Request {
-    fn from(other: Set) -> Self {
-        Self::Set(other)
-    }
-}
-
-impl From<SetAdd> for Request {
-    fn from(value: SetAdd) -> Self {
-        Self::SetAdd(value)
-    }
-}
-
-impl From<SetRem> for Request {
-    fn from(value: SetRem) -> Self {
-        Self::SetRem(value)
-    }
-}
-
-impl From<SetDiff> for Request {
-    fn from(value: SetDiff) -> Self {
-        Self::SetDiff(value)
-    }
-}
-
-impl From<SetUnion> for Request {
-    fn from(value: SetUnion) -> Self {
-        Self::SetUnion(value)
-    }
-}
-
-impl From<SetIntersect> for Request {
-    fn from(value: SetIntersect) -> Self {
-        Self::SetIntersect(value)
-    }
-}
-
-impl From<SetMembers> for Request {
-    fn from(value: SetMembers) -> Self {
-        Self::SetMembers(value)
-    }
-}
-
-impl From<SetIsMember> for Request {
-    fn from(value: SetIsMember) -> Self {
-        Self::SetIsMember(value)
-    }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum Command {
-    BAdd,
-    Get,
-    HashDelete,
-    HashExists,
-    HashGet,
-    HashGetAll,
-    HashKeys,
-    HashLength,
-    HashMultiGet,
-    HashSet,
-    HashValues,
-    Incr,
-    Set,
-}
-
-impl TryFrom<&[u8]> for Command {
-    type Error = ();
-
-    fn try_from(other: &[u8]) -> Result<Self, ()> {
-        match other {
-            b"badd" | b"BADD" => Ok(Command::BAdd),
-            b"get" | b"GET" => Ok(Command::Get),
-            b"hdel" | b"HDEL" => Ok(Command::HashDelete),
-            b"hexists" | b"HEXISTS" => Ok(Command::HashExists),
-            b"hget" | b"HGET" => Ok(Command::HashGet),
-            b"hgetall" | b"HGETALL" => Ok(Command::HashGetAll),
-            b"hkeys" | b"HKEYS" => Ok(Command::HashKeys),
-            b"hlen" | b"HLEN" => Ok(Command::HashLength),
-            b"hmget" | b"HMGET" => Ok(Command::HashMultiGet),
-            b"hset" | b"HSET" => Ok(Command::HashSet),
-            b"hvals" | b"HVALS" => Ok(Command::HashValues),
-            b"incr" | b"INCR" => Ok(Command::Incr),
-            b"set" | b"SET" => Ok(Command::Set),
-            _ => Err(()),
-        }
     }
 }
 
