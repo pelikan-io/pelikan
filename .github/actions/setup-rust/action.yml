@@ -1,0 +1,22 @@
+name: setup-smoketest
+description: common setup for pelikan smoketests
+
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-protoc
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        components: clippy
+
+    - name: Configure Rustflags
+      shell: bash
+      env:
+        CONFIG: |
+          [target.x86_64-unknown-linux-gnu]
+          rustflags = [ "-C", "link-arg=-fuse-ld=lld" ]
+
+          [target.x86_64-apple-darwin]
+          rustflags = [ "-C", "link-arg=-fuse-ld=lld" ]
+      run: |
+        echo "$CONFIG" >> ~/.cargo/config.toml
