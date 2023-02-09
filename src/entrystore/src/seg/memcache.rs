@@ -289,7 +289,7 @@ impl Storage for Seg {
         // no way of checking the cas value without performing a cas
         // and checking the result, setting the shortest possible ttl
         // results in nearly immediate expiry
-        let ttl = cas.ttl().get().unwrap_or(1);
+        let ttl = cas.ttl().get().unwrap_or(0);
 
         let ttl = if ttl < 0 {
             Duration::from_secs(0)
