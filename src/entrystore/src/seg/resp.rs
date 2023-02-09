@@ -83,3 +83,95 @@ impl Storage for Seg {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::Seg;
+    use config::RdsConfig;
+    use protocol_resp::*;
+
+    #[test]
+    fn it_should_set() {
+        let config = RdsConfig::default();
+        let mut seg = Seg::new(&config).expect("could not initialize seg");
+        let set_missing = Set::new(b"missing", b"value", None, SetMode::Set, false);
+        let response = seg.set(&set_missing);
+        assert_eq!(response, Response::ok());
+    }
+
+    #[test]
+    fn it_should_get() {
+        //setup
+        let config = RdsConfig::default();
+        let mut seg = Seg::new(&config).expect("could not initialize seg");
+
+        //missing
+        let get_missing = Get::new(b"missing");
+        let response = seg.get(&get_missing);
+        assert_eq!(response, Response::null());
+
+        //get something set
+        let key = b"foo";
+        let value = b"bar";
+        let set = Set::new(key, value, None, SetMode::Set, false);
+        let response = seg.set(&set);
+        assert_eq!(response, Response::ok());
+
+        let get = Get::new(key);
+        let response = seg.get(&get);
+        assert_eq!(response, Response::bulk_string(value));
+    }
+
+    #[test]
+    fn it_should_incr() {
+        //setup
+        let config = RdsConfig::default();
+        let mut seg = Seg::new(&config).expect("could not initialize seg");
+
+        // incr missing
+        let incr_missing = Incr::new(b"missing");
+        let response = seg.incr(&incr_missing);
+        assert_eq!(response, Response::integer(1));
+
+        // incr numeric set
+        let key = b"number";
+        let number = 123456_i64;
+        let set = Set::new(
+            key,
+            number.to_string().as_bytes(),
+            None,
+            SetMode::Set,
+            false,
+        );
+        seg.set(&set);
+
+        let incr_numeric = Incr::new(key);
+        let response = seg.incr(&incr_numeric);
+        assert_eq!(response, Response::integer(number + 1));
+
+        // incr string set
+        let key = b"string";
+        let set = Set::new(key, b"value", None, SetMode::Set, false);
+        seg.set(&set);
+
+        let incr_missing = Incr::new(key);
+        let response = seg.incr(&incr_missing);
+        assert_eq!(
+            response,
+            Response::error("value is not an integer or out of range")
+        );
+
+        // incr overflow
+        let key = b"string";
+        let value = b"9223372036854775807";
+        let set = Set::new(key, value, None, SetMode::Set, false);
+        seg.set(&set);
+
+        let incr_overflow = Incr::new(key);
+        let response = seg.incr(&incr_overflow);
+        assert_eq!(
+            response,
+            Response::error("increment or decrement would overflow")
+        );
+    }
+}
