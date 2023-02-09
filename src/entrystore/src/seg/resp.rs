@@ -10,9 +10,9 @@ use protocol_common::*;
 
 use protocol_resp::*;
 
+use protocol_common::parsing::parse_signed_redis;
 use seg::Value::{Bytes, U64};
 use std::time::Duration;
-use storage_types::parse_signed_redis;
 
 impl Execute<Request, Response> for Seg {
     fn execute(&mut self, request: &Request) -> Response {
@@ -61,26 +61,25 @@ impl Storage for Seg {
     fn incr(&mut self, incr: &Incr) -> Response {
         if let Some(mut item) = self.data.get(incr.key()) {
             match item.value() {
-                seg::Value::Bytes(b) => Response::error("wrong data type"),
+                seg::Value::Bytes(_) => Response::error("value is not an integer or out of range"),
                 seg::Value::U64(uint) => {
                     if let Some(incremented) = (uint as i64).checked_add(1) {
-                        item.wrapping_add(1);
+                        item.wrapping_add(1)
+                            .expect("we already checked that type is numeric, how can this fail?");
                         Response::integer(incremented)
                     } else {
                         Response::error("increment or decrement would overflow")
                     }
                 }
             }
+        } else if self
+            .data
+            .insert(incr.key(), 1_u64, None, Duration::ZERO)
+            .is_ok()
+        {
+            Response::integer(1)
         } else {
-            if self
-                .data
-                .insert(incr.key(), 1 as u64, None, Duration::from_secs(0))
-                .is_ok()
-            {
-                Response::integer(1)
-            } else {
-                Response::error("not stored")
-            }
+            Response::error("not stored")
         }
     }
 }

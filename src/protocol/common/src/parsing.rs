@@ -42,7 +42,7 @@ pub fn parse_signed_redis(bytes: &[u8]) -> Option<i64> {
     match &bytes[0] {
         b'-' if bytes.len() >= 2 && bytes[1] != b'0' => {
             let first_digit = convert_digit(bytes[1])?;
-            parse_rest((first_digit as i64) * -1, &bytes[2..], -1)
+            parse_rest(-(first_digit as i64), &bytes[2..], -1)
         }
         other if (b'1'..=b'9').contains(other) => {
             let digit = convert_digit(*other)?;
