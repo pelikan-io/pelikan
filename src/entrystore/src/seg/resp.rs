@@ -25,7 +25,7 @@ impl Execute<Request, Response> for Seg {
 
 impl Storage for Seg {
     fn del(&mut self, delete: &Del) -> Response {
-        let count: usize = delete
+        let count = delete
             .keys()
             .iter()
             .filter(|key| self.data.delete(key))
@@ -38,7 +38,7 @@ impl Storage for Seg {
         if let Some(item) = self.data.get(get.key()) {
             match item.value() {
                 seg::Value::Bytes(b) => Response::bulk_string(b),
-                seg::Value::U64(v) => Response::bulk_string(format!("{}", v).as_bytes()),
+                seg::Value::U64(v) => Response::bulk_string(format!("{v}").as_bytes()),
             }
         } else {
             Response::null()
@@ -59,6 +59,52 @@ impl Storage for Seg {
             Response::simple_string("OK")
         } else {
             Response::error("not stored")
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Seg;
+    use config::RdsConfig;
+    use protocol_resp::*;
+
+    #[test]
+    fn it_should_del() {
+        let config = RdsConfig::default();
+        let mut seg = Seg::new(&config).expect("could not initialize seg");
+
+        //ignores missing
+        let del_missing = Del::new(&[b"missing"]);
+        let response = seg.del(&del_missing);
+        assert_eq!(response, Response::integer(0));
+
+        //deletes multiple keys, returning the number deleted
+        let mut keys = vec![];
+        for i in 1..5 {
+            let key_string = format!("k{i}");
+            let key = key_string.as_bytes();
+            let set = Set::new(key, format!("v{i}").as_bytes(), None, SetMode::Set, false);
+            seg.set(&set);
+            keys.push(key_string);
+        }
+
+        let del = Del::new(
+            keys.iter()
+                .map(|s| s.as_bytes())
+                .collect::<Vec<&[u8]>>()
+                .as_slice(),
+        );
+
+        let response = seg.del(&del);
+        assert_eq!(response, Response::integer(keys.len() as i64));
+
+        for key in keys {
+            let bytes = key.as_bytes();
+
+            let get = Get::new(bytes);
+            let response = seg.get(&get);
+            assert_eq!(response, Response::null())
         }
     }
 }
