@@ -108,37 +108,37 @@ pub(crate) async fn handle_resp_client(
                     resp::hdel(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashExists(r) => {
-                    resp::hexists(&mut client, &cache_name, &mut socket, r.key(), r.field()).await?
+                    resp::hexists(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashGet(r) => {
-                    resp::hget(&mut client, &cache_name, &mut socket, r.key(), r.field()).await?
+                    resp::hget(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashGetAll(r) => {
-                    resp::hgetall(&mut client, &cache_name, &mut socket, r.key()).await?
+                    resp::hgetall(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashIncrBy(r) => {
-                    resp::hincrby(&mut client, &cache_name, &mut socket, r).await?
+                    resp::hincrby(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashKeys(r) => {
-                    resp::hkeys(&mut client, &cache_name, &mut socket, r.key()).await?
+                    resp::hkeys(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashLength(r) => {
-                    resp::hlen(&mut client, &cache_name, &mut socket, r.key()).await?
+                    resp::hlen(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashMultiGet(r) => {
-                    resp::hmget(&mut client, &cache_name, &mut socket, r.key(), r.fields()).await?
+                    resp::hmget(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashSet(r) => {
-                    resp::hset(&mut client, &cache_name, &mut socket, r.key(), r.data()).await?
+                    resp::hset(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::HashValues(r) => {
-                    resp::hvals(&mut client, &cache_name, &mut socket, r.key()).await?
+                    resp::hvals(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::ListIndex(r) => {
-                    resp::lindex(&mut client, &cache_name, &mut socket, r).await?
+                    resp::lindex(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::ListLen(r) => {
-                    resp::llen(&mut client, &cache_name, &mut socket, r).await?
+                    resp::llen(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::ListPop(r) => {
                     resp::lpop(&mut client, &cache_name, &mut response_buf, r).await?
@@ -159,13 +159,13 @@ pub(crate) async fn handle_resp_client(
                     resp::rpop(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::Set(r) => {
-                    resp::set(&mut client, &cache_name, &mut socket, r).await?
+                    resp::set(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::SetAdd(r) => {
-                    resp::sadd(&mut client, &cache_name, &mut socket, r).await?
+                    resp::sadd(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::SetRem(r) => {
-                    resp::srem(&mut client, &cache_name, &mut socket, r).await?
+                    resp::srem(&mut client, &cache_name, &mut response_buf, r).await?
                 }
                 resp::Request::SetDiff(r) => {
                     resp::sdiff(&mut client, &cache_name, &mut response_buf, r).await?
@@ -217,6 +217,15 @@ pub(crate) async fn handle_resp_client(
                     ProxyError::UnsupportedCommand => {
                         println!("bad request");
                         response_buf.extend_from_slice(b"CLIENT_ERROR\r\n");
+                        true
+                    }
+                    ProxyError::Custom(message) => {
+                        SESSION_SEND.increment();
+                        BACKEND_EX.increment();
+                        response_buf.extend_from_slice(b"-ERR ");
+                        response_buf.extend_from_slice(message.as_bytes());
+                        response_buf.extend_from_slice(b"\r\n");
+
                         true
                     }
                 }
