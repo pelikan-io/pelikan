@@ -30,7 +30,7 @@ impl Storage for Seg {
         if let Some(item) = self.data.get(get.key()) {
             match item.value() {
                 seg::Value::Bytes(b) => Response::bulk_string(b),
-                seg::Value::U64(v) => Response::bulk_string(format!("{}", v).as_bytes()),
+                seg::Value::U64(v) => Response::bulk_string(format!("{v}").as_bytes()),
             }
         } else {
             Response::null()

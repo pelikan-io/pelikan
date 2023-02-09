@@ -325,10 +325,10 @@ impl Default for ExpireTime {
 impl Display for ExpireTime {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            ExpireTime::Seconds(s) => write!(f, "{}s", s),
-            ExpireTime::Milliseconds(ms) => write!(f, "{}ms", ms),
-            ExpireTime::UnixSeconds(s) => write!(f, "{}unix_secs", s),
-            ExpireTime::UnixMilliseconds(ms) => write!(f, "{}unix_ms", ms),
+            ExpireTime::Seconds(s) => write!(f, "{s}s"),
+            ExpireTime::Milliseconds(ms) => write!(f, "{ms}ms"),
+            ExpireTime::UnixSeconds(s) => write!(f, "{s}unix_secs"),
+            ExpireTime::UnixMilliseconds(ms) => write!(f, "{ms}unix_ms"),
             ExpireTime::KeepTtl => write!(f, "keep_ttl"),
         }
     }
