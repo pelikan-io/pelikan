@@ -54,7 +54,8 @@ pub fn parse_signed_redis(bytes: &[u8]) -> Option<i64> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parse::parse_signed_redis;
+    use crate::parsing::parse_signed_redis;
+
     #[test]
     fn it_should_parse_obvious_numbers() {
         for x in 0..=10_000 {

@@ -9,6 +9,11 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[[bench]]
+name = "parsing"
+path = "benches/benchmark.rs"
+harness = false
+
 [dependencies]
 bytes = { workspace = true }
 common = { path = "../../common" }

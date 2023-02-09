@@ -8,6 +8,8 @@
 
 pub use bytes::BufMut;
 
+pub mod parsing;
+
 pub const CRLF: &str = "\r\n";
 
 pub trait Compose {

@@ -7,13 +7,3 @@ edition = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
-[[bench]]
-name = "parsing"
-path = "benches/benchmark.rs"
-harness = false
-[dependencies]
-
-
-[dev-dependencies]
-criterion = "0.3.4"
-

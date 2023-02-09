@@ -3,14 +3,13 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use std::num::ParseIntError;
-use storage_types::*;
+use protocol_common::parsing::*;
 
 use std::time::Duration;
 
 fn parse_redis_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("parse_signed_redis");
-    group.measurement_time(Duration::from_secs(2));
+    group.measurement_time(Duration::from_secs(4));
 
     let examples = vec![
         ("max_value", "9223372036854775807"),
@@ -23,7 +22,7 @@ fn parse_redis_benchmark(c: &mut Criterion) {
 
     //passing cases
     group.throughput(Throughput::Elements(1));
-    for (label, value) in examples {
+    for (label, value) in examples.iter() {
         let bytes = value.as_bytes();
         group.bench_with_input(format!("parse i64: {}", label), &bytes, |b, &bytes| {
             b.iter(|| {
@@ -36,7 +35,7 @@ fn parse_redis_benchmark(c: &mut Criterion) {
     let examples = vec![("overflowed_value", "92233720368547758079223372036854775807")];
     //non-passing cases
     group.throughput(Throughput::Elements(1));
-    for (label, value) in examples {
+    for (label, value) in examples.iter() {
         let bytes = value.as_bytes();
         group.bench_with_input(
             format!("parse (failed) i64: {}", label),
