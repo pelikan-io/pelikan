@@ -7,7 +7,6 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: full
-  RUSTFLAGS: "--cfg=CI"
 
 jobs:
   # First stage: these are quick jobs that give immediate feedback on a PR.
