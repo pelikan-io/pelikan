@@ -10,8 +10,37 @@ env:
   FUZZ_TIME: 300
   FUZZ_JOBS: 2
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-protoc
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: fuzz
+          prefix-key: v1-rust
+      - uses: dtolnay/install@cargo-fuzz
+
+      - name: cargo build
+        shell: bash
+        run: |
+          export CARGO_TARGET_DIR=$(pwd)/target
+
+          for target in protocol/admin protocol/memcache protocol/ping protocol/thrift storage/seg; do
+            cd src/$target
+            echo "::group::Building $target"
+            cargo fuzz build
+            echo "::endgroup::"
+            cd - > /dev/null
+          done
+
+  fuzz:
     strategy:
       matrix:
         os: [ ubuntu-latest ]
@@ -25,35 +54,34 @@ jobs:
         ]
     name: fuzz-${{ matrix.os }}-${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    needs: [ build ]
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: nightly
+      - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-protoc
-      - uses: Swatinem/rust-cache@v1
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.os }}-${{ matrix.target }}
-
-      - uses: actions-rs/cargo@v1
-        name: Install cargo-fuzz
-        with:
-          command: install
-          args: cargo-fuzz
+          shared-key: fuzz
+          prefix-key: v1-rust
+          save-if: false
+      - uses: dtolnay/install@cargo-fuzz
 
       - name: fuzz ${{ matrix.target }}
         run: |
+          export CARGO_TARGET_DIR=$(pwd)/target
+
           cd src/${{ matrix.target }}
-          for FUZZ_TARGET in `cargo +nightly fuzz list`; do
-            cargo +nightly fuzz run ${FUZZ_TARGET} --jobs ${{ env.FUZZ_JOBS }} -- \
+          for FUZZ_TARGET in `cargo fuzz list`; do
+            cargo fuzz run ${FUZZ_TARGET} --jobs ${{ env.FUZZ_JOBS }} -- \
               -max_total_time=${{ env.FUZZ_TIME }};
           done
 
   check-success:
-    name: verify all tests pass
+    name: verify all fuzz tests pass
     runs-on: ubuntu-latest
     needs:
       - build
+      - fuzz
 
     steps:
       - name: no-op

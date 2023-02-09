@@ -59,7 +59,7 @@ impl From<&SetUnion> for Message {
     fn from(value: &SetUnion) -> Self {
         let mut vals = Vec::with_capacity(value.keys().len() + 1);
         vals.push(Message::bulk_string(b"SUNION"));
-        vals.extend(value.keys().iter().map(|v| Message::bulk_string(&v)));
+        vals.extend(value.keys().iter().map(|v| Message::bulk_string(v)));
 
         Message::Array(Array { inner: Some(vals) })
     }

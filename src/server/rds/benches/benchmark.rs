@@ -51,9 +51,9 @@ fn get_benchmark(c: &mut Criterion) {
     // benchmark for a few key lengths
     for klen in [1, 16, 64, 255].iter() {
         // benchmark getting empty value
-        let bench_name = format!("get/{}b/0b", klen);
+        let bench_name = format!("get/{klen}b/0b");
         let key = format!("{:01$}", 0, klen);
-        let msg = format!("get {}\r\n", key);
+        let msg = format!("get {key}\r\n");
         group.bench_function(&bench_name, |b| {
             b.iter(|| {
                 assert!(stream.write_all(msg.as_bytes()).is_ok());
@@ -67,9 +67,9 @@ fn get_benchmark(c: &mut Criterion) {
 
         // benchmark across a few value lengths
         for vlen in [1, 64, 1024, 4096].iter() {
-            let key = format!("{:01$}", key_id, klen);
+            let key = format!("{key_id:0klen$}");
             let value = format!("{:A>1$}", 0, vlen);
-            let msg = format!("set {} {}\r\n", key, value);
+            let msg = format!("set {key} {value}\r\n");
             assert!(stream.write_all(msg.as_bytes()).is_ok());
             if let Ok(bytes) = stream.read(&mut buffer) {
                 assert_eq!(&buffer[0..bytes], RESP_OK, "invalid response");
@@ -77,9 +77,9 @@ fn get_benchmark(c: &mut Criterion) {
                 panic!("read error");
             }
 
-            let bench_name = format!("get/{}b/{}b", klen, vlen);
-            let msg = format!("get {}\r\n", key);
-            let response = format!("${}\r\n{}\r\n", vlen, value);
+            let bench_name = format!("get/{klen}b/{vlen}b");
+            let msg = format!("get {key}\r\n");
+            let response = format!("${vlen}\r\n{value}\r\n");
             group.bench_function(&bench_name, |b| {
                 b.iter(|| {
                     assert!(stream.write_all(msg.as_bytes()).is_ok());
