@@ -287,10 +287,10 @@ impl Storage for Seg {
     fn cas(&mut self, cas: &Cas) -> Response {
         // TTL of None means that it doesn't expire. In `Seg` storage
         // a TTL of zero maps to the longest TTL representable which
-        // is ~97 days. 
+        // is ~97 days.
         
         let ttl = cas.ttl().get().unwrap_or(0);
-    
+
         // Since we allow specifying Unix timestamps as TTLs, we can actually
         // make a request that says that if the CAS value matches, the item
         // should be immediately expired.
@@ -304,7 +304,7 @@ impl Storage for Seg {
         // should've already been expired.
 
         let mut delete_after = false;
-        
+
         let ttl = if ttl < 0 {
             delete_after = true;
             Duration::from_secs(1)
