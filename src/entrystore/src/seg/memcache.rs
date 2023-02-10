@@ -288,7 +288,7 @@ impl Storage for Seg {
         // TTL of None means that it doesn't expire. In `Seg` storage
         // a TTL of zero maps to the longest TTL representable which
         // is ~97 days.
-        
+
         let ttl = cas.ttl().get().unwrap_or(0);
 
         // Since we allow specifying Unix timestamps as TTLs, we can actually
@@ -354,7 +354,7 @@ impl Storage for Seg {
                 Err(_) => Response::error(),
             }
         };
-        
+
         // If CAS was successful and TTL was in the past, we now delete the
         // item.
         if delete_after {
