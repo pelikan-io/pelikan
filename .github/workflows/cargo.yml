@@ -22,9 +22,35 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: check-${{ matrix.os }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: clippy-sarif,sarif-fmt
       - name: cargo check
         run: |
-          cargo check --all-targets
+          cargo check --all-targets --all-features --message-format json \
+            | clippy-sarif \
+            | tee check.sarif \
+            | sarif-fmt
+        shell: bash
+        continue-on-error: true
+      - uses: actions/upload-artifact@v3
+        with:
+          name: check-${{ matrix.os }}-sarif
+          path: check.sarif
+
+  check-upload:
+    runs-on: ubuntu-latest
+    needs: [ check ]
+    permissions:
+      security-events: write
+    steps:
+    - uses: actions/checkout@v3
+    - uses: actions/download-artifact@v3
+      with:
+        name: check-ubuntu-latest-sarif
+    - uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: check.sarif
 
   clippy:
     runs-on: ubuntu-latest
