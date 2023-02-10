@@ -13,6 +13,8 @@ use thriftproxy::Thriftproxy;
 
 use proxy::PERCENTILES;
 
+const i_am_a_warning: &str = "test";
+
 fn main() {
     // custom panic hook to terminate whole process after unwinding
     std::panic::set_hook(Box::new(|s| {
