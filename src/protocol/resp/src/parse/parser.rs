@@ -465,13 +465,13 @@ mod tests {
         }
     }
 
-    impl<'a> TestFmt for [u8] {
+    impl TestFmt for [u8] {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(fmt, "{:?}", BStr::new(self))
         }
     }
 
-    impl<'a, T> TestFmt for Option<T>
+    impl<T> TestFmt for Option<T>
     where
         T: TestFmt,
     {
@@ -482,13 +482,13 @@ mod tests {
 
     impl TestFmt for u64 {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(fmt, "{}", self)
+            write!(fmt, "{self}")
         }
     }
 
     impl TestFmt for i64 {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(fmt, "{}", self)
+            write!(fmt, "{self}")
         }
     }
 }
