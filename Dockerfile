@@ -5,12 +5,12 @@
 FROM rust:latest as cargo-build
 
 COPY . .
-RUN apt-get update
-RUN apt-get install -y cmake
-RUN apt-get install -y clang
+RUN apt-get update && apt-get install -y \
+  cmake \
+  clang \
+  protobuf-compiler
 RUN cargo vendor > .cargo/config
 
-RUN  apt-get install -y protobuf-compiler
 RUN cargo build --release
 
 # -----------------
