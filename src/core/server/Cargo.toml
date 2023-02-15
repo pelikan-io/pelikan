@@ -23,3 +23,4 @@ protocol-common = { path = "../../protocol/common" }
 session = { path = "../../session" }
 slab = { workspace = true }
 switchboard = { workspace = true }
+ctrlc = {workspace = true}

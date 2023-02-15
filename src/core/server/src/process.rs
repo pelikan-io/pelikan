@@ -81,6 +81,15 @@ where
             .unwrap();
 
         let workers = workers.spawn();
+        let cloned_signal_tx = signal_tx.clone();
+
+        //Signal handlers
+        ctrlc::set_handler(move || {
+            //Handle SIGINT by making a best attempt at signalling shutdown via admin thread.
+            //NOTE: Does not wait for completion, which we should rectify at some point
+            Process::shutdown_signal(&cloned_signal_tx);
+        })
+        .expect("Error setting Ctrl-C handler");
 
         Process {
             admin,
@@ -109,12 +118,17 @@ impl Process {
     pub fn shutdown(self) {
         // this sends a shutdown to the admin thread, which will broadcast the
         // signal to all sibling threads in the process
-        if self.signal_tx.try_send(Signal::Shutdown).is_err() {
-            fatal!("error sending shutdown signal to thread");
-        }
+        Process::shutdown_signal(&self.signal_tx);
 
         // wait and join all threads
         self.wait()
+    }
+
+    /// Communicates to the admin thread that shutdown should occur
+    fn shutdown_signal(signal_tx: &Sender<Signal>) {
+        if signal_tx.try_send(Signal::Shutdown).is_err() {
+            fatal!("error sending shutdown signal to thread");
+        }
     }
 
     /// Will block until all threads terminate. This should be used to keep the
