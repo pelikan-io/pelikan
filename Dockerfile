@@ -10,6 +10,7 @@ RUN apt-get install -y cmake
 RUN apt-get install -y clang
 RUN cargo vendor > .cargo/config
 
+RUN  apt-get install -y protobuf-compiler
 RUN cargo build --release
 
 # -----------------
