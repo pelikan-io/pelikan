@@ -8,7 +8,8 @@ COPY . .
 RUN apt-get update && apt-get install -y \
   cmake \
   clang \
-  protobuf-compiler
+  protobuf-compiler \
+  && rm -rf /var/lib/apt/lists/*
 RUN cargo vendor > .cargo/config
 
 RUN cargo build --release
