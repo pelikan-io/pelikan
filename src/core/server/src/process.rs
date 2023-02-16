@@ -86,7 +86,6 @@ where
         //Signal handlers
         ctrlc::set_handler(move || {
             //Handle SIGINT by making a best attempt at signalling shutdown via admin thread.
-            //NOTE: Does not wait for completion, which we should rectify at some point
             Process::shutdown_signal(&cloned_signal_tx);
         })
         .expect("Error setting Ctrl-C handler");
