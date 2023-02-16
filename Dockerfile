@@ -5,9 +5,11 @@
 FROM rust:latest as cargo-build
 
 COPY . .
-RUN apt-get update
-RUN apt-get install -y cmake
-RUN apt-get install -y clang
+RUN apt-get update && apt-get install -y \
+  cmake \
+  clang \
+  protobuf-compiler \
+  && rm -rf /var/lib/apt/lists/*
 RUN cargo vendor > .cargo/config
 
 RUN cargo build --release  -p momento_proxy
