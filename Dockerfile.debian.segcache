@@ -1,8 +1,5 @@
 # Reference Dockerfile for building and running Segcache from a clean slate Debian install
-#
-# It's recommended 
-#
-#
+
 # -----------------
 # Cargo Build Stage
 # -----------------
