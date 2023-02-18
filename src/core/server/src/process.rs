@@ -86,11 +86,13 @@ where
         let workers = workers.spawn();
         let cloned_signal_tx = signal_tx.clone();
 
-        let signal_handler = std::thread::Builder::new()
+        // NOTE: Signal handler join handle is not taken ownership of by [Process] as it's
+        // considered something that has the same lifetime as the actual OS process as a whole
+        // and there aren't any current use cases for blocking on join()'ing the thread
+        // if we want to dynamically rebind signal handlers in the future we should reconsider this
+        let _signal_handler = std::thread::Builder::new()
             .name(format!("{THREAD_PREFIX}_signal_handler"))
             .spawn(move || Process::signal_handler(&cloned_signal_tx));
-
-        //Process::shutdown_signal(&cloned_signal_tx);
 
         Process {
             admin,
