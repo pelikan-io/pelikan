@@ -141,7 +141,10 @@ impl Process {
         //Infinite iterator of signals
         for signal in &mut signals {
             match signal {
-                SIGTERM | SIGINT | SIGQUIT => Process::shutdown_signal(signal_tx),
+                SIGTERM | SIGINT | SIGQUIT => {
+                    Process::shutdown_signal(signal_tx);
+                    break;
+                }
                 _ => (),
             }
         }
