@@ -54,9 +54,6 @@ COPY --from=cargo-build ./target/release/pelikan_segcache_rs .
 COPY --from=cargo-build ./config/segcache.toml ./config
 
 RUN chmod +x ./pelikan_segcache_rs
-CMD ./momento_proxy ./config/segcache.toml
-
-
 
 CMD ["./pelikan_segcache_rs", "./config/segcache.toml"]
 
