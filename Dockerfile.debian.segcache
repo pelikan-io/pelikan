@@ -1,9 +1,10 @@
 # Reference Dockerfile for building and running Segcache from a clean slate Debian install
 # 
-# Note: using `rust:latest` in FROM will save a lot of the effort of installing Rust but will also bring along many packages from `buildpack-deps` or otherwise
-# we've created this Dockerfile from `debian:stable-slim` to make a best attempt at demonstrating the list of packages one would need if starting from 
-# a minimal installation for the purpose of informing developers of Pelikan.
-# 
+# Note: using `rust:latest` in FROM will save a lot of the effort of installing Rust
+# but will also bring along many packages from `buildpack-deps` or otherwise
+# we've created this Dockerfile from `debian:stable-slim` to make a best attempt
+# at demonstrating the list of packages one would need if starting from a minimal installation
+# for the purpose of informing developers of Pelikan.
 #
 # -----------------
 # Cargo Build Stage
