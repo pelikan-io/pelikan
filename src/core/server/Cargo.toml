@@ -15,12 +15,14 @@ common = { path = "../../common" }
 config = { path = "../../config" }
 crossbeam-channel = { workspace = true }
 entrystore = { path = "../../entrystore" }
+libc = {workspace = true}
 logger = { path = "../../logger" }
 metriken = { workspace = true }
 net = { path = "../../net" }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-common = { path = "../../protocol/common" }
 session = { path = "../../session" }
+signal-hook = {workspace = true}
+signal-hook-tokio = {workspace = true}
 slab = { workspace = true }
 switchboard = { workspace = true }
-ctrlc = {workspace = true}

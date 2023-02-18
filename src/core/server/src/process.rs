@@ -3,6 +3,9 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use crate::*;
+use libc::c_int;
+use signal_hook::consts::signal::*;
+use signal_hook::iterator::Signals;
 use std::thread::JoinHandle;
 
 pub struct ProcessBuilder<Parser, Request, Response, Storage> {
@@ -83,12 +86,11 @@ where
         let workers = workers.spawn();
         let cloned_signal_tx = signal_tx.clone();
 
-        //Signal handlers
-        ctrlc::set_handler(move || {
-            //Handle SIGINT by making a best attempt at signalling shutdown via admin thread.
-            Process::shutdown_signal(&cloned_signal_tx);
-        })
-        .expect("Error setting Ctrl-C handler");
+        let signal_handler = std::thread::Builder::new()
+            .name(format!("{THREAD_PREFIX}_signal_handler"))
+            .spawn(move || Process::signal_handler(&cloned_signal_tx));
+
+        //Process::shutdown_signal(&cloned_signal_tx);
 
         Process {
             admin,
@@ -127,6 +129,21 @@ impl Process {
     fn shutdown_signal(signal_tx: &Sender<Signal>) {
         if signal_tx.try_send(Signal::Shutdown).is_err() {
             fatal!("error sending shutdown signal to thread");
+        }
+    }
+
+    /// Registers Process to listen to relevant signals
+    /// and depending on the signal, may relay Pelikan [Signal] messages to admin channel
+    fn signal_handler(signal_tx: &Sender<Signal>) {
+        const SIGNALS: &[c_int] = &[SIGHUP, SIGINT, SIGTERM, SIGQUIT];
+        let mut signals = Signals::new(SIGNALS).expect("Couldn't instantiate Signals");
+
+        //Infinite iterator of signals
+        for signal in &mut signals {
+            match signal {
+                SIGTERM | SIGINT | SIGQUIT => Process::shutdown_signal(signal_tx),
+                _ => (),
+            }
         }
     }
 
