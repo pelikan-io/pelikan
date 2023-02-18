@@ -23,6 +23,5 @@ protocol-admin = { path = "../../protocol/admin" }
 protocol-common = { path = "../../protocol/common" }
 session = { path = "../../session" }
 signal-hook = {workspace = true}
-signal-hook-tokio = {workspace = true}
 slab = { workspace = true }
 switchboard = { workspace = true }
