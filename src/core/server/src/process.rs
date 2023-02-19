@@ -91,7 +91,7 @@ where
         // and there aren't any current use cases for blocking on join()'ing the thread
         // if we want to dynamically rebind signal handlers in the future we should reconsider this
         let _signal_handler = std::thread::Builder::new()
-            .name(format!("{THREAD_PREFIX}_signal_handler"))
+            .name(format!("{THREAD_PREFIX}_signal"))
             .spawn(move || Process::signal_handler(&cloned_signal_tx));
 
         Process {
