@@ -3,6 +3,9 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use crate::*;
+use libc::c_int;
+use signal_hook::consts::signal::*;
+use signal_hook::iterator::Signals;
 use std::thread::JoinHandle;
 
 pub struct ProcessBuilder<Parser, Request, Response, Storage> {
@@ -81,6 +84,15 @@ where
             .unwrap();
 
         let workers = workers.spawn();
+        let cloned_signal_tx = signal_tx.clone();
+
+        // NOTE: Signal handler join handle is not taken ownership of by [Process] as it's
+        // considered something that has the same lifetime as the actual OS process as a whole
+        // and there aren't any current use cases for blocking on join()'ing the thread
+        // if we want to dynamically rebind signal handlers in the future we should reconsider this
+        let _signal_handler = std::thread::Builder::new()
+            .name(format!("{THREAD_PREFIX}_signal"))
+            .spawn(move || Process::signal_handler(&cloned_signal_tx));
 
         Process {
             admin,
@@ -109,12 +121,35 @@ impl Process {
     pub fn shutdown(self) {
         // this sends a shutdown to the admin thread, which will broadcast the
         // signal to all sibling threads in the process
-        if self.signal_tx.try_send(Signal::Shutdown).is_err() {
-            fatal!("error sending shutdown signal to thread");
-        }
+        Process::shutdown_signal(&self.signal_tx);
 
         // wait and join all threads
         self.wait()
+    }
+
+    /// Communicates to the admin thread that shutdown should occur
+    fn shutdown_signal(signal_tx: &Sender<Signal>) {
+        if signal_tx.try_send(Signal::Shutdown).is_err() {
+            fatal!("error sending shutdown signal to thread");
+        }
+    }
+
+    /// Registers Process to listen to relevant signals
+    /// and depending on the signal, may relay Pelikan [Signal] messages to admin channel
+    fn signal_handler(signal_tx: &Sender<Signal>) {
+        const SIGNALS: &[c_int] = &[SIGHUP, SIGINT, SIGTERM, SIGQUIT];
+        let mut signals = Signals::new(SIGNALS).expect("Couldn't instantiate Signals");
+
+        //Infinite iterator of signals
+        for signal in &mut signals {
+            match signal {
+                SIGTERM | SIGINT | SIGQUIT => {
+                    Process::shutdown_signal(signal_tx);
+                    break;
+                }
+                _ => (),
+            }
+        }
     }
 
     /// Will block until all threads terminate. This should be used to keep the
