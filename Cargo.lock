@@ -973,12 +973,13 @@ checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 
 [[package]]
 name = "heatmap"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44a040d43defb8644617d52575557275232693a27c594d136b16c12283244683"
+checksum = "0eb03972c2abd3d09b18a58eec103ab2debb59d5f2ca631fa43a87fa726765fa"
 dependencies = [
  "clocksource",
  "histogram",
+ "parking_lot",
  "thiserror",
 ]
 
@@ -1008,9 +1009,9 @@ dependencies = [
 
 [[package]]
 name = "histogram"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "913e066ae237bc8adb23b539f140ae81152af2dc3ff357ada35af13bcf48f016"
+checksum = "f2cddb1ee43e0813fb269066abae4e09550efca332cc2c639369b64c3b2ebd55"
 dependencies = [
  "thiserror",
 ]
@@ -1340,9 +1341,9 @@ dependencies = [
 
 [[package]]
 name = "metriken"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af0a70e90189b46fa6b104f52d68566059d5dc34f55cd314755249a60727dc34"
+checksum = "c051f99c84bdd165f31c1aaa7717f9d43d21410c08335cb33e97dca98fb7ad79"
 dependencies = [
  "clocksource",
  "heatmap",
@@ -2398,12 +2399,14 @@ dependencies = [
  "config",
  "crossbeam-channel",
  "entrystore",
+ "libc",
  "logger",
  "metriken",
  "net",
  "protocol-admin",
  "protocol-common",
  "session",
+ "signal-hook",
  "slab",
  "switchboard",
 ]
@@ -2425,6 +2428,16 @@ name = "shlex"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
+
+[[package]]
+name = "signal-hook"
+version = "0.3.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "732768f1176d21d09e076c23a93123d40bba92d50c4058da34d45c8de8e682b9"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
 
 [[package]]
 name = "signal-hook-registry"
