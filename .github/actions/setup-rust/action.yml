@@ -8,15 +8,3 @@ runs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
-
-    - name: Configure Rustflags
-      shell: bash
-      env:
-        CONFIG: |
-          [target.x86_64-unknown-linux-gnu]
-          rustflags = [ "-C", "link-arg=-fuse-ld=lld" ]
-
-          [target.x86_64-apple-darwin]
-          rustflags = [ "-C", "link-arg=-fuse-ld=lld" ]
-      run: |
-        echo "$CONFIG" >> ~/.cargo/config.toml
