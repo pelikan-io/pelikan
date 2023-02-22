@@ -23,7 +23,7 @@ impl BulkString {
         self.inner.as_ref().map(|i| i.len()).unwrap_or(0)
     }
 
-    pub fn nil() -> Self {
+    pub fn null() -> Self {
         Self { inner: None }
     }
 }
@@ -58,6 +58,7 @@ impl Compose for BulkString {
             buf.put_slice(b"\r\n");
             header.as_bytes().len() + value.len() + 2
         } else {
+            // A null bulk string is serialized as `$-1\r\n`.
             buf.put_slice(b"$-1\r\n");
             5
         }
