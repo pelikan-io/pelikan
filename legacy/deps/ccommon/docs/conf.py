@@ -9,6 +9,7 @@ extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
     'sphinx.ext.ifconfig',
+    'sphinx.ext.mathjax',
 ]
 
 exclude_patterns = ['_build']

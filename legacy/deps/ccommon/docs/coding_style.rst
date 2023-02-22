@@ -201,7 +201,7 @@ Braces
 
 
 Infinite loops
-=============
+==============
 
 Create infinite loops with ``for`` statements, not ``while`` statements.
 For example:
