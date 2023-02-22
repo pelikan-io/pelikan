@@ -38,7 +38,7 @@ endif()
 
 # version info
 set(${PROJECT_NAME}_VERSION_MAJOR 2)
-set(${PROJECT_NAME}_VERSION_MINOR 1)
+set(${PROJECT_NAME}_VERSION_MINOR 2)
 set(${PROJECT_NAME}_VERSION_PATCH 0)
 set(${PROJECT_NAME}_VERSION
    ${${PROJECT_NAME}_VERSION_MAJOR}.${${PROJECT_NAME}_VERSION_MINOR}.${${PROJECT_NAME}_VERSION_PATCH}
@@ -55,14 +55,9 @@ option(HAVE_STATS "stats enabled by default" ON)
 option(HAVE_TEST "test built by default" ON)
 option(HAVE_DEBUG_MM "debugging oriented memory management disabled by default" OFF)
 option(HAVE_COVERAGE "code coverage" OFF)
-option(HAVE_RUST "rust bindings not built by default" OFF)
 option(HAVE_ITT_INSTRUMENTATION "instrument code with ITT API" OFF)
 
 option(FORCE_CHECK_BUILD "Force building check with ci/install-check.sh" OFF)
-
-if(HAVE_RUST)
-    option(RUST_VERBOSE_BUILD "pass -vv to cargo compilation" OFF)
-endif()
 
 include(CheckIncludeFiles)
 if(OS_PLATFORM STREQUAL "OS_LINUX")
@@ -198,23 +193,6 @@ if(HAVE_TEST)
     add_subdirectory(test)
 endif(HAVE_TEST)
 
-if(HAVE_RUST)
-    include(CMakeCargo)
-    add_subdirectory(rust)
-
-    if (${CMAKE_VERSION} VERSION_LESS "3.13.0")
-        # CMakeCargo requires the use of some newer features of cmake
-        # for changes to dependant libraries to cause a rebuild. This
-        # will never break the build, it is just annoying for development.
-        # Leave a warning here, but don't break the build for older cmake
-        # versions.
-        message(
-            WARNING
-            "Rust targets don't properly pick up changes to dependencies in cmake version <= 3.13"
-        )
-    endif()
-endif()
-
 ###################
 # print a summary #
 ###################
@@ -239,7 +217,6 @@ endif()
 message(STATUS "=======================================")
 
 message(STATUS "======Status of optional features======")
-message(STATUS "HAVE_RUST: " ${HAVE_RUST})
 message(STATUS "HAVE_ASSERT_LOG: " ${HAVE_ASSERT_LOG})
 message(STATUS "HAVE_ASSERT_PANIC: " ${HAVE_ASSERT_PANIC})
 message(STATUS "HAVE_LOGGING: " ${HAVE_LOGGING})
