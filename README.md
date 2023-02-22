@@ -81,11 +81,11 @@ is not actively worked on. We do not recommend it for production deployments.
 - (to build `momento_proxy`) Follow [the gRPC instructions here][grpc-url]
   to install Protocol Buffer Compiler. Alternatively, you can skip the
   `momento_proxy` package.
-
-_To build legacy Pelikan, you will need:_
-
 - C toolchain: `llvm/clang (>= 7.0)`
 - Build tools: `cmake (>= 3.2)`
+
+The C/C++ tools are used by Pelikan dependencies such as BoringSSL, and also
+necessary if you are building legacy Pelikan which is written in C.
 
 ## Build
 
