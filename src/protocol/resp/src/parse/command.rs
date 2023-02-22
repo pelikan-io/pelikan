@@ -14,6 +14,9 @@ enum Detail<'a, 'p> {
     Resp(ArrayParser<'a, 'p>),
 }
 
+/// Parser for redis commands, whether inline or using the RESP protocol.
+///
+/// See <https://redis.io/docs/reference/protocol-spec/> for the specification.
 pub struct CommandParser<'a, 'p> {
     detail: Detail<'a, 'p>,
 }
@@ -21,12 +24,16 @@ pub struct CommandParser<'a, 'p> {
 impl<'a, 'p> CommandParser<'a, 'p> {
     pub fn new(parser: &'p mut Parser<'a>) -> ParseResult<'a, Self> {
         match parser.peek() {
+            // If the buffer starts with one of these then we have a RESP
+            // object so we should parse it as such. This will give an error if
+            // it is not an array but that is what we want here.
             Some(b'+' | b'-' | b':' | b'$' | b'*') => Ok(Self {
                 detail: Detail::Resp(parser.parse_array()?.ok_or(ParseError::Custom {
-                    expected: "a non-nil array",
-                    found: "a nil array",
+                    expected: "a non-null array",
+                    found: "a null array",
                 })?),
             }),
+            // Otherwise parse using the inline command format.
             Some(_) => {
                 let mut parser = InlineParser::new(parser.parse_command_line()?);
                 let mut items = Vec::new();
