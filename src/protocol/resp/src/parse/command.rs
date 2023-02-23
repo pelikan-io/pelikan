@@ -27,7 +27,7 @@ impl<'a, 'p> CommandParser<'a, 'p> {
             // If the buffer starts with one of these then we have a RESP
             // object so we should parse it as such. This will give an error if
             // it is not an array but that is what we want here.
-            Some(b'+' | b'-' | b':' | b'$' | b'*') => Ok(Self {
+            Some(b'*' | b'+' | b'-' | b':' | b'$') => Ok(Self {
                 detail: Detail::Resp(parser.parse_array()?.ok_or(ParseError::Custom {
                     expected: "a non-null array",
                     found: "a null array",
