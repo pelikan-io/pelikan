@@ -113,9 +113,10 @@ impl<'a, 'p> CommandParser<'a, 'p> {
     pub fn parse_message(mut self) -> ParseResult<'a, Message> {
         use crate::message::Array;
 
-        // Note: Need to limit the maximum capacity we allocate to prevent DOS attacks
-        //       in pelikan.
-        let mut elements = Vec::with_capacity(self.remaining().min(64));
+        // To avoid DOS attacks we should only pre-allocate capacity up to a certain size.
+        const MAX_MESSAGE_PREALLOC: usize = 64;
+
+        let mut elements = Vec::with_capacity(self.remaining().min(MAX_MESSAGE_PREALLOC));
 
         for _ in 0..self.remaining() {
             elements.push(Message::bulk_string(&self.parse_string_nonnil()?));
