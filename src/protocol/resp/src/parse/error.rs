@@ -10,7 +10,7 @@ use thiserror::Error;
 
 #[derive(Error)]
 pub enum ParseError<'a> {
-    #[error("ran out of data unexpectedly")]
+    #[error("parsing incomplete: not enough data")]
     Incomplete,
     #[error("expected {:?}, got {:?} instead", BStr::new(.expected), BStr::new(.found))]
     InvalidLiteral {
@@ -21,12 +21,12 @@ pub enum ParseError<'a> {
     InvalidNumber(Cow<'a, [u8]>),
     #[error("expected a non-negative number, got {:?} instead", BStr::new(.0))]
     UnexpectedNegativeNumber(Cow<'a, [u8]>),
-    #[error("expected a non-nil string, got a nil one instead")]
-    UnexpectedNilString,
+    #[error("expected a non-null string, got a null one instead")]
+    UnexpectedNullString,
 
-    #[error("expected an array element, but array was too short")]
+    #[error("malformed array: an expected array element is missing")]
     ExpectedArrayElement,
-    #[error("expected array to be completely parsed, but there were more elements")]
+    #[error("malformed array: an unexpected extra array element was provided")]
     UnexpectedArrayElement,
 
     #[error("expected {expected}, got {:?}", BStr::new(&[*.found]))]
@@ -77,7 +77,7 @@ impl<'a> fmt::Debug for ParseError<'a> {
                 .debug_tuple("UnexpectedNegativeNumber")
                 .field(&BStr::new(val))
                 .finish(),
-            Self::UnexpectedNilString => f.write_str("UnexpectedNilString"),
+            Self::UnexpectedNullString => f.write_str("UnexpectedNilString"),
             Self::ExpectedArrayElement => f.write_str("ExpectedArrayElement"),
             Self::UnexpectedArrayElement => f.write_str("UnexpectedArrayElement"),
             Self::UnexpectedCharacter { expected, found } => f

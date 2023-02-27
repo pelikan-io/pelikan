@@ -70,7 +70,7 @@ impl<'a, 'p> CommandParser<'a, 'p> {
     }
 
     pub fn parse_string_nonnil(&mut self) -> ParseResult<'a, Cow<'a, [u8]>> {
-        self.parse_string()?.ok_or(ParseError::UnexpectedNilString)
+        self.parse_string()?.ok_or(ParseError::UnexpectedNullString)
     }
 
     pub fn parse_u64(&mut self) -> ParseResult<'a, u64> {
