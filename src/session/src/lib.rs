@@ -140,8 +140,10 @@ impl Session {
         let mut read = 0;
 
         loop {
+            let remaining_mut = self.read_buffer.remaining_mut();
+
             // if the buffer has too little space available, expand it
-            if self.read_buffer.remaining_mut() < BUFFER_MIN_FREE {
+            if remaining_mut < BUFFER_MIN_FREE {
                 self.read_buffer.reserve(TARGET_READ_SIZE);
             }
 
@@ -159,6 +161,19 @@ impl Session {
                         self.read_buffer.advance_mut(n);
                     }
                     read += n;
+
+                    #[cfg(target_family = "unix")]
+                    {
+                        // On UNIX systems where we're using kqueue and epoll we
+                        // can rely on the fact that if we didn't fill the free
+                        // space in the buffer on this read, that there is no
+                        // data left to read right now.
+                        //
+                        // By returning here, we save ourselves an extra read()
+                        if n < remaining_mut {
+                            return Ok(read);
+                        }
+                    }
                 }
                 Err(e) => match e.kind() {
                     ErrorKind::WouldBlock => {
