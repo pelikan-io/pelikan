@@ -7,7 +7,7 @@ use common::time::{Instant, Nanoseconds, Seconds, UnixInstant};
 use core::ops::Range;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[cfg(os = "linux")]
 use std::os::unix::fs::OpenOptionsExt;
@@ -38,92 +38,6 @@ pub trait Datapool: Send {
 
     fn len(&self) -> usize {
         self.as_slice().len()
-    }
-}
-
-#[derive(PartialEq)]
-pub enum Kind {
-    Memory,
-    MmapFile,
-    FileBackedMemory,
-}
-
-pub struct Builder {
-    path: Option<PathBuf>,
-    kind: Kind,
-    size: usize,
-    user_version: Option<u64>,
-}
-
-impl Builder {
-    /// Create a new `Builder` which can be used to construct any of the
-    /// `Datapool` implementations.
-    pub fn new(size: usize) -> Self {
-        Self {
-            path: None,
-            kind: Kind::Memory,
-            size,
-            user_version: None,
-        }
-    }
-
-    /// Set a path for a file to be used for the `Datapool`. Note: this is
-    /// ignored for ephemeral datapools.
-    pub fn path<T: AsRef<Path>>(mut self, path: T) -> Self {
-        self.path = Some(path.as_ref().to_owned());
-        self
-    }
-
-    /// Specify what `Kind` of `Datapool` should be constructed.
-    pub fn kind(mut self, kind: Kind) -> Self {
-        self.kind = kind;
-        self
-    }
-
-    /// Consumes the `Builder` and returns a result containing the resulting
-    /// `Datapool` or some error.
-    pub fn build(self) -> Result<Box<dyn Datapool>, Error> {
-        if self.kind == Kind::Memory {
-            return Ok(Box::new(Memory::create(self.size)?));
-        }
-
-        let user_version = self
-            .user_version
-            .ok_or_else(|| Error::new(ErrorKind::Other, "no user version set"))?;
-        let path = self
-            .path
-            .ok_or_else(|| Error::new(ErrorKind::Other, "no file path set"))?;
-
-        // check if the file already exists and we have permission to open it
-        if OpenOptions::new()
-            .create_new(false)
-            .read(true)
-            .write(true)
-            .open(path.clone())
-            .is_ok()
-        {
-            // the file exists and we could open it, so try to open the existing datapool
-            match self.kind {
-                Kind::FileBackedMemory => Ok(Box::new(FileBackedMemory::open(
-                    path,
-                    self.size,
-                    user_version,
-                )?)),
-                Kind::Memory => unreachable!(),
-                Kind::MmapFile => Ok(Box::new(MmapFile::open(path, self.size, user_version)?)),
-            }
-        } else {
-            // the file either didnt exist or we couldn't open it, try to create a new datapool
-            match self.kind {
-                Kind::FileBackedMemory => Ok(Box::new(FileBackedMemory::create(
-                    path,
-                    self.size,
-                    user_version,
-                )?)),
-                Kind::Memory => unreachable!(),
-                Kind::MmapFile => Ok(Box::new(MmapFile::create(path, self.size, user_version)?)),
-            }
-        }
     }
 }
 

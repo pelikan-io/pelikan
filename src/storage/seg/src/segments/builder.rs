@@ -4,7 +4,6 @@
 
 //! A builder struct for initializing segment storage.
 
-use datapool::Kind;
 use crate::eviction::*;
 use crate::item::*;
 use crate::segments::*;
@@ -17,7 +16,6 @@ pub(crate) struct SegmentsBuilder {
     pub(super) segment_size: i32,
     pub(super) evict_policy: Policy,
     pub(super) datapool_path: Option<PathBuf>,
-    pub(super) datapool_kind: Kind,
 }
 
 impl Default for SegmentsBuilder {
@@ -27,7 +25,6 @@ impl Default for SegmentsBuilder {
             heap_size: 64 * 1024 * 1024,
             evict_policy: Policy::Random,
             datapool_path: None,
-            datapool_kind: Kind::Memory,
         }
     }
 }
