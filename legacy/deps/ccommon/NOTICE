@@ -24,3 +24,10 @@
 
 We use the CMakeRust project (https://github.com/Devolutions/CMakeRust) under
 the Apache 2.0 License.
+
+The HdrHistogram included is partially based on the C implementation of
+HdrHistogram at https://github.com/HdrHistogram/HdrHistogram_c/tree/master/src
+with modification. The original licence notice is included below:
+/* Written by Michael Barker and released to the public domain,
+ * as explained at http://creativecommons.org/publicdomain/zero/1.0/
+ */
