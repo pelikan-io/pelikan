@@ -224,6 +224,12 @@ impl<'a> Parser<'a> {
         }))
     }
 
+    /// Parser function for when you don't know exactly what value type you
+    /// want ahead of time.
+    ///
+    /// To use, implement [`Visitor`] with whatever methods you want and pass
+    /// it into this function. This was originally meant to be used to implement
+    /// parsing for `Message` but that ended up not being needed.
     pub fn parse_any<V: Visitor<'a>>(&mut self, visitor: V) -> ParseResult<'a, V::Output> {
         match self.peek() {
             Some(b'+') => visitor.visit_simple_string(self.parse_simple_string()?),
