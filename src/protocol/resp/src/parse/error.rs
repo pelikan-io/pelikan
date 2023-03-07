@@ -77,7 +77,7 @@ impl<'a> fmt::Debug for ParseError<'a> {
                 .debug_tuple("UnexpectedNegativeNumber")
                 .field(&BStr::new(val))
                 .finish(),
-            Self::UnexpectedNullString => f.write_str("UnexpectedNilString"),
+            Self::UnexpectedNullString => f.write_str("UnexpectedNullString"),
             Self::ExpectedArrayElement => f.write_str("ExpectedArrayElement"),
             Self::UnexpectedArrayElement => f.write_str("UnexpectedArrayElement"),
             Self::UnexpectedCharacter { expected, found } => f
