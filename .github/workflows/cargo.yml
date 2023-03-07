@@ -70,7 +70,7 @@ jobs:
         with:
           shared-key: check-ubuntu-latest
           save-if: false
-      - uses: baptiste0928/cargo-install
+      - uses: baptiste0928/cargo-install@v1
         with:
           crate: cargo-audit
           locked: true
