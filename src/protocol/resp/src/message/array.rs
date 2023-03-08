@@ -10,6 +10,15 @@ pub struct Array {
     pub(crate) inner: Option<Vec<Message>>,
 }
 
+impl Array {
+    /// Create a null array.
+    ///
+    /// This serializes to `*-1\r\n` on the wire.
+    pub fn null() -> Self {
+        Self { inner: None }
+    }
+}
+
 impl Compose for Array {
     fn compose(&self, session: &mut dyn BufMut) -> usize {
         let mut len = 0;
@@ -23,6 +32,7 @@ impl Compose for Array {
             session.put_slice(b"\r\n");
             len += 2;
         } else {
+            // A null array is serialized as `*-1\r\n`.
             session.put_slice(b"*-1\r\n");
             len += 5;
         }

@@ -1979,11 +1979,14 @@ dependencies = [
 name = "protocol-resp"
 version = "0.3.1"
 dependencies = [
+ "bstr 1.1.0",
  "common",
  "logger",
+ "memchr",
  "metriken",
  "nom",
  "protocol-common",
+ "thiserror",
 ]
 
 [[package]]

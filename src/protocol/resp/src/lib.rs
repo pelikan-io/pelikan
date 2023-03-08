@@ -11,6 +11,8 @@ mod response;
 mod storage;
 mod util;
 
+pub mod parse;
+
 pub(crate) use crate::util::*;
 
 pub use crate::request::*;

@@ -103,47 +103,18 @@ macro_rules! decl_request {
 
         impl Parse<$name> for RequestParser {
             fn parse(&self, buffer: &[u8]) -> Result<ParseOk<$name>, Error> {
-                // we have two different parsers, one for RESP and one for inline
-                // both require that there's at least one character in the buffer
-                if buffer.is_empty() {
-                    return Err(Error::from(ErrorKind::WouldBlock));
-                }
+                use crate::parse::*;
 
-                let (message, consumed) = if matches!(buffer[0], b'*' | b'+' | b'-' | b':' | b'$') {
-                    self.message_parser.parse(buffer).map(|v| {
-                        let c = v.consumed();
-                        (v.into_inner(), c)
-                    })?
-                } else {
-                    let mut remaining = buffer;
+                let mut parser = Parser::new(buffer);
+                let result = CommandParser::new(&mut parser)
+                    .and_then(|command| command.parse_message());
 
-                    let mut message = Vec::new();
-
-                    while let Ok((r, string)) = string(remaining) {
-                        message.push(Message::BulkString(BulkString {
-                            inner: Some(string.into()),
-                        }));
-                        remaining = r;
-
-                        if let Ok((r, _)) = space1(remaining) {
-                            remaining = r;
-                        } else {
-                            break;
-                        }
-                    }
-
-                    if !remaining.starts_with(b"\r\n") {
-                        return Err(Error::from(ErrorKind::WouldBlock));
-                    }
-
-                    let message = Message::Array(Array {
-                        inner: Some(message),
-                    });
-
-                    let consumed = (buffer.len() - remaining.len()) + 2;
-
-                    (message, consumed)
+                let message = match result {
+                    Ok(message) => message,
+                    Err(ParseError::Incomplete) => return Err(Error::from(ErrorKind::WouldBlock)),
+                    Err(e) => return Err(Error::new(ErrorKind::Other, e.to_string())),
                 };
+                let consumed = (parser.remaining().as_ptr() as usize) - (buffer.as_ptr() as usize);
 
                 let array = match &message {
                     Message::Array(Array { inner: Some(array)}) if !array.is_empty() => array,
@@ -225,15 +196,11 @@ decl_request! {
 }
 
 #[derive(Clone, Default)]
-pub struct RequestParser {
-    message_parser: MessageParser,
-}
+pub struct RequestParser {}
 
 impl RequestParser {
     pub fn new() -> Self {
-        Self {
-            message_parser: MessageParser {},
-        }
+        Self {}
     }
 }
 
