@@ -70,9 +70,10 @@ jobs:
         with:
           shared-key: check-ubuntu-latest
           save-if: false
-      - uses: taiki-e/install-action@v2
+      - uses: baptiste0928/cargo-install@v1
         with:
-          tool: cargo-audit
+          crate: cargo-audit
+          args: --locked
       - run: |
           cargo audit
         
