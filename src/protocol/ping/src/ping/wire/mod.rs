@@ -9,9 +9,3 @@ mod response;
 
 pub use request::*;
 pub use response::*;
-
-#[allow(unused)]
-use metriken::*;
-
-counter!(PING);
-counter!(PONG);
