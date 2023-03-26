@@ -26,5 +26,6 @@ criterion = "0.3.4"
 
 [features]
 default = []
-client = []
-server = []
+client = ["stats"]
+server = ["stats"]
+stats = []

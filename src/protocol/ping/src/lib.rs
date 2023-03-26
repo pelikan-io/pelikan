@@ -18,4 +18,18 @@ mod ping;
 
 pub use ping::*;
 
+#[cfg(feature = "stats")]
+use stats::*;
+
+#[cfg(feature = "stats")]
+mod stats {
+    use metriken::*;
+
+    #[cfg(feature = "server")]
+    counter!(PING, "the number of ping requests");
+
+    #[cfg(feature = "client")]
+    counter!(PONG, "the number of pong responses");
+}
+
 common::metrics::test_no_duplicates!();
