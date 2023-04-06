@@ -30,7 +30,6 @@ ahash = { workspace = true }
 common = { path = "../../common" }
 datapool = { path = "../datapool" }
 logger = { path = "../../logger" }
-memmap2 = { workspace = true }
 metriken = { workspace = true }
 rand = { workspace = true , features = ["small_rng", "getrandom"] }
 rand_chacha = { workspace = true }
