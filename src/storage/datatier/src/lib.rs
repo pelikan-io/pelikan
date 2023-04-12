@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use blake3::Hash;
-use common::time::{Instant, Nanoseconds, Seconds, UnixInstant};
+use clocksource::{Instant, Nanoseconds, Seconds, UnixInstant};
 use core::ops::Range;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};

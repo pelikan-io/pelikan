@@ -6,7 +6,7 @@ use crate::eviction::*;
 use crate::item::*;
 use crate::segments::*;
 use core::num::NonZeroU32;
-use datapool::*;
+use datatier::*;
 
 /// `Segments` contain all items within the cache. This struct is a collection
 /// of individual `Segment`s which are represented by a `SegmentHeader` and a
@@ -419,7 +419,6 @@ impl Segments {
                 self.headers[id_idx].write_offset()
             );
 
-            common::time::refresh_clock();
             self.headers[id_idx].mark_created();
             self.headers[id_idx].mark_merged();
 
@@ -558,7 +557,7 @@ impl Segments {
                 // reduces CPU load under heavy rewrite/delete workloads at the
                 // cost of letting more dead items remain in the segements,
                 // reducing the hitrate
-                // if self.headers[seg_id as usize].merge_at() + CoarseDuration::from_secs(30) > CoarseInstant::recent() {
+                // if self.headers[seg_id as usize].merge_at() + CoarseDuration::from_secs(30) > CoarseInstant::now() {
                 //     return Ok(());
                 // }
 
