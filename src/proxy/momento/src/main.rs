@@ -2,8 +2,6 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-#![deny(clippy::print_stdout)]
-
 #[macro_use]
 extern crate logger;
 
