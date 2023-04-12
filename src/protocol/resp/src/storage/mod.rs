@@ -5,6 +5,7 @@
 use crate::*;
 
 pub trait Storage {
+    fn del(&mut self, request: &Del) -> Response;
     fn get(&mut self, request: &Get) -> Response;
     fn set(&mut self, request: &Set) -> Response;
 }
