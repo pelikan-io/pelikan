@@ -24,10 +24,10 @@
 
 // macro includes
 #[macro_use]
-extern crate logger;
+extern crate ringlog;
 
 // external crate includes
-use common::time::Seconds;
+use clocksource::Seconds;
 
 // includes from core/std
 use core::hash::{BuildHasher, Hasher};
@@ -64,8 +64,8 @@ pub use item::Item;
 pub use storage_types::Value;
 
 // type aliases
-pub(crate) type Duration = common::time::Duration<Seconds<u32>>;
-pub(crate) type Instant = common::time::Instant<Seconds<u32>>;
+pub(crate) type Duration = clocksource::Duration<Seconds<u32>>;
+pub(crate) type Instant = clocksource::Instant<Seconds<u32>>;
 
 // items from submodules which are imported for convenience to the crate level
 pub(crate) use crate::rand::*;
@@ -74,5 +74,3 @@ pub(crate) use item::*;
 pub(crate) use metrics::*;
 pub(crate) use segments::*;
 pub(crate) use ttl_buckets::*;
-
-common::metrics::test_no_duplicates!();

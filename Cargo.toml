@@ -31,7 +31,7 @@ members = [
     "src/server/segcache",
     "src/session",
     "src/storage/bloom",
-    "src/storage/datapool",
+    "src/storage/datatier",
     "src/storage/seg",
     "src/storage/types",
 ]

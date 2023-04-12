@@ -736,11 +736,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "datapool"
-version = "0.3.1"
+name = "datatier"
+version = "0.1.0"
 dependencies = [
  "blake3",
- "common",
+ "clocksource",
  "libc",
  "memmap2",
  "tempfile",
@@ -1847,9 +1847,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.50"
+version = "1.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ef7d57beacfaf2d8aee5937dab7b7f28de3cb8b1828479bb5de2a7106f2bae2"
+checksum = "2b63bdb0cd06f1f4dedf69b254734f9b45af66e4a031e42a7480257d9898b435"
 dependencies = [
  "unicode-ident",
 ]
@@ -2304,15 +2304,14 @@ name = "seg"
 version = "0.3.1"
 dependencies = [
  "ahash",
- "common",
+ "clocksource",
  "criterion 0.3.6",
- "datapool",
- "logger",
- "memmap2",
+ "datatier",
  "metriken",
  "rand",
  "rand_chacha",
  "rand_xoshiro",
+ "ringlog",
  "storage-types",
  "thiserror",
 ]
