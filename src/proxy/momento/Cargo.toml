@@ -12,12 +12,13 @@ license = { workspace = true }
 [dependencies]
 backtrace = { workspace = true }
 clap = { workspace = true }
+clocksource = { workspace = true }
 common = { path = "../../common" }
 config = { path = "../../config" }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-momento = "0.21.9"
+momento = "0.26.2"
 net = { path = "../../net" }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-memcache = { path = "../../protocol/memcache" }

@@ -18,7 +18,7 @@ pub enum ProxyError {
     #[error("{0}")]
     Custom(&'static str),
     #[error("unsupported resp command")]
-    UnsupportedCommand,
+    UnsupportedCommand(&'static str),
 }
 
 impl ProxyError {

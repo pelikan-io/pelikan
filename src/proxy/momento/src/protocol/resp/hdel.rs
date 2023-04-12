@@ -17,11 +17,26 @@ pub async fn hdel(
 ) -> ProxyResult {
     update_method_metrics(&HDEL, &HDEL_EX, async move {
         let fields: Vec<&[u8]> = req.fields().iter().map(|f| &**f).collect();
-        timeout(
+        match timeout(
             Duration::from_millis(200),
             client.dictionary_delete(cache_name, req.key(), Fields::Some(fields)),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(_)) => {}
+            Ok(Err(e)) => {
+                for field in req.fields() {
+                    klog_2(&"hdel", &req.key(), field, Status::ServerError, 0);
+                }
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                for field in req.fields() {
+                    klog_2(&"hdel", &req.key(), field, Status::Timeout, 0);
+                }
+                return Err(ProxyError::from(e));
+            }
+        }
 
         // NOTE: the Momento protocol does not inform us of how many fields are
         // deleted. We lie to the client and say that they all were deleted.

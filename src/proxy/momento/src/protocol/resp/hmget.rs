@@ -12,6 +12,7 @@ use protocol_resp::{
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_2, Status};
+use crate::ProxyError;
 use crate::BACKEND_EX;
 
 use super::update_method_metrics;
@@ -24,11 +25,26 @@ pub async fn hmget(
 ) -> ProxyResult {
     update_method_metrics(&HMGET, &HMGET_EX, async move {
         let fields: Vec<_> = req.fields().iter().map(|x| &**x).collect();
-        let response = tokio::time::timeout(
+        let response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.dictionary_get(cache_name, req.key(), fields),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                for field in req.fields() {
+                    klog_2(&"hmget", &req.key(), field, Status::ServerError, 0);
+                }
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                for field in req.fields() {
+                    klog_2(&"hmget", &req.key(), field, Status::Timeout, 0);
+                }
+                return Err(ProxyError::from(e));
+            }
+        };
 
         match response.result {
             MomentoDictionaryGetStatus::ERROR => {

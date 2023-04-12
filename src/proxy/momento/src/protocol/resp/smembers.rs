@@ -12,6 +12,7 @@ use tokio::time;
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
+use crate::ProxyError;
 
 use super::update_method_metrics;
 
@@ -22,11 +23,22 @@ pub async fn smembers(
     req: &SetMembers,
 ) -> ProxyResult {
     update_method_metrics(&SMEMBERS, &SMEMBERS_EX, async move {
-        let response = time::timeout(
+        let response = match time::timeout(
             Duration::from_millis(200),
             client.set_fetch(cache_name, req.key()),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                klog_1(&"sismember", &req.key(), Status::ServerError, 0);
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                klog_1(&"sismember", &req.key(), Status::Timeout, 0);
+                return Err(ProxyError::from(e));
+            }
+        };
 
         let (set, status) = match response.value {
             Some(set) => (set, Status::Hit),
