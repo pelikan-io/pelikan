@@ -268,10 +268,6 @@ impl SegmentHeader {
     }
 
     #[inline]
-    // clippy throws a false positive for suspicious_operation_groupings lint
-    // for the instant + duration portion. We set the allow pragma to silence
-    // the false positive.
-    // #[allow(clippy::suspicious_operation_groupings)]
     /// Can the segment be evicted?
     pub fn can_evict(&self) -> bool {
         self.evictable()
