@@ -40,10 +40,10 @@ impl Storage for Seg {
                 let o = item.optional().unwrap_or(&[0, 0, 0, 0]);
                 let flags = u32::from_be_bytes([o[0], o[1], o[2], o[3]]);
                 match item.value() {
-                    seg::Value::Bytes(b) => {
+                    pelikan_storage_seg::Value::Bytes(b) => {
                         values.push(Value::new(item.key(), flags, None, b));
                     }
-                    seg::Value::U64(v) => {
+                    pelikan_storage_seg::Value::U64(v) => {
                         values.push(Value::new(
                             item.key(),
                             flags,
@@ -66,10 +66,10 @@ impl Storage for Seg {
                 let o = item.optional().unwrap_or(&[0, 0, 0, 0]);
                 let flags = u32::from_be_bytes([o[0], o[1], o[2], o[3]]);
                 match item.value() {
-                    seg::Value::Bytes(b) => {
+                    pelikan_storage_seg::Value::Bytes(b) => {
                         values.push(Value::new(item.key(), flags, Some(item.cas().into()), b));
                     }
-                    seg::Value::U64(v) => {
+                    pelikan_storage_seg::Value::U64(v) => {
                         values.push(Value::new(
                             item.key(),
                             flags,
@@ -263,7 +263,7 @@ impl Storage for Seg {
     fn incr(&mut self, incr: &Incr) -> Response {
         match self.data.wrapping_add(incr.key(), incr.value()) {
             Ok(item) => match item.value() {
-                seg::Value::U64(v) => Response::numeric(v, incr.noreply()),
+                pelikan_storage_seg::Value::U64(v) => Response::numeric(v, incr.noreply()),
                 _ => Response::server_error(""),
             },
             Err(SegError::NotFound) => Response::not_found(incr.noreply()),
@@ -275,7 +275,7 @@ impl Storage for Seg {
     fn decr(&mut self, decr: &Decr) -> Response {
         match self.data.saturating_sub(decr.key(), decr.value()) {
             Ok(item) => match item.value() {
-                seg::Value::U64(v) => Response::numeric(v, decr.noreply()),
+                pelikan_storage_seg::Value::U64(v) => Response::numeric(v, decr.noreply()),
                 _ => Response::server_error(""),
             },
             Err(SegError::NotFound) => Response::not_found(decr.noreply()),

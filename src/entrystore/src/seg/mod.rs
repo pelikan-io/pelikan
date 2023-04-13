@@ -10,7 +10,7 @@ use crate::EntryStore;
 
 use config::seg::Eviction;
 use config::SegConfig;
-use seg::{Policy, SegError};
+use pelikan_storage_seg::{Policy, SegError};
 
 mod memcache;
 mod resp;
@@ -18,7 +18,7 @@ mod resp;
 /// A wrapper around [`seg::Seg`] which implements `EntryStore` and storage
 /// protocol traits.
 pub struct Seg {
-    data: ::seg::Seg,
+    data: pelikan_storage_seg::Seg,
 }
 
 impl Seg {
@@ -43,7 +43,7 @@ impl Seg {
         };
 
         // build the datastructure from the config
-        let data = ::seg::Seg::builder()
+        let data = pelikan_storage_seg::Seg::builder()
             .hash_power(config.hash_power())
             .overflow_factor(config.overflow_factor())
             .heap_size(config.heap_size())
