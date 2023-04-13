@@ -155,8 +155,13 @@ impl Seg {
             if retries == 0 {
                 // segment acquire failed, increment the stats and return with
                 // an error
-                SEGMENT_REQUEST.increment();
-                SEGMENT_REQUEST_FAILURE.increment();
+
+                #[cfg(feature = "metrics")]
+                {
+                    SEGMENT_REQUEST.increment();
+                    SEGMENT_REQUEST_FAILURE.increment();
+                }
+
                 return Err(SegError::NoFreeSegments);
             }
             retries -= 1;

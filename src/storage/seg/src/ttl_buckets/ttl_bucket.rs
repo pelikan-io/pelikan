@@ -100,7 +100,10 @@ impl TtlBucket {
                     }
                     segment.clear(hashtable, true);
                     segments.push_free(seg_id);
+
+                    #[cfg(feature = "metrics")]
                     SEGMENT_EXPIRE.increment();
+
                     expired += 1;
                 } else {
                     return expired;
@@ -132,7 +135,10 @@ impl TtlBucket {
                 }
                 segment.clear(hashtable, true);
                 segments.push_free(seg_id);
+
+                #[cfg(feature = "metrics")]
                 SEGMENT_CLEAR.increment();
+
                 cleared += 1;
             } else {
                 return cleared;

@@ -277,9 +277,13 @@ impl<'a> Segment<'a> {
     pub(crate) fn alloc_item(&mut self, size: i32) -> RawItem {
         let offset = self.write_offset() as usize;
         self.incr_item(size);
-        ITEM_ALLOCATE.increment();
-        ITEM_CURRENT.increment();
-        ITEM_CURRENT_BYTES.add(size as _);
+
+        #[cfg(feature = "metrics")]
+        {
+            ITEM_ALLOCATE.increment();
+            ITEM_CURRENT.increment();
+            ITEM_CURRENT_BYTES.add(size as _);
+        }
 
         let ptr = unsafe { self.data.as_mut_ptr().add(offset) };
         RawItem::from_ptr(ptr)
@@ -298,10 +302,13 @@ impl<'a> Segment<'a> {
 
         let item_size = item.size() as i64;
 
-        ITEM_CURRENT.decrement();
-        ITEM_CURRENT_BYTES.sub(item_size);
-        ITEM_DEAD.increment();
-        ITEM_DEAD_BYTES.add(item_size);
+        #[cfg(feature = "metrics")]
+        {
+            ITEM_CURRENT.decrement();
+            ITEM_CURRENT_BYTES.sub(item_size);
+            ITEM_DEAD.increment();
+            ITEM_DEAD_BYTES.add(item_size);
+        }
 
         self.check_magic();
         self.decr_item(item_size as i32);
@@ -334,7 +341,9 @@ impl<'a> Segment<'a> {
 
         let mut write_offset = read_offset;
 
+        #[cfg(feature = "metrics")]
         let mut items_pruned = 0;
+        #[cfg(feature = "metrics")]
         let mut bytes_pruned = 0;
 
         while read_offset <= max_offset {
@@ -350,11 +359,16 @@ impl<'a> Segment<'a> {
             // don't copy deleted items
             let deleted = !hashtable.is_item_at(item.key(), self.id(), read_offset as u64);
             if deleted {
-                items_pruned += 1;
-                bytes_pruned += item.size();
+                #[cfg(feature = "metrics")]
+                {
+                    items_pruned += 1;
+                    bytes_pruned += item.size();
+                    ITEM_COMPACTED.increment();
+                }
+
                 // move read offset forward, leave write offset trailing
                 read_offset += item_size;
-                ITEM_COMPACTED.increment();
+
                 continue;
             }
 
@@ -391,10 +405,13 @@ impl<'a> Segment<'a> {
             continue;
         }
 
-        // We have removed dead items, so we must subtract the pruned items from
-        // the dead item stats.
-        ITEM_DEAD.sub(items_pruned as _);
-        ITEM_DEAD_BYTES.sub(bytes_pruned as _);
+        #[cfg(feature = "metrics")]
+        {
+            // We have removed dead items, so we must subtract the pruned items
+            // from the dead item stats.
+            ITEM_DEAD.sub(items_pruned as _);
+            ITEM_DEAD_BYTES.sub(bytes_pruned as _);
+        }
 
         // updates the write offset to the new position
         self.set_write_offset(write_offset as i32);
@@ -421,7 +438,9 @@ impl<'a> Segment<'a> {
             0
         };
 
+        #[cfg(feature = "metrics")]
         let mut items_copied = 0;
+        #[cfg(feature = "metrics")]
         let mut bytes_copied = 0;
 
         while read_offset <= max_offset {
@@ -465,8 +484,12 @@ impl<'a> Segment<'a> {
                 target.header.incr_live_items();
                 target.header.incr_live_bytes(item_size as i32);
                 target.set_write_offset(write_offset as i32 + item_size as i32);
-                items_copied += 1;
-                bytes_copied += item_size;
+
+                #[cfg(feature = "metrics")]
+                {
+                    items_copied += 1;
+                    bytes_copied += item_size;
+                }
             } else {
                 // TODO(bmartin): figure out if this could happen and make the
                 // relink function infallible if it can't happen
@@ -476,11 +499,14 @@ impl<'a> Segment<'a> {
             read_offset += item_size;
         }
 
-        // We need to increment the current bytes, because removing items from
-        // this segment decrements these as it marks the item as removed. This
-        // should result in these stats remaining unchanged by this function.
-        ITEM_CURRENT.add(items_copied);
-        ITEM_CURRENT_BYTES.add(bytes_copied as _);
+        #[cfg(feature = "metrics")]
+        {
+            // We need to increment the current bytes, because removing items from
+            // this segment decrements these as it marks the item as removed. This
+            // should result in these stats remaining unchanged by this function.
+            ITEM_CURRENT.add(items_copied);
+            ITEM_CURRENT_BYTES.add(bytes_copied as _);
+        }
 
         Ok(())
     }
@@ -601,7 +627,9 @@ impl<'a> Segment<'a> {
         };
 
         // track all items and bytes that are cleared
+        #[cfg(feature = "metrics")]
         let mut items = 0;
+        #[cfg(feature = "metrics")]
         let mut bytes = 0;
 
         while offset <= max_offset {
@@ -614,8 +642,11 @@ impl<'a> Segment<'a> {
 
             debug_assert!(item.klen() > 0, "invalid klen: ({})", item.klen());
 
-            items += 1;
-            bytes += item.size();
+            #[cfg(feature = "metrics")]
+            {
+                items += 1;
+                bytes += item.size();
+            }
 
             let deleted = !hashtable.is_item_at(item.key(), self.id(), offset as u64);
             if !deleted {
@@ -647,13 +678,16 @@ impl<'a> Segment<'a> {
             offset += item.size();
         }
 
-        // At the end of the clear phase above, we have only dead items that we
-        // are clearing from the segment. The functions that removed the live
-        // items from the hashtable have decremented the live items, and
-        // incremented the dead items. So we subtract all items that were in
-        // this segment from the dead item stats.
-        ITEM_DEAD.sub(items as _);
-        ITEM_DEAD_BYTES.sub(bytes as _);
+        #[cfg(feature = "metrics")]
+        {
+            // At the end of the clear phase above, we have only dead items that we
+            // are clearing from the segment. The functions that removed the live
+            // items from the hashtable have decremented the live items, and
+            // incremented the dead items. So we subtract all items that were in
+            // this segment from the dead item stats.
+            ITEM_DEAD.sub(items as _);
+            ITEM_DEAD_BYTES.sub(bytes as _);
+        }
 
         // skips over seg_wait_refcount and evict retry, because no threading
 

@@ -1,9 +1,9 @@
 [package]
-name = "seg"
-description = "segment-structured in-memory storage with eager expiration"
+name = "pelikan-storage-seg"
+version = "0.1.0"
+description = "Pelikan segment-structured storage"
 authors = ["Brian Martin <brian@pelikan.io>"]
 
-version = { workspace = true }
 edition = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -19,22 +19,24 @@ harness = false
 # enables setting/checking magic strings
 magic = []
 
+# enables metrics
+metrics = ["metriken"]
+
 # metafeatures
 debug = ["magic"]
 
 # default set of enabled features
-default = []
+default = ["metrics"]
 
 [dependencies]
 ahash = { workspace = true }
 clocksource = { workspace = true }
-datatier = { path = "../datatier" }
-metriken = { workspace = true }
+datatier = { workspace = true }
+log = { workspace = true }
+metriken = { workspace = true, optional = true }
 rand = { workspace = true , features = ["small_rng", "getrandom"] }
 rand_chacha = { workspace = true }
 rand_xoshiro = { workspace = true }
-ringlog = { workspace = true }
-storage-types = { path = "../types" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
