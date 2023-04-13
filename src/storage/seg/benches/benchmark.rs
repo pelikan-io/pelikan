@@ -3,9 +3,9 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
+use pelikan_storage_seg::*;
 use rand::RngCore;
 use rand::SeedableRng;
-use seg::*;
 
 use std::time::Duration;
 

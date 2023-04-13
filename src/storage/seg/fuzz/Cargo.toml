@@ -11,7 +11,7 @@ cargo-fuzz = true
 [dependencies]
 libfuzzer-sys = "0.4"
 
-[dependencies.seg]
+[dependencies.pelikan_storage_seg]
 path = ".."
 
 # Prevent this from interfering with workspaces

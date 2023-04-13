@@ -7,7 +7,7 @@ use libfuzzer_sys::fuzz_target;
 
 use core::time::Duration;
 
-use seg::*;
+use pelikan_storage_seg::*;
 
 const DEBUG_PRINTS: bool = false;
 
