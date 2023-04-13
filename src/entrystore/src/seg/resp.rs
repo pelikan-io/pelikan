@@ -27,7 +27,9 @@ impl Storage for Seg {
         if let Some(item) = self.data.get(get.key()) {
             match item.value() {
                 pelikan_storage_seg::Value::Bytes(b) => Response::bulk_string(b),
-                pelikan_storage_seg::Value::U64(v) => Response::bulk_string(format!("{v}").as_bytes()),
+                pelikan_storage_seg::Value::U64(v) => {
+                    Response::bulk_string(format!("{v}").as_bytes())
+                }
             }
         } else {
             Response::null()
