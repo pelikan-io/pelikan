@@ -7,4 +7,5 @@ use crate::*;
 pub trait Storage {
     fn get(&mut self, request: &Get) -> Response;
     fn set(&mut self, request: &Set) -> Response;
+    fn incr(&mut self, request: &Incr) -> Response;
 }

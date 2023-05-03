@@ -25,6 +25,7 @@ mod hlen;
 mod hmget;
 mod hset;
 mod hvals;
+mod incr;
 mod lindex;
 mod llen;
 mod lpop;
@@ -68,6 +69,7 @@ pub use hlen::*;
 pub use hmget::*;
 pub use hset::*;
 pub use hvals::*;
+pub use incr::*;
 pub use sadd::*;
 pub use set::*;
 
@@ -176,6 +178,7 @@ decl_request! {
         HashSet(HashSet) => "hset",
         HashValues(HashValues) => "hvals",
         HashIncrBy(HashIncrBy) => "hincrby",
+        Incr(Incr) => "incr",
         ListIndex(ListIndex) => "lindex",
         ListLen(ListLen) => "llen",
         ListPop(ListPop) => "lpop",

@@ -50,6 +50,9 @@ impl Message {
     pub fn bulk_string(value: &[u8]) -> Self {
         Self::BulkString(BulkString::new(value))
     }
+    pub fn ok() -> Self {
+        Self::simple_string("OK")
+    }
 }
 
 impl Compose for Message {
