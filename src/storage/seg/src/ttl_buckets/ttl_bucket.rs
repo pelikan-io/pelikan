@@ -84,7 +84,7 @@ impl TtlBucket {
         }
 
         let mut expired = 0;
-        let ts = Instant::recent();
+        let ts = Instant::now();
 
         loop {
             let seg_id = self.head;
