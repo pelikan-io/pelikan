@@ -33,7 +33,7 @@ impl Builder {
     /// `2^(N + 3)` bytes.
     ///
     /// ```
-    /// use seg::Seg;
+    /// use pelikan_storage_seg::Seg;
     ///
     /// // create a cache with a small hashtable that has room for ~114k items
     /// // without using any overflow buckets.
@@ -53,7 +53,7 @@ impl Builder {
     /// will result in a hash table that is 100% larger.
     ///
     /// ```
-    /// use seg::Seg;
+    /// use pelikan_storage_seg::Seg;
     ///
     /// // create a cache with a hashtable with room for ~228k items, which is
     /// // about the same as using a hash power of 18, but is more tolerant of
@@ -79,7 +79,7 @@ impl Builder {
     /// This includes, key, value, and per-item overheads.
     ///
     /// ```
-    /// use seg::Seg;
+    /// use pelikan_storage_seg::Seg;
     ///
     /// const MB: usize = 1024 * 1024;
     ///
@@ -102,7 +102,7 @@ impl Builder {
     /// same total size.
     ///
     /// ```
-    /// use seg::Seg;
+    /// use pelikan_storage_seg::Seg;
     ///
     /// const MB: i32 = 1024 * 1024;
     ///
@@ -121,7 +121,7 @@ impl Builder {
     /// for more details about each strategy.
     ///
     /// ```
-    /// use seg::{Policy, Seg};
+    /// use pelikan_storage_seg::{Policy, Seg};
     ///
     /// // create a cache using random segment eviction
     /// let cache = Seg::builder().eviction(Policy::Random).build();
@@ -148,7 +148,7 @@ impl Builder {
     /// Consumes the builder and returns a fully-allocated `Seg` instance.
     ///
     /// ```
-    /// use seg::{Policy, Seg};
+    /// use pelikan_storage_seg::{Policy, Seg};
     ///
     /// const MB: usize = 1024 * 1024;
     ///
