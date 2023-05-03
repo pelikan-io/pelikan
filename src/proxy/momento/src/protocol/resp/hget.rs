@@ -10,6 +10,7 @@ use protocol_resp::{HashGet, HGET, HGET_EX, HGET_HIT, HGET_MISS};
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_2, Status};
+use crate::ProxyError;
 use crate::BACKEND_EX;
 
 use super::update_method_metrics;
@@ -21,11 +22,22 @@ pub async fn hget(
     req: &HashGet,
 ) -> ProxyResult {
     update_method_metrics(&HGET, &HGET_EX, async move {
-        let response = tokio::time::timeout(
+        let response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.dictionary_get(cache_name, req.key(), vec![req.field()]),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                klog_2(&"hget", &req.key(), &req.field(), Status::ServerError, 0);
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                klog_2(&"hget", &req.key(), &req.field(), Status::Timeout, 0);
+                return Err(ProxyError::from(e));
+            }
+        };
 
         match response.result {
             MomentoDictionaryGetStatus::ERROR => {
