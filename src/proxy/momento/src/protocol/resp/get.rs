@@ -17,7 +17,21 @@ pub async fn get(
     update_method_metrics(&GET, &GET_EX, async move {
         GET_KEY.increment();
 
-        let response = timeout(Duration::from_millis(200), client.get(cache_name, key)).await??;
+        let response = match timeout(Duration::from_millis(200), client.get(cache_name, key)).await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                GET_EX.increment();
+                klog_1(&"get", &key, Status::ServerError, 0);
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                GET_EX.increment();
+                klog_1(&"get", &key, Status::Timeout, 0);
+                return Err(ProxyError::from(e));
+            }
+        };
+
         match response.result {
             MomentoGetStatus::ERROR => {
                 // we got some error from
@@ -25,6 +39,8 @@ pub async fn get(
                 BACKEND_EX.increment();
                 GET_EX.increment();
                 response_buf.extend_from_slice(b"-ERR backend error\r\n");
+
+                klog_1(&"get", &key, Status::ServerError, 0);
             }
             MomentoGetStatus::HIT => {
                 GET_KEY_HIT.increment();

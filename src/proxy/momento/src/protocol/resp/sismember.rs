@@ -10,6 +10,7 @@ use tokio::time;
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_2, Status};
+use crate::ProxyError;
 
 use super::update_method_metrics;
 
@@ -20,11 +21,34 @@ pub async fn sismember(
     req: &SetIsMember,
 ) -> ProxyResult {
     update_method_metrics(&SISMEMBER, &SISMEMBER_EX, async move {
-        let response = time::timeout(
+        let response = match time::timeout(
             Duration::from_millis(200),
             client.set_fetch(cache_name, req.key()),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                klog_2(
+                    &"sismember",
+                    &req.key(),
+                    &req.field(),
+                    Status::ServerError,
+                    0,
+                );
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                klog_2(
+                    &"sismember",
+                    &req.key(),
+                    &req.field(),
+                    Status::ServerError,
+                    0,
+                );
+                return Err(ProxyError::from(e));
+            }
+        };
 
         let status = match response.value {
             Some(set) if set.contains(req.field()) => {

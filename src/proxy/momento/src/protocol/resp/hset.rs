@@ -5,13 +5,13 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use momento::response::MomentoDictionarySetStatus;
 use momento::SimpleCacheClient;
 use protocol_resp::{HashSet, HSET, HSET_EX, HSET_STORED};
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_7, Status};
-use crate::{BACKEND_EX, COLLECTION_TTL};
+use crate::ProxyError;
+use crate::COLLECTION_TTL;
 
 use super::update_method_metrics;
 
@@ -27,22 +27,14 @@ pub async fn hset(
             map.insert(&**field, &**value);
         }
 
-        let response = tokio::time::timeout(
+        let _response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.dictionary_set(cache_name, req.key(), map.clone(), COLLECTION_TTL),
         )
-        .await??;
-
-        match response.result {
-            MomentoDictionarySetStatus::ERROR => {
-                // we got some error from
-                // the backend.
-                BACKEND_EX.increment();
-                HSET_EX.increment();
-                response_buf.extend_from_slice(b"-ERR backend error\r\n");
-            }
-            MomentoDictionarySetStatus::OK => {
-                HSET_STORED.increment();
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
                 for (field, value) in map.iter() {
                     klog_7(
                         &"hset",
@@ -50,13 +42,41 @@ pub async fn hset(
                         field,
                         0,
                         value.len(),
-                        Status::Stored,
+                        Status::ServerError,
                         0,
                     );
                 }
-                response_buf.extend_from_slice(format!(":{}\r\n", req.data().len()).as_bytes());
+                return Err(ProxyError::from(e));
             }
+            Err(e) => {
+                for (field, value) in map.iter() {
+                    klog_7(
+                        &"hset",
+                        &req.key(),
+                        field,
+                        0,
+                        value.len(),
+                        Status::Timeout,
+                        0,
+                    );
+                }
+                return Err(ProxyError::from(e));
+            }
+        };
+
+        HSET_STORED.increment();
+        for (field, value) in map.iter() {
+            klog_7(
+                &"hset",
+                &req.key(),
+                field,
+                0,
+                value.len(),
+                Status::Stored,
+                0,
+            );
         }
+        response_buf.extend_from_slice(format!(":{}\r\n", req.data().len()).as_bytes());
 
         Ok(())
     })

@@ -5,6 +5,8 @@
 use core::fmt::Display;
 
 #[allow(dead_code)]
+/// A collection of klog status codes taken from:
+/// legacy/src/protocol/data/memcache/response.h
 pub enum Status {
     Miss = 0,
     Hit = 4,
@@ -13,6 +15,9 @@ pub enum Status {
     Deleted = 7,
     NotFound = 8,
     NotStored = 9,
+    ClientError = 10,
+    ServerError = 11,
+    Timeout = 12, // NOTE: this is not a standard klog code
 }
 
 pub(crate) fn klog_1(
@@ -73,7 +78,7 @@ pub fn klog_set(
     flags: u32,
     ttl: i32,
     value_len: usize,
-    result_code: usize,
+    status: Status,
     response_len: usize,
 ) {
     klog!(
@@ -82,7 +87,7 @@ pub fn klog_set(
         flags,
         ttl,
         value_len,
-        result_code,
+        status as u8,
         response_len
     );
 }

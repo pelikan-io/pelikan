@@ -2,11 +2,6 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-// use crate::klog::*;
-// use crate::{Error, *};
-// use ::net::*;
-// use protocol_resp::*;
-
 use std::time::Duration;
 
 use momento::response::MomentoDictionaryFetchStatus;
@@ -15,6 +10,7 @@ use protocol_resp::{HashGetAll, HGETALL, HGETALL_EX, HGETALL_HIT, HGETALL_MISS};
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
+use crate::ProxyError;
 use crate::BACKEND_EX;
 
 use super::update_method_metrics;
@@ -26,11 +22,22 @@ pub async fn hgetall(
     req: &HashGetAll,
 ) -> ProxyResult {
     update_method_metrics(&HGETALL, &HGETALL_EX, async move {
-        let response = tokio::time::timeout(
+        let response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.dictionary_fetch(cache_name, req.key()),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                klog_1(&"hgetall", &req.key(), Status::ServerError, 0);
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                klog_1(&"hgetall", &req.key(), Status::Timeout, 0);
+                return Err(ProxyError::from(e));
+            }
+        };
 
         match response.result {
             MomentoDictionaryFetchStatus::ERROR => {
@@ -46,6 +53,8 @@ pub async fn hgetall(
                     BACKEND_EX.increment();
                     HGETALL_EX.increment();
                     response_buf.extend_from_slice(b"-ERR backend error\r\n");
+
+                    klog_1(&"hgetall", &req.key(), Status::ServerError, 0);
                 } else {
                     HGETALL_HIT.increment();
                     let dictionary = response.dictionary.as_ref().unwrap();

@@ -11,6 +11,7 @@ counter!(ADMIN_CONN_CLOSE);
 
 pub(crate) async fn admin(mut log_drain: Box<dyn logger::Drain>, admin_listener: TcpListener) {
     loop {
+        clocksource::refresh_clock();
         let _ = log_drain.flush();
 
         // accept a new client

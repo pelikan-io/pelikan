@@ -11,6 +11,7 @@ use tokio::time::timeout;
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_2, Status};
+use crate::ProxyError;
 use crate::BACKEND_EX;
 
 use super::update_method_metrics;
@@ -22,11 +23,22 @@ pub async fn hexists(
     req: &HashExists,
 ) -> ProxyResult {
     update_method_metrics(&HEXISTS, &HEXISTS_EX, async move {
-        let response = timeout(
+        let response = match timeout(
             Duration::from_millis(200),
             client.dictionary_get(cache_name, req.key(), vec![req.field()]),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                klog_2(&"hexists", &req.key(), &req.field(), Status::ServerError, 0);
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                klog_2(&"hexists", &req.key(), &req.field(), Status::Timeout, 0);
+                return Err(ProxyError::from(e));
+            }
+        };
 
         match response.result {
             MomentoDictionaryGetStatus::ERROR => {
