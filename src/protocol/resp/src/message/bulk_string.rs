@@ -26,6 +26,10 @@ impl BulkString {
     pub fn null() -> Self {
         Self { inner: None }
     }
+
+    pub fn bytes(&self) -> Option<&[u8]> {
+        self.inner.as_ref().map(|v| v.as_ref())
+    }
 }
 
 impl From<Arc<[u8]>> for BulkString {
