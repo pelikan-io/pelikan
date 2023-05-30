@@ -17,6 +17,12 @@ impl Array {
     pub fn null() -> Self {
         Self { inner: None }
     }
+
+    /// Get the number of items in the array. The `None` variant indicates a
+    /// null array.
+    pub fn len(&self) -> Option<usize> {
+        self.inner.as_ref().map(|a| a.len())
+    }
 }
 
 impl Compose for Array {
