@@ -223,7 +223,7 @@ impl Request {
     pub fn del(keys: &[&[u8]]) -> Self {
         Self::Del(Del::new(keys))
     }
-    
+
     pub fn get(key: &[u8]) -> Self {
         Self::Get(Get::new(key))
     }
