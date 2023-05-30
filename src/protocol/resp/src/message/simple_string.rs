@@ -9,11 +9,18 @@ pub struct SimpleString {
     pub(crate) inner: String,
 }
 
+impl AsRef<str> for SimpleString {
+    fn as_ref(&self) -> &str {
+        &self.inner
+    }
+}
+
 impl SimpleString {
     pub fn len(&self) -> usize {
         self.inner.len()
     }
 }
+
 impl Compose for SimpleString {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         buf.put_slice(b"+");
