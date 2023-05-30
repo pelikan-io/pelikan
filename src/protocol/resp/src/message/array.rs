@@ -84,11 +84,19 @@ mod tests {
 
     #[test]
     fn parse() {
-        assert_eq!(message(b"*-1\r\n"), Ok((&b""[..], Message::Array(Array::null()),)));
+        assert_eq!(
+            message(b"*-1\r\n"),
+            Ok((&b""[..], Message::Array(Array::null()),))
+        );
 
         assert_eq!(
             message(b"*1\r\n$5\r\nHELLO\r\n"),
-            Ok((&b""[..], Message::Array(Array { inner: Some(vec![Message::bulk_string(b"HELLO")])})))
+            Ok((
+                &b""[..],
+                Message::Array(Array {
+                    inner: Some(vec![Message::bulk_string(b"HELLO")])
+                })
+            ))
         );
     }
 }
