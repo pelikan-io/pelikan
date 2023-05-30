@@ -14,6 +14,7 @@ use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
 mod badd;
+mod del;
 mod get;
 mod hdel;
 mod hexists;
@@ -57,6 +58,7 @@ pub use self::smembers::*;
 pub use self::srem::*;
 pub use self::sunion::*;
 pub use badd::*;
+pub use del::*;
 pub use get::*;
 pub use hdel::*;
 pub use hexists::*;
@@ -165,6 +167,7 @@ macro_rules! decl_request {
 decl_request! {
     pub enum Request {
         BtreeAdd(BtreeAdd) => "badd",
+        Del(Del) => "del",
         Get(Get) => "get",
         HashDelete(HashDelete) => "hdel",
         HashExists(HashExists) => "hexists",
@@ -217,6 +220,10 @@ impl Klog for Request {
 }
 
 impl Request {
+    pub fn del(keys: &[&[u8]]) -> Self {
+        Self::Del(Del::new(keys))
+    }
+    
     pub fn get(key: &[u8]) -> Self {
         Self::Get(Get::new(key))
     }
