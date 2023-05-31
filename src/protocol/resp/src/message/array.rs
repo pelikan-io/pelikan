@@ -84,6 +84,37 @@ pub fn parse(input: &[u8]) -> IResult<&[u8], Array> {
     }
 }
 
+pub struct Iter<'a> {
+    array: &'a Array,
+    position: usize,
+}
+
+impl<'a> Iterator for Iter<'a> {
+    type Item = &'a Message;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if let Some(inner) = &self.array.inner {
+            let next = inner.get(self.position);
+            self.position += 1;
+            next
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Array {
+    type IntoIter = Iter<'a>;
+    type Item = &'a Message;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Iter {
+            array: self,
+            position: 0,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,5 +135,17 @@ mod tests {
                 })
             ))
         );
+    }
+
+    #[test]
+    fn iter() {
+        let message = Array::null();
+        assert_eq!(message.into_iter().next(), None);
+
+        let message = Array {
+            inner: Some(vec![Message::bulk_string(b"HELLO")])
+        };
+        assert_eq!(message.into_iter().next(), Some(&Message::bulk_string(b"HELLO")));
+
     }
 }
