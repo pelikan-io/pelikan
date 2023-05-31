@@ -10,6 +10,7 @@ use protocol_resp::{ListIndex, LINDEX, LINDEX_EX, LINDEX_HIT, LINDEX_MISS};
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_2, Status};
+use crate::ProxyError;
 
 use super::update_method_metrics;
 
@@ -20,11 +21,26 @@ pub async fn lindex(
     req: &ListIndex,
 ) -> ProxyResult {
     update_method_metrics(&LINDEX, &LINDEX_EX, async move {
-        let entry = tokio::time::timeout(
+        let entry = match tokio::time::timeout(
             Duration::from_millis(200),
             client.list_fetch(cache_name, req.key()),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                let index = format!("{}", req.index());
+                klog_2(&"lindex", &req.key(), &index, Status::ServerError, 0);
+
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                let index = format!("{}", req.index());
+                klog_2(&"lindex", &req.key(), &index, Status::Timeout, 0);
+
+                return Err(ProxyError::from(e));
+            }
+        };
 
         if let Some(entry) = entry {
             let list = entry.value();

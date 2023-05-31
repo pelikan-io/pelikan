@@ -10,6 +10,7 @@ use protocol_resp::{HashKeys, HKEYS, HKEYS_EX, HKEYS_HIT, HKEYS_MISS};
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
+use crate::ProxyError;
 use crate::BACKEND_EX;
 
 use super::update_method_metrics;
@@ -21,11 +22,22 @@ pub async fn hkeys(
     req: &HashKeys,
 ) -> ProxyResult {
     update_method_metrics(&HKEYS, &HKEYS_EX, async move {
-        let response = tokio::time::timeout(
+        let response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.dictionary_fetch(cache_name, req.key()),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                klog_1(&"hkeys", &req.key(), Status::ServerError, 0);
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                klog_1(&"hkeys", &req.key(), Status::Timeout, 0);
+                return Err(ProxyError::from(e));
+            }
+        };
 
         match response.result {
             MomentoDictionaryFetchStatus::ERROR => {

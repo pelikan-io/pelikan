@@ -24,7 +24,9 @@ pub(crate) async fn handle_memcache_client(
             break;
         }
 
-        match parser.parse(buf.borrow()) {
+        let borrowed_buf = buf.borrow();
+
+        match parser.parse(borrowed_buf) {
             Ok(request) => {
                 let consumed = request.consumed();
                 let request = request.into_inner();
@@ -56,7 +58,10 @@ pub(crate) async fn handle_memcache_client(
                 ErrorKind::WouldBlock => {}
                 _ => {
                     // invalid request
-                    let _ = socket.write_all(b"CLIENT_ERROR\r\n").await;
+                    trace!("malformed request: {:?}", borrowed_buf);
+                    let _ = socket
+                        .write_all(b"CLIENT_ERROR malformed request\r\n")
+                        .await;
                     break;
                 }
             },
@@ -81,13 +86,15 @@ pub(crate) async fn handle_resp_client(
             break;
         }
 
-        let request = match parser.parse(buf.borrow()) {
+        let borrowed_buf = buf.borrow();
+
+        let request = match parser.parse(borrowed_buf) {
             Ok(request) => request,
             Err(e) => match e.kind() {
                 ErrorKind::WouldBlock => continue,
                 _ => {
-                    println!("bad request");
-                    let _ = socket.write_all(b"CLIENT_ERROR\r\n").await;
+                    trace!("malformed request: {:?}", borrowed_buf);
+                    let _ = socket.write_all(b"-ERR malformed request\r\n").await;
                     break;
                 }
             },
@@ -182,7 +189,7 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::SetIsMember(r) => {
                     resp::sismember(&mut client, &cache_name, &mut response_buf, r).await?
                 }
-                _ => return Err(ProxyError::UnsupportedCommand),
+                _ => return Err(ProxyError::UnsupportedCommand(request.command())),
             }
 
             Ok(())
@@ -214,9 +221,11 @@ pub(crate) async fn handle_resp_client(
                         false
                     }
                     ProxyError::Io(_) => true,
-                    ProxyError::UnsupportedCommand => {
-                        println!("bad request");
-                        response_buf.extend_from_slice(b"CLIENT_ERROR\r\n");
+                    ProxyError::UnsupportedCommand(command) => {
+                        debug!("unsupported resp command: {command}");
+                        response_buf.extend_from_slice(
+                            format!("-ERR unsupported command: {command}\r\n").as_bytes(),
+                        );
                         true
                     }
                     ProxyError::Custom(message) => {

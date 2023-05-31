@@ -13,6 +13,8 @@ mod util;
 
 pub mod parse;
 
+pub use protocol_common::*;
+
 pub(crate) use crate::util::*;
 
 pub use crate::request::*;

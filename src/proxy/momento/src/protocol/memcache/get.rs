@@ -76,22 +76,22 @@ pub async fn get(
                     }
                 }
             }
-            Ok(Err(MomentoError::LimitExceeded(_))) => {
-                BACKEND_EX.increment();
-                BACKEND_EX_RATE_LIMITED.increment();
-            }
             Ok(Err(e)) => {
                 // we got some error from the momento client
                 // log and incr stats and move on treating it
                 // as a miss
-                error!("error for get: {}", e);
+                error!("backend error for get: {}", e);
                 BACKEND_EX.increment();
+
+                klog_1(&"get", &key, Status::ServerError, 0);
             }
             Err(_) => {
                 // we had a timeout, incr stats and move on
                 // treating it as a miss
                 BACKEND_EX.increment();
                 BACKEND_EX_TIMEOUT.increment();
+
+                klog_1(&"get", &key, Status::Timeout, 0);
             }
         }
     }

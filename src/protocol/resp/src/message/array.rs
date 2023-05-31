@@ -17,13 +17,19 @@ impl Array {
     pub fn null() -> Self {
         Self { inner: None }
     }
+
+    /// Get the number of items in the array. The `None` variant indicates a
+    /// null array.
+    pub fn len(&self) -> Option<usize> {
+        self.inner.as_ref().map(|a| a.len())
+    }
 }
 
 impl Compose for Array {
     fn compose(&self, session: &mut dyn BufMut) -> usize {
         let mut len = 0;
         if let Some(values) = &self.inner {
-            let header = format!("${}\r\n", values.len());
+            let header = format!("*{}\r\n", values.len());
             session.put_slice(header.as_bytes());
             len += header.as_bytes().len();
             for value in values {
@@ -84,21 +90,19 @@ mod tests {
 
     #[test]
     fn parse() {
-        assert_eq!(message(b"$-1\r\n"), Ok((&b""[..], Message::null(),)));
-
         assert_eq!(
-            message(b"$0\r\n\r\n"),
-            Ok((&b""[..], Message::bulk_string(&[])))
+            message(b"*-1\r\n"),
+            Ok((&b""[..], Message::Array(Array::null()),))
         );
 
         assert_eq!(
-            message(b"$1\r\n\0\r\n"),
-            Ok((&b""[..], Message::bulk_string(&[0])))
-        );
-
-        assert_eq!(
-            message(b"$11\r\nHELLO WORLD\r\n"),
-            Ok((&b""[..], Message::bulk_string("HELLO WORLD".as_bytes())))
+            message(b"*1\r\n$5\r\nHELLO\r\n"),
+            Ok((
+                &b""[..],
+                Message::Array(Array {
+                    inner: Some(vec![Message::bulk_string(b"HELLO")])
+                })
+            ))
         );
     }
 }

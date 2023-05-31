@@ -10,6 +10,7 @@ use protocol_resp::{HashIncrBy, HINCRBY, HINCRBY_EX};
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
+use crate::ProxyError;
 use crate::COLLECTION_TTL;
 
 use super::update_method_metrics;
@@ -21,7 +22,7 @@ pub async fn hincrby(
     req: &HashIncrBy,
 ) -> ProxyResult {
     update_method_metrics(&HINCRBY, &HINCRBY_EX, async move {
-        let response = tokio::time::timeout(
+        let response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.dictionary_increment(
                 cache_name,
@@ -31,7 +32,18 @@ pub async fn hincrby(
                 COLLECTION_TTL,
             ),
         )
-        .await??;
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
+                klog_1(&"hincrby", &req.key(), Status::ServerError, 0);
+                return Err(ProxyError::from(e));
+            }
+            Err(e) => {
+                klog_1(&"hincrby", &req.key(), Status::Timeout, 0);
+                return Err(ProxyError::from(e));
+            }
+        };
 
         write!(response_buf, ":{}\r\n", response.value)?;
         klog_1(&"hincrby", &req.key(), Status::Hit, response_buf.len());

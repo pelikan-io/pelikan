@@ -4,13 +4,12 @@
 
 use std::time::Duration;
 
-use momento::response::MomentoSetStatus;
 use momento::SimpleCacheClient;
-use protocol_memcache::{SET, SET_EX, SET_NOT_STORED, SET_STORED};
+use protocol_memcache::{SET, SET_EX, SET_STORED};
 use protocol_resp::Set;
 
 use crate::error::{ProxyError, ProxyResult};
-use crate::klog::klog_set;
+use crate::klog::{klog_set, Status};
 
 use super::update_method_metrics;
 
@@ -30,40 +29,48 @@ pub async fn set(
             None => None,
         };
 
-        let response = tokio::time::timeout(
+        let _response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.set(cache_name, req.key(), req.value(), ttl),
         )
-        .await??;
-
-        match response.result {
-            MomentoSetStatus::OK => {
-                SET_STORED.increment();
+        .await
+        {
+            Ok(Ok(r)) => r,
+            Ok(Err(e)) => {
                 klog_set(
                     &req.key(),
                     0,
                     ttl.map(|v| v.as_millis()).unwrap_or(0) as i32,
                     req.value().len(),
-                    5,
-                    8,
+                    Status::ServerError,
+                    0,
                 );
-
-                response_buf.extend_from_slice(b"+OK\r\n");
+                return Err(ProxyError::from(e));
             }
-            MomentoSetStatus::ERROR => {
-                SET_NOT_STORED.increment();
+            Err(e) => {
                 klog_set(
                     &req.key(),
                     0,
                     ttl.map(|v| v.as_millis()).unwrap_or(0) as i32,
                     req.value().len(),
-                    9,
-                    12,
+                    Status::Timeout,
+                    0,
                 );
-
-                return Err(ProxyError::custom("backend error"));
+                return Err(ProxyError::from(e));
             }
-        }
+        };
+
+        SET_STORED.increment();
+        klog_set(
+            &req.key(),
+            0,
+            ttl.map(|v| v.as_millis()).unwrap_or(0) as i32,
+            req.value().len(),
+            Status::Stored,
+            8,
+        );
+
+        response_buf.extend_from_slice(b"+OK\r\n");
 
         Ok(())
     })
