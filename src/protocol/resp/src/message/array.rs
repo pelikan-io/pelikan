@@ -143,9 +143,11 @@ mod tests {
         assert_eq!(message.into_iter().next(), None);
 
         let message = Array {
-            inner: Some(vec![Message::bulk_string(b"HELLO")])
+            inner: Some(vec![Message::bulk_string(b"HELLO")]),
         };
-        assert_eq!(message.into_iter().next(), Some(&Message::bulk_string(b"HELLO")));
-
+        assert_eq!(
+            message.into_iter().next(),
+            Some(&Message::bulk_string(b"HELLO"))
+        );
     }
 }
