@@ -18,7 +18,7 @@ pub use storage::*;
 
 pub use protocol_common::*;
 
-use common::expiry::TimeType;
+pub use common::expiry::TimeType;
 use logger::Klog;
 use metriken::time::*;
 use metriken::*;
