@@ -15,7 +15,6 @@ use core::time::Duration;
 use logger::configure_logging;
 use logger::Drain;
 use metriken::*;
-use momento::response::*;
 use momento::*;
 use net::TCP_RECV_BYTE;
 use protocol_admin::*;
@@ -255,17 +254,21 @@ async fn spawn(
 
     // initialize the Momento cache client
     if std::env::var("MOMENTO_AUTHENTICATION").is_err() {
-        error!("environment variable `MOMENTO_AUTHENTICATION` is not set");
-        let _ = log_drain.flush();
+        eprintln!("environment variable `MOMENTO_AUTHENTICATION` is not set");
         std::process::exit(1);
     }
     let auth_token =
         std::env::var("MOMENTO_AUTHENTICATION").expect("MOMENTO_AUTHENTICATION must be set");
-    let client_builder = match SimpleCacheClientBuilder::new(auth_token, DEFAULT_TTL) {
+    let credential_provider = CredentialProviderBuilder::from_string(auth_token)
+        .build()
+        .unwrap_or_else(|e| {
+            eprintln!("failed to initialize credential provider. error: {e}");
+            std::process::exit(1);
+        });
+    let client_builder = match SimpleCacheClientBuilder::new(credential_provider, DEFAULT_TTL) {
         Ok(c) => c,
         Err(e) => {
-            error!("could not create cache client: {}", e);
-            let _ = log_drain.flush();
+            eprintln!("could not create cache client: {}", e);
             std::process::exit(1);
         }
     };

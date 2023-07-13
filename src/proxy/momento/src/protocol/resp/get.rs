@@ -4,6 +4,7 @@
 
 use crate::klog::{klog_1, Status};
 use crate::*;
+use momento::response::Get as GetResponse;
 use protocol_memcache::*;
 
 use super::update_method_metrics;
@@ -32,28 +33,21 @@ pub async fn get(
             }
         };
 
-        match response.result {
-            MomentoGetStatus::ERROR => {
-                // we got some error from
-                // the backend.
-                BACKEND_EX.increment();
-                GET_EX.increment();
-                response_buf.extend_from_slice(b"-ERR backend error\r\n");
-
-                klog_1(&"get", &key, Status::ServerError, 0);
-            }
-            MomentoGetStatus::HIT => {
+        match response {
+            GetResponse::Hit { value } => {
                 GET_KEY_HIT.increment();
 
-                let item_header = format!("${}\r\n", response.value.len());
+                let value: Vec<u8> = value.into();
+
+                let item_header = format!("${}\r\n", value.len());
 
                 response_buf.extend_from_slice(item_header.as_bytes());
-                response_buf.extend_from_slice(&response.value);
+                response_buf.extend_from_slice(&value);
                 response_buf.extend_from_slice(b"\r\n");
 
-                klog_1(&"get", &key, Status::Hit, response.value.len());
+                klog_1(&"get", &key, Status::Hit, value.len());
             }
-            MomentoGetStatus::MISS => {
+            GetResponse::Miss => {
                 GET_KEY_MISS.increment();
 
                 response_buf.extend_from_slice(b"$-1\r\n");
