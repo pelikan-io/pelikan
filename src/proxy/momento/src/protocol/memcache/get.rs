@@ -5,6 +5,7 @@
 use crate::klog::{klog_1, Status};
 use crate::{Error, *};
 use ::net::*;
+use momento::response::Get as GetResponse;
 use protocol_memcache::*;
 
 pub async fn get(
@@ -45,29 +46,23 @@ pub async fn get(
 
         match timeout(Duration::from_millis(200), client.get(cache_name, key)).await {
             Ok(Ok(response)) => {
-                match response.result {
-                    MomentoGetStatus::ERROR => {
-                        // we got some error from
-                        // the backend.
-                        BACKEND_EX.increment();
-
-                        // ignore and move on to the next key, treating this as
-                        // a cache miss
-                    }
-                    MomentoGetStatus::HIT => {
+                match response {
+                    GetResponse::Hit { value } => {
                         GET_KEY_HIT.increment();
 
-                        let length = response.value.len();
+                        let value: Vec<u8> = value.into();
+
+                        let length = value.len();
 
                         let item_header = format!("VALUE {key} 0 {length}\r\n");
 
                         klog_1(&"get", &key, Status::Hit, length);
 
                         response_buf.extend_from_slice(item_header.as_bytes());
-                        response_buf.extend_from_slice(&response.value);
+                        response_buf.extend_from_slice(&value);
                         response_buf.extend_from_slice(b"\r\n");
                     }
-                    MomentoGetStatus::MISS => {
+                    GetResponse::Miss => {
                         GET_KEY_MISS.increment();
 
                         // we don't write anything for a miss

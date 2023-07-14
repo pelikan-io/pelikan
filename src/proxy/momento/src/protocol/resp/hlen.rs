@@ -4,14 +4,13 @@
 
 use std::time::Duration;
 
-use momento::response::MomentoDictionaryFetchStatus;
+use momento::response::DictionaryFetch;
 use momento::SimpleCacheClient;
 use protocol_resp::{HashLength, HLEN, HLEN_EX, HLEN_HIT, HLEN_MISS};
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
 use crate::ProxyError;
-use crate::BACKEND_EX;
 
 use super::update_method_metrics;
 
@@ -39,29 +38,18 @@ pub async fn hlen(
             }
         };
 
-        match response.result {
-            MomentoDictionaryFetchStatus::ERROR => {
-                BACKEND_EX.increment();
-                HLEN_EX.increment();
-                response_buf.extend_from_slice(b"-ERR backend error\r\n");
+        match response {
+            DictionaryFetch::Hit { value } => {
+                HLEN_HIT.increment();
+
+                let map: Vec<(Vec<u8>, Vec<u8>)> = value.collect_into();
+                let response = format!(":{}\r\n", map.len()).into_bytes();
+
+                response_buf.extend_from_slice(&response);
+
+                klog_1(&"hlen", &req.key(), Status::Hit, response_buf.len());
             }
-            MomentoDictionaryFetchStatus::FOUND => {
-                if response.dictionary.is_none() {
-                    BACKEND_EX.increment();
-                    HLEN_EX.increment();
-                    response_buf.extend_from_slice(b"-ERR backend error\r\n");
-                } else {
-                    HLEN_HIT.increment();
-
-                    let dictionary = response.dictionary.as_ref().unwrap();
-                    let response = format!(":{}\r\n", dictionary.len()).into_bytes();
-
-                    response_buf.extend_from_slice(&response);
-
-                    klog_1(&"hlen", &req.key(), Status::Hit, response_buf.len());
-                }
-            }
-            MomentoDictionaryFetchStatus::MISSING => {
+            DictionaryFetch::Miss => {
                 HLEN_MISS.increment();
                 response_buf.extend_from_slice(b":0\r\n");
                 klog_1(&"hlen", &req.key(), Status::Miss, response_buf.len());

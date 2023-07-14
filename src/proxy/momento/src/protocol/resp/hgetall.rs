@@ -4,14 +4,13 @@
 
 use std::time::Duration;
 
-use momento::response::MomentoDictionaryFetchStatus;
+use momento::response::DictionaryFetch;
 use momento::SimpleCacheClient;
 use protocol_resp::{HashGetAll, HGETALL, HGETALL_EX, HGETALL_HIT, HGETALL_MISS};
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
 use crate::ProxyError;
-use crate::BACKEND_EX;
 
 use super::update_method_metrics;
 
@@ -39,45 +38,28 @@ pub async fn hgetall(
             }
         };
 
-        match response.result {
-            MomentoDictionaryFetchStatus::ERROR => {
-                // we got some error from
-                // the backend.
-                BACKEND_EX.increment();
-                HGETALL_EX.increment();
-                response_buf.extend_from_slice(b"-ERR backend error\r\n");
-            }
-            MomentoDictionaryFetchStatus::FOUND => {
-                if response.dictionary.is_none() {
-                    error!("error for hgetall: dictionary found but not provided in response");
-                    BACKEND_EX.increment();
-                    HGETALL_EX.increment();
-                    response_buf.extend_from_slice(b"-ERR backend error\r\n");
+        match response {
+            DictionaryFetch::Hit { value } => {
+                HGETALL_HIT.increment();
+                let map: Vec<(Vec<u8>, Vec<u8>)> = value.collect_into();
 
-                    klog_1(&"hgetall", &req.key(), Status::ServerError, 0);
-                } else {
-                    HGETALL_HIT.increment();
-                    let dictionary = response.dictionary.as_ref().unwrap();
+                response_buf.extend_from_slice(format!("*{}\r\n", map.len() * 2).as_bytes());
 
-                    response_buf
-                        .extend_from_slice(format!("*{}\r\n", dictionary.len() * 2).as_bytes());
+                for (field, value) in map {
+                    let field_header = format!("${}\r\n", field.len());
+                    let value_header = format!("${}\r\n", value.len());
 
-                    for (field, value) in dictionary {
-                        let field_header = format!("${}\r\n", field.len());
-                        let value_header = format!("${}\r\n", value.len());
-
-                        response_buf.extend_from_slice(field_header.as_bytes());
-                        response_buf.extend_from_slice(field);
-                        response_buf.extend_from_slice(b"\r\n");
-                        response_buf.extend_from_slice(value_header.as_bytes());
-                        response_buf.extend_from_slice(value);
-                        response_buf.extend_from_slice(b"\r\n");
-                    }
-
-                    klog_1(&"hgetall", &req.key(), Status::Hit, response_buf.len());
+                    response_buf.extend_from_slice(field_header.as_bytes());
+                    response_buf.extend_from_slice(&field);
+                    response_buf.extend_from_slice(b"\r\n");
+                    response_buf.extend_from_slice(value_header.as_bytes());
+                    response_buf.extend_from_slice(&value);
+                    response_buf.extend_from_slice(b"\r\n");
                 }
+
+                klog_1(&"hgetall", &req.key(), Status::Hit, response_buf.len());
             }
-            MomentoDictionaryFetchStatus::MISSING => {
+            DictionaryFetch::Miss => {
                 HGETALL_MISS.increment();
                 response_buf.extend_from_slice(b"*0\r\n");
                 klog_1(&"hgetall", &req.key(), Status::Miss, response_buf.len());

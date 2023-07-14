@@ -3,7 +3,7 @@ name = "momento_proxy"
 description = "a proxy to access Momento cache(s) over memcache protocol"
 authors = ["Brian Martin <brayniac@gmail.com>"]
 
-version = { workspace = true }
+version = "0.3.2"
 edition = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
@@ -18,7 +18,7 @@ config = { path = "../../config" }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-momento = "0.26.2"
+momento = "0.30.0"
 net = { path = "../../net" }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-memcache = { path = "../../protocol/memcache" }
