@@ -5,23 +5,48 @@
 use super::map_result;
 use crate::*;
 
-heatmap!(
-    FRONTEND_EVENT_DEPTH,
-    100_000,
-    "distribution of the number of events received per iteration of the event loop"
-);
-counter!(FRONTEND_EVENT_ERROR, "the number of error events received");
-counter!(
-    FRONTEND_EVENT_LOOP,
-    "the number of times the event loop has run"
-);
-counter!(
-    FRONTEND_EVENT_MAX_REACHED,
-    "the number of times the maximum number of events was returned"
-);
-counter!(FRONTEND_EVENT_READ, "the number of read events received");
-counter!(FRONTEND_EVENT_TOTAL, "the total number of events received");
-counter!(FRONTEND_EVENT_WRITE, "the number of write events received");
+#[metric(
+    name = "frontend_event_depth",
+    description = "distribution of the number of events received per iteration of the event loop"
+)]
+pub static FRONTEND_EVENT_DEPTH: Heatmap =
+    Heatmap::new(0, 8, 20, Duration::from_secs(60), Duration::from_secs(1));
+
+#[metric(
+    name = "frontend_event_error",
+    description = "the number of error events received"
+)]
+pub static FRONTEND_EVENT_ERROR: Counter = Counter::new();
+
+#[metric(
+    name = "frontend_event_loop",
+    description = "the number of times the event loop has run"
+)]
+pub static FRONTEND_EVENT_LOOP: Counter = Counter::new();
+
+#[metric(
+    name = "frontend_event_max_reached",
+    description = "the number of times the maximum number of events was returned"
+)]
+pub static FRONTEND_EVENT_MAX_REACHED: Counter = Counter::new();
+
+#[metric(
+    name = "frontend_event_read",
+    description = "the number of read events received"
+)]
+pub static FRONTEND_EVENT_READ: Counter = Counter::new();
+
+#[metric(
+    name = "frontend_event_total",
+    description = "the total number of events received"
+)]
+pub static FRONTEND_EVENT_TOTAL: Counter = Counter::new();
+
+#[metric(
+    name = "frontend_event_write",
+    description = "the number of write events received"
+)]
+pub static FRONTEND_EVENT_WRITE: Counter = Counter::new();
 
 pub struct FrontendWorkerBuilder<
     FrontendParser,
@@ -202,7 +227,7 @@ where
             if count == self.nevent {
                 FRONTEND_EVENT_MAX_REACHED.increment();
             } else {
-                FRONTEND_EVENT_DEPTH.increment(timestamp, count as _, 1);
+                let _ = FRONTEND_EVENT_DEPTH.increment(timestamp, count as _);
             }
 
             // process all events

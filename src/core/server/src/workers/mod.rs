@@ -13,23 +13,48 @@ use multi::*;
 use single::*;
 use storage::*;
 
-heatmap!(
-    WORKER_EVENT_DEPTH,
-    100_000,
-    "distribution of the number of events received per iteration of the event loop"
-);
-counter!(WORKER_EVENT_ERROR, "the number of error events received");
-counter!(
-    WORKER_EVENT_LOOP,
-    "the number of times the event loop has run"
-);
-counter!(
-    WORKER_EVENT_MAX_REACHED,
-    "the number of times the maximum number of events was returned"
-);
-counter!(WORKER_EVENT_READ, "the number of read events received");
-counter!(WORKER_EVENT_TOTAL, "the total number of events received");
-counter!(WORKER_EVENT_WRITE, "the number of write events received");
+#[metric(
+    name = "worker_event_depth",
+    description = "distribution of the number of events received per iteration of the event loop"
+)]
+pub static WORKER_EVENT_DEPTH: Heatmap =
+    Heatmap::new(0, 8, 20, Duration::from_secs(60), Duration::from_secs(1));
+
+#[metric(
+    name = "worker_event_error",
+    description = "the number of error events received"
+)]
+pub static WORKER_EVENT_ERROR: Counter = Counter::new();
+
+#[metric(
+    name = "worker_event_loop",
+    description = "the number of times the event loop has run"
+)]
+pub static WORKER_EVENT_LOOP: Counter = Counter::new();
+
+#[metric(
+    name = "worker_event_max_reached",
+    description = "the number of times the maximum number of events was returned"
+)]
+pub static WORKER_EVENT_MAX_REACHED: Counter = Counter::new();
+
+#[metric(
+    name = "worker_event_read",
+    description = "the number of read events received"
+)]
+pub static WORKER_EVENT_READ: Counter = Counter::new();
+
+#[metric(
+    name = "worker_event_total",
+    description = "the total number of events received"
+)]
+pub static WORKER_EVENT_TOTAL: Counter = Counter::new();
+
+#[metric(
+    name = "worker_event_write",
+    description = "the number of write events received"
+)]
+pub static WORKER_EVENT_WRITE: Counter = Counter::new();
 
 fn map_result(result: Result<usize>) -> Result<()> {
     match result {

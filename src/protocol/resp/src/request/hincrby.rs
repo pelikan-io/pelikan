@@ -6,8 +6,11 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-counter!(HINCRBY);
-counter!(HINCRBY_EX);
+#[metric(name = "hincrby")]
+pub static HINCRBY: Counter = Counter::new();
+
+#[metric(name = "hincrby_ex")]
+pub static HINCRBY_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashIncrBy {

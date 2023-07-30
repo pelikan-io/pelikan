@@ -6,10 +6,17 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-counter!(HGETALL);
-counter!(HGETALL_EX);
-counter!(HGETALL_HIT);
-counter!(HGETALL_MISS);
+#[metric(name = "hgetall")]
+pub static HGETALL: Counter = Counter::new();
+
+#[metric(name = "hgetall_ex")]
+pub static HGETALL_EX: Counter = Counter::new();
+
+#[metric(name = "hgetall_hit")]
+pub static HGETALL_HIT: Counter = Counter::new();
+
+#[metric(name = "hgetall_miss")]
+pub static HGETALL_MISS: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashGetAll {

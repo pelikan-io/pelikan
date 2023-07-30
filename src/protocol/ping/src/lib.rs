@@ -26,10 +26,12 @@ mod stats {
     use metriken::*;
 
     #[cfg(feature = "server")]
-    counter!(PING, "the number of ping requests");
+    #[metric(name = "ping", description = "the number of ping requests")]
+    pub static PING: Counter = Counter::new();
 
     #[cfg(feature = "client")]
-    counter!(PONG, "the number of pong responses");
+    #[metric(name = "pong", description = "the number of pong responses")]
+    pub static PONG: Counter = Counter::new();
 }
 
 common::metrics::test_no_duplicates!();

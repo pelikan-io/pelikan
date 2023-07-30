@@ -6,10 +6,17 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-counter!(HSET);
-counter!(HSET_EX);
-counter!(HSET_STORED);
-counter!(HSET_NOT_STORED);
+#[metric(name = "hset")]
+pub static HSET: Counter = Counter::new();
+
+#[metric(name = "hset_ex")]
+pub static HSET_EX: Counter = Counter::new();
+
+#[metric(name = "hset_stored")]
+pub static HSET_STORED: Counter = Counter::new();
+
+#[metric(name = "hset_not_stored")]
+pub static HSET_NOT_STORED: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashSet {

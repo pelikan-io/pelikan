@@ -5,8 +5,11 @@
 use super::*;
 use std::io::{Error, ErrorKind};
 
-counter!(HDEL);
-counter!(HDEL_EX);
+#[metric(name = "hdel")]
+pub static HDEL: Counter = Counter::new();
+
+#[metric(name = "hdel_ex")]
+pub static HDEL_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashDelete {

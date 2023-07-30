@@ -6,8 +6,11 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-counter!(SMEMBERS);
-counter!(SMEMBERS_EX);
+#[metric(name = "smembers")]
+pub static SMEMBERS: Counter = Counter::new();
+
+#[metric(name = "smembers_ex")]
+pub static SMEMBERS_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SetMembers {

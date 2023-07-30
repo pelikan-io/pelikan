@@ -4,8 +4,11 @@
 
 use super::*;
 
-counter!(LRANGE);
-counter!(LRANGE_EX);
+#[metric(name = "lrange")]
+pub static LRANGE: Counter = Counter::new();
+
+#[metric(name = "lrange_ex")]
+pub static LRANGE_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListRange {

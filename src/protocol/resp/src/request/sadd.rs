@@ -7,8 +7,11 @@ use std::sync::Arc;
 
 use super::*;
 
-counter!(SADD);
-counter!(SADD_EX);
+#[metric(name = "sadd")]
+pub static SADD: Counter = Counter::new();
+
+#[metric(name = "sadd_ex")]
+pub static SADD_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SetAdd {

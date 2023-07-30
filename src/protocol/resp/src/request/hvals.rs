@@ -5,10 +5,17 @@
 use super::*;
 use std::io::{Error, ErrorKind};
 
-counter!(HVALS);
-counter!(HVALS_EX);
-counter!(HVALS_HIT);
-counter!(HVALS_MISS);
+#[metric(name = "hvals")]
+pub static HVALS: Counter = Counter::new();
+
+#[metric(name = "hvals_ex")]
+pub static HVALS_EX: Counter = Counter::new();
+
+#[metric(name = "hvals_hit")]
+pub static HVALS_HIT: Counter = Counter::new();
+
+#[metric(name = "hvals_miss")]
+pub static HVALS_MISS: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashValues {

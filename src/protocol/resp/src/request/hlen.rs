@@ -5,10 +5,17 @@
 use super::*;
 use std::io::{Error, ErrorKind};
 
-counter!(HLEN);
-counter!(HLEN_EX);
-counter!(HLEN_HIT);
-counter!(HLEN_MISS);
+#[metric(name = "hlen")]
+pub static HLEN: Counter = Counter::new();
+
+#[metric(name = "hlen_ex")]
+pub static HLEN_EX: Counter = Counter::new();
+
+#[metric(name = "hlen_hit")]
+pub static HLEN_HIT: Counter = Counter::new();
+
+#[metric(name = "hlen_miss")]
+pub static HLEN_MISS: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashLength {
