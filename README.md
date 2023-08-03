@@ -14,10 +14,9 @@ Pelikan is a framework for developing cache services. It is:
 [![License: Apache-2.0][license-badge]][license-url]
 [![Build Status][cargo-build-badge]][cargo-build-url]
 [![Fuzz Status][cargo-fuzz-badge]][cargo-fuzz-url]
-[![Zulip Chat][zulip-badge]][zulip-url]
 
 [Website](http://pelikan.io) |
-[Chat][zulip-url]
+[Chat][discord-url]
 
 # Content
 
@@ -166,10 +165,9 @@ included under the `config` directory.
 
 ## Stay in touch
 
-- Join our project chat on [![Zulip][zulip-badge]][zulip-url]
-  for questions and discussions
-- Follow us on Twitter: [@pelikan_cache]
+- Join our [Discord server][discord-url] for questions and discussions
 - Visit <http://pelikan.io>
+- Follow us on Twitter: [@pelikan_cache]
 
 ## Contributing
 
@@ -207,3 +205,4 @@ This software is licensed under the Apache 2.0 license, see [LICENSE](LICENSE) f
 [zulip-badge]: https://img.shields.io/badge/zulip-join_chat-blue.svg
 [zulip-url]: https://pelikan.zulipchat.com/
 [grpc-url]: https://grpc.io/docs/protoc-installation/
+[discord-url]: https://discord.gg/yUBWHqxGUR
