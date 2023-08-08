@@ -13,7 +13,7 @@ use std::collections::VecDeque;
     description = "distribution of the number of events received per iteration of the event loop"
 )]
 pub static BACKEND_EVENT_DEPTH: Heatmap =
-    Heatmap::new(0, 8, 20, Duration::from_secs(60), Duration::from_secs(1));
+    Heatmap::new(0, 8, 17, Duration::from_secs(60), Duration::from_secs(1));
 
 #[metric(
     name = "backend_event_error",
