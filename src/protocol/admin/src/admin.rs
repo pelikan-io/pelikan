@@ -137,14 +137,14 @@ impl Compose for AdminResponse {
                         data.push(format!("STAT {} {}\r\n", metric.name(), gauge.value()));
                     } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
                         for (label, value) in PERCENTILES {
-                            let percentile =
-                                heatmap.percentile(*value).map(|b| b.high()).unwrap_or(0);
-                            data.push(format!(
-                                "STAT {}_{} {}\r\n",
-                                metric.name(),
-                                label,
-                                percentile
-                            ));
+                            if let Some(Ok(bucket)) = heatmap.percentile(*value) {
+                                data.push(format!(
+                                    "STAT {}_{} {}\r\n",
+                                    metric.name(),
+                                    label,
+                                    bucket.high()
+                                ));
+                            }
                         }
                     }
                 }

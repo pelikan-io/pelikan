@@ -7,8 +7,11 @@ use std::sync::Arc;
 
 use super::*;
 
-counter!(LPUSH);
-counter!(LPUSH_EX);
+#[metric(name = "lpush")]
+pub static LPUSH: Counter = Counter::new();
+
+#[metric(name = "lpush_ex")]
+pub static LPUSH_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListPush {

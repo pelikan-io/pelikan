@@ -20,8 +20,7 @@ pub use protocol_common::*;
 
 pub use common::expiry::TimeType;
 use logger::Klog;
-use metriken::time::*;
-use metriken::*;
+use metriken::{metric, Counter, Heatmap};
 
 const CRLF: &[u8] = b"\r\n";
 
@@ -33,72 +32,218 @@ pub enum MemcacheError {
 
 type Instant = common::time::Instant<common::time::Nanoseconds<u64>>;
 
-counter!(GET);
-heatmap!(
-    GET_CARDINALITY,
-    1_000_000,
-    "distribution of key cardinality for get requests"
+/*
+ * GET
+ */
+
+#[metric(name = "get")]
+pub static GET: Counter = Counter::new();
+
+#[metric(name = "get_ex")]
+pub static GET_EX: Counter = Counter::new();
+
+#[metric(name = "get_key")]
+pub static GET_KEY: Counter = Counter::new();
+
+#[metric(name = "get_key_hit")]
+pub static GET_KEY_HIT: Counter = Counter::new();
+
+#[metric(name = "get_key_miss")]
+pub static GET_KEY_MISS: Counter = Counter::new();
+
+#[metric(
+    name = "get_cardinality",
+    description = "distribution of key cardinality for get requests"
+)]
+pub static GET_CARDINALITY: Heatmap = Heatmap::new(
+    0,
+    8,
+    20,
+    core::time::Duration::from_secs(60),
+    core::time::Duration::from_secs(1),
 );
-counter!(GET_EX);
-counter!(GET_KEY);
-counter!(GET_KEY_HIT);
-counter!(GET_KEY_MISS);
 
-counter!(GETS);
-counter!(GETS_EX);
-counter!(GETS_KEY);
-counter!(GETS_KEY_HIT);
-counter!(GETS_KEY_MISS);
+/*
+ * GETS
+ */
 
-counter!(SET);
-counter!(SET_EX);
-counter!(SET_STORED);
-counter!(SET_NOT_STORED);
+#[metric(name = "gets")]
+pub static GETS: Counter = Counter::new();
 
-counter!(ADD);
-counter!(ADD_EX);
-counter!(ADD_STORED);
-counter!(ADD_NOT_STORED);
+#[metric(name = "gets_ex")]
+pub static GETS_EX: Counter = Counter::new();
 
-counter!(REPLACE);
-counter!(REPLACE_EX);
-counter!(REPLACE_STORED);
-counter!(REPLACE_NOT_STORED);
+#[metric(name = "gets_key")]
+pub static GETS_KEY: Counter = Counter::new();
 
-counter!(APPEND);
-counter!(APPEND_EX);
-counter!(APPEND_STORED);
-counter!(APPEND_NOT_STORED);
+#[metric(name = "gets_key_hit")]
+pub static GETS_KEY_HIT: Counter = Counter::new();
 
-counter!(PREPEND);
-counter!(PREPEND_EX);
-counter!(PREPEND_STORED);
-counter!(PREPEND_NOT_STORED);
+#[metric(name = "gets_key_miss")]
+pub static GETS_KEY_MISS: Counter = Counter::new();
 
-counter!(DELETE);
-counter!(DELETE_EX);
-counter!(DELETE_DELETED);
-counter!(DELETE_NOT_FOUND);
+/*
+ * SET
+ */
 
-counter!(INCR);
-counter!(INCR_EX);
-counter!(INCR_STORED);
-counter!(INCR_NOT_FOUND);
+#[metric(name = "set")]
+pub static SET: Counter = Counter::new();
 
-counter!(DECR);
-counter!(DECR_EX);
-counter!(DECR_STORED);
-counter!(DECR_NOT_FOUND);
+#[metric(name = "set_ex")]
+pub static SET_EX: Counter = Counter::new();
 
-counter!(CAS);
-counter!(CAS_EX);
-counter!(CAS_EXISTS);
-counter!(CAS_NOT_FOUND);
-counter!(CAS_STORED);
+#[metric(name = "set_stored")]
+pub static SET_STORED: Counter = Counter::new();
 
-counter!(FLUSH_ALL);
-counter!(FLUSH_ALL_EX);
+#[metric(name = "set_not_stored")]
+pub static SET_NOT_STORED: Counter = Counter::new();
 
-counter!(QUIT);
+/*
+ * ADD
+ */
+
+#[metric(name = "add")]
+pub static ADD: Counter = Counter::new();
+
+#[metric(name = "add_ex")]
+pub static ADD_EX: Counter = Counter::new();
+
+#[metric(name = "add_stored")]
+pub static ADD_STORED: Counter = Counter::new();
+
+#[metric(name = "add_not_stored")]
+pub static ADD_NOT_STORED: Counter = Counter::new();
+
+/*
+ * REPLACE
+ */
+
+#[metric(name = "replace")]
+pub static REPLACE: Counter = Counter::new();
+
+#[metric(name = "replace_ex")]
+pub static REPLACE_EX: Counter = Counter::new();
+
+#[metric(name = "replace_stored")]
+pub static REPLACE_STORED: Counter = Counter::new();
+
+#[metric(name = "replace_not_stored")]
+pub static REPLACE_NOT_STORED: Counter = Counter::new();
+
+/*
+ * APPEND
+ */
+
+#[metric(name = "append")]
+pub static APPEND: Counter = Counter::new();
+
+#[metric(name = "append_ex")]
+pub static APPEND_EX: Counter = Counter::new();
+
+#[metric(name = "append_stored")]
+pub static APPEND_STORED: Counter = Counter::new();
+
+#[metric(name = "append_not_stored")]
+pub static APPEND_NOT_STORED: Counter = Counter::new();
+
+/*
+ * PREPEND
+ */
+
+#[metric(name = "prepend")]
+pub static PREPEND: Counter = Counter::new();
+
+#[metric(name = "prepend_ex")]
+pub static PREPEND_EX: Counter = Counter::new();
+
+#[metric(name = "prepend_stored")]
+pub static PREPEND_STORED: Counter = Counter::new();
+
+#[metric(name = "prepend_not_stored")]
+pub static PREPEND_NOT_STORED: Counter = Counter::new();
+
+/*
+ * DELETE
+ */
+
+#[metric(name = "delete")]
+pub static DELETE: Counter = Counter::new();
+
+#[metric(name = "delete_ex")]
+pub static DELETE_EX: Counter = Counter::new();
+
+#[metric(name = "delete_deleted")]
+pub static DELETE_DELETED: Counter = Counter::new();
+
+#[metric(name = "delete_not_found")]
+pub static DELETE_NOT_FOUND: Counter = Counter::new();
+
+/*
+ * INCR
+ */
+
+#[metric(name = "incr")]
+pub static INCR: Counter = Counter::new();
+
+#[metric(name = "incr_ex")]
+pub static INCR_EX: Counter = Counter::new();
+
+#[metric(name = "incr_stored")]
+pub static INCR_STORED: Counter = Counter::new();
+
+#[metric(name = "incr_not_found")]
+pub static INCR_NOT_FOUND: Counter = Counter::new();
+
+/*
+ * DECR
+ */
+
+#[metric(name = "decr")]
+pub static DECR: Counter = Counter::new();
+
+#[metric(name = "decr_ex")]
+pub static DECR_EX: Counter = Counter::new();
+
+#[metric(name = "decr_stored")]
+pub static DECR_STORED: Counter = Counter::new();
+
+#[metric(name = "decr_not_found")]
+pub static DECR_NOT_FOUND: Counter = Counter::new();
+
+/*
+ * CAS
+ */
+
+#[metric(name = "cas")]
+pub static CAS: Counter = Counter::new();
+
+#[metric(name = "cas_ex")]
+pub static CAS_EX: Counter = Counter::new();
+
+#[metric(name = "cas_exists")]
+pub static CAS_EXISTS: Counter = Counter::new();
+
+#[metric(name = "cas_not_found")]
+pub static CAS_NOT_FOUND: Counter = Counter::new();
+
+#[metric(name = "cas_stored")]
+pub static CAS_STORED: Counter = Counter::new();
+
+/*
+ * FLUSH_ALL
+ */
+
+#[metric(name = "flush_all")]
+pub static FLUSH_ALL: Counter = Counter::new();
+
+#[metric(name = "flush_all_ex")]
+pub static FLUSH_ALL_EX: Counter = Counter::new();
+
+/*
+ * QUIT
+ */
+
+#[metric(name = "quit")]
+pub static QUIT: Counter = Counter::new();
 
 common::metrics::test_no_duplicates!();

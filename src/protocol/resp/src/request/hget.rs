@@ -5,10 +5,17 @@
 use super::*;
 use std::io::{Error, ErrorKind};
 
-counter!(HGET);
-counter!(HGET_EX);
-counter!(HGET_HIT);
-counter!(HGET_MISS);
+#[metric(name = "hget")]
+pub static HGET: Counter = Counter::new();
+
+#[metric(name = "hget_ex")]
+pub static HGET_EX: Counter = Counter::new();
+
+#[metric(name = "hget_hit")]
+pub static HGET_HIT: Counter = Counter::new();
+
+#[metric(name = "hget_miss")]
+pub static HGET_MISS: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashGet {

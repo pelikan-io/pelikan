@@ -4,8 +4,11 @@
 
 use super::*;
 
-counter!(LPOP);
-counter!(LPOP_EX);
+#[metric(name = "lpop")]
+pub static LPOP: Counter = Counter::new();
+
+#[metric(name = "lpop_ex")]
+pub static LPOP_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListPop {

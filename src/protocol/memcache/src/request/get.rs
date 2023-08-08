@@ -73,7 +73,7 @@ impl RequestParser {
                 GET.increment();
                 let keys = request.keys.len() as u64;
                 GET_KEY.add(keys);
-                GET_CARDINALITY.increment(Instant::now(), keys, 1);
+                let _ = GET_CARDINALITY.increment(Instant::now(), keys);
                 Ok((input, request))
             }
             Err(e) => {

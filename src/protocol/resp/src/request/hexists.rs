@@ -5,10 +5,17 @@
 use super::*;
 use std::io::{Error, ErrorKind};
 
-counter!(HEXISTS);
-counter!(HEXISTS_EX);
-counter!(HEXISTS_HIT);
-counter!(HEXISTS_MISS);
+#[metric(name = "hexists")]
+pub static HEXISTS: Counter = Counter::new();
+
+#[metric(name = "hexists_ex")]
+pub static HEXISTS_EX: Counter = Counter::new();
+
+#[metric(name = "hexists_hit")]
+pub static HEXISTS_HIT: Counter = Counter::new();
+
+#[metric(name = "hexists_miss")]
+pub static HEXISTS_MISS: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashExists {

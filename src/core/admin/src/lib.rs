@@ -20,50 +20,104 @@ use std::time::Duration;
 use switchboard::{Queues, Waker};
 use tiny_http::{Method, Request, Response};
 
-counter!(ADMIN_REQUEST_PARSE);
-counter!(ADMIN_RESPONSE_COMPOSE);
-counter!(ADMIN_EVENT_ERROR);
-counter!(ADMIN_EVENT_WRITE);
-counter!(ADMIN_EVENT_READ);
-counter!(ADMIN_EVENT_LOOP);
-counter!(ADMIN_EVENT_TOTAL);
+#[metric(name = "admin_request_parse")]
+pub static ADMIN_REQUEST_PARSE: Counter = Counter::new();
 
-counter!(RU_UTIME);
-counter!(RU_STIME);
-gauge!(RU_MAXRSS);
-gauge!(RU_IXRSS);
-gauge!(RU_IDRSS);
-gauge!(RU_ISRSS);
-counter!(RU_MINFLT);
-counter!(RU_MAJFLT);
-counter!(RU_NSWAP);
-counter!(RU_INBLOCK);
-counter!(RU_OUBLOCK);
-counter!(RU_MSGSND);
-counter!(RU_MSGRCV);
-counter!(RU_NSIGNALS);
-counter!(RU_NVCSW);
-counter!(RU_NIVCSW);
+#[metric(name = "admin_response_compose")]
+pub static ADMIN_RESPONSE_COMPOSE: Counter = Counter::new();
 
-counter!(
-    ADMIN_SESSION_ACCEPT,
-    "total number of attempts to accept a session"
-);
-counter!(
-    ADMIN_SESSION_ACCEPT_EX,
-    "number of times accept resulted in an exception, ignoring attempts that would block"
-);
-counter!(
-    ADMIN_SESSION_ACCEPT_OK,
-    "number of times a session was accepted successfully"
-);
+#[metric(name = "admin_event_error")]
+pub static ADMIN_EVENT_ERROR: Counter = Counter::new();
 
-counter!(
-    ADMIN_SESSION_CLOSE,
-    "total number of times a session was closed"
-);
+#[metric(name = "admin_event_read")]
+pub static ADMIN_EVENT_READ: Counter = Counter::new();
 
-gauge!(ADMIN_SESSION_CURR, "current number of admin sessions");
+#[metric(name = "admin_event_write")]
+pub static ADMIN_EVENT_WRITE: Counter = Counter::new();
+
+#[metric(name = "admin_event_loop")]
+pub static ADMIN_EVENT_LOOP: Counter = Counter::new();
+
+#[metric(name = "admin_event_total")]
+pub static ADMIN_EVENT_TOTAL: Counter = Counter::new();
+
+#[metric(name = "ru_utime")]
+pub static RU_UTIME: Counter = Counter::new();
+
+#[metric(name = "ru_stime")]
+pub static RU_STIME: Counter = Counter::new();
+
+#[metric(name = "ru_maxrss")]
+pub static RU_MAXRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_ixrss")]
+pub static RU_IXRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_idrss")]
+pub static RU_IDRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_isrss")]
+pub static RU_ISRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_minflt")]
+pub static RU_MINFLT: Counter = Counter::new();
+
+#[metric(name = "ru_majflt")]
+pub static RU_MAJFLT: Counter = Counter::new();
+
+#[metric(name = "ru_nswap")]
+pub static RU_NSWAP: Counter = Counter::new();
+
+#[metric(name = "ru_inblock")]
+pub static RU_INBLOCK: Counter = Counter::new();
+
+#[metric(name = "ru_oublock")]
+pub static RU_OUBLOCK: Counter = Counter::new();
+
+#[metric(name = "ru_msgsnd")]
+pub static RU_MSGSND: Counter = Counter::new();
+
+#[metric(name = "ru_msgrcv")]
+pub static RU_MSGRCV: Counter = Counter::new();
+
+#[metric(name = "ru_nsignals")]
+pub static RU_NSIGNALS: Counter = Counter::new();
+
+#[metric(name = "ru_nvcsw")]
+pub static RU_NVCSW: Counter = Counter::new();
+
+#[metric(name = "ru_nivcsw")]
+pub static RU_NIVCSW: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_accept",
+    description = "total number of attempts to accept a session"
+)]
+pub static ADMIN_SESSION_ACCEPT: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_accept_ex",
+    description = "number of times accept resulted in an exception, ignoring attempts that would block"
+)]
+pub static ADMIN_SESSION_ACCEPT_EX: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_accept_ok",
+    description = "number of times a session was accepted successfully"
+)]
+pub static ADMIN_SESSION_ACCEPT_OK: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_close",
+    description = "total number of times a session was closed"
+)]
+pub static ADMIN_SESSION_CLOSE: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_curr",
+    description = "current number of admin sessions"
+)]
+pub static ADMIN_SESSION_CURR: Gauge = Gauge::new();
 
 // consts
 
@@ -473,8 +527,9 @@ impl Admin {
                 data.push(format!("{}: {}", metric.name(), gauge.value()));
             } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
                 for (label, value) in PERCENTILES {
-                    let percentile = heatmap.percentile(*value).map(|b| b.high()).unwrap_or(0);
-                    data.push(format!("{}_{}: {}", metric.name(), label, percentile));
+                    if let Some(Ok(bucket)) = heatmap.percentile(*value) {
+                        data.push(format!("{}_{}: {}", metric.name(), label, bucket.high()));
+                    }
                 }
             }
         }
@@ -511,8 +566,14 @@ impl Admin {
                 data.push(format!("\"{}\": {}", metric.name(), gauge.value()));
             } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
                 for (label, value) in PERCENTILES {
-                    let percentile = heatmap.percentile(*value).map(|b| b.high()).unwrap_or(0);
-                    data.push(format!("\"{}_{}\": {}", metric.name(), label, percentile));
+                    if let Some(Ok(bucket)) = heatmap.percentile(*value) {
+                        data.push(format!(
+                            "\"{}_{}\": {}",
+                            metric.name(),
+                            label,
+                            bucket.high()
+                        ));
+                    }
                 }
             }
         }
@@ -582,14 +643,15 @@ impl Admin {
                 ));
             } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
                 for (label, value) in PERCENTILES {
-                    let percentile = heatmap.percentile(*value).map(|b| b.high()).unwrap_or(0);
-                    data.push(format!(
-                        "# TYPE {} gauge\n{}{{percentile=\"{}\"}} {}",
-                        metric.name(),
-                        metric.name(),
-                        label,
-                        percentile
-                    ));
+                    if let Some(Ok(bucket)) = heatmap.percentile(*value) {
+                        data.push(format!(
+                            "# TYPE {} gauge\n{}{{percentile=\"{}\"}} {}",
+                            metric.name(),
+                            metric.name(),
+                            label,
+                            bucket.high()
+                        ));
+                    }
                 }
             }
         }

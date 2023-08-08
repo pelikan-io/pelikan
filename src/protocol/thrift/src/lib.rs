@@ -13,8 +13,11 @@ use protocol_common::ParseOk;
 const THRIFT_HEADER_LEN: usize = std::mem::size_of::<u32>();
 
 // Stats
-counter!(MESSAGES_PARSED);
-counter!(MESSAGES_COMPOSED);
+#[metric(name = "messages_parsed")]
+pub static MESSAGES_PARSED: Counter = Counter::new();
+
+#[metric(name = "messages_composed")]
+pub static MESSAGES_COMPOSED: Counter = Counter::new();
 
 /// An opaque Thrift message
 pub struct Message {

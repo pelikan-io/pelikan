@@ -7,8 +7,11 @@ use std::sync::Arc;
 
 use super::*;
 
-counter!(DEL);
-counter!(DEL_EX);
+#[metric(name = "del")]
+pub static DEL: Counter = Counter::new();
+
+#[metric(name = "del_ex")]
+pub static DEL_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Del {

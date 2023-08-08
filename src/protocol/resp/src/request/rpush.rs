@@ -7,8 +7,11 @@ use std::sync::Arc;
 
 use super::*;
 
-counter!(RPUSH);
-counter!(RPUSH_EX);
+#[metric(name = "rpush")]
+pub static RPUSH: Counter = Counter::new();
+
+#[metric(name = "rpush_ex")]
+pub static RPUSH_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListPushBack {
