@@ -143,7 +143,7 @@ where
             if count == self.nevent {
                 WORKER_EVENT_MAX_REACHED.increment();
             } else {
-                let _ = WORKER_EVENT_DEPTH.increment(timestamp, count as _);
+                let _ = WORKER_EVENT_DEPTH.increment(count as _);
             }
 
             // process all events

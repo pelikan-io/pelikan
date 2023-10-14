@@ -157,17 +157,6 @@ async fn stats_response(socket: &mut tokio::net::TcpStream) -> Result<(), Error>
             data.push(format!("STAT {} {}\r\n", metric.name(), counter.value()));
         } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
             data.push(format!("STAT {} {}\r\n", metric.name(), gauge.value()));
-        } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
-            for (label, value) in PERCENTILES {
-                if let Some(Ok(bucket)) = heatmap.percentile(*value) {
-                    data.push(format!(
-                        "STAT {}_{} {}\r\n",
-                        metric.name(),
-                        label,
-                        bucket.high()
-                    ));
-                }
-            }
         }
     }
 

@@ -525,12 +525,6 @@ impl Admin {
                 data.push(format!("{}: {}", metric.name(), counter.value()));
             } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
                 data.push(format!("{}: {}", metric.name(), gauge.value()));
-            } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
-                for (label, value) in PERCENTILES {
-                    if let Some(Ok(bucket)) = heatmap.percentile(*value) {
-                        data.push(format!("{}_{}: {}", metric.name(), label, bucket.high()));
-                    }
-                }
             }
         }
 
@@ -564,17 +558,6 @@ impl Admin {
                 data.push(format!("\"{}\": {}", metric.name(), counter.value()));
             } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
                 data.push(format!("\"{}\": {}", metric.name(), gauge.value()));
-            } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
-                for (label, value) in PERCENTILES {
-                    if let Some(Ok(bucket)) = heatmap.percentile(*value) {
-                        data.push(format!(
-                            "\"{}_{}\": {}",
-                            metric.name(),
-                            label,
-                            bucket.high()
-                        ));
-                    }
-                }
             }
         }
 
@@ -641,18 +624,6 @@ impl Admin {
                     metric.name(),
                     gauge.value()
                 ));
-            } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
-                for (label, value) in PERCENTILES {
-                    if let Some(Ok(bucket)) = heatmap.percentile(*value) {
-                        data.push(format!(
-                            "# TYPE {} gauge\n{}{{percentile=\"{}\"}} {}",
-                            metric.name(),
-                            metric.name(),
-                            label,
-                            bucket.high()
-                        ));
-                    }
-                }
             }
         }
         data.sort();

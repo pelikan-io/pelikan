@@ -81,7 +81,7 @@ where
                     .pop_front()
                     .ok_or_else(|| Error::from(ErrorKind::InvalidInput))?;
                 let latency = now - timestamp;
-                let _ = REQUEST_LATENCY.increment(now, latency.as_nanos());
+                let _ = REQUEST_LATENCY.increment(latency.as_nanos());
                 let consumed = res.consumed();
                 let msg = res.into_inner();
                 self.session.consume(consumed);

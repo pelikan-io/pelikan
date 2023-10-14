@@ -78,8 +78,8 @@ pub static SESSION_SEND_BYTE: Counter = Counter::new();
     name = "request_latency",
     description = "distribution of request latencies in nanoseconds"
 )]
-pub static REQUEST_LATENCY: Heatmap =
-    Heatmap::new(0, 8, 32, Duration::from_secs(60), Duration::from_secs(1));
+pub static REQUEST_LATENCY: AtomicHistogram =
+    AtomicHistogram::new(7, 32);
 
 type Instant = common::time::Instant<Nanoseconds<u64>>;
 

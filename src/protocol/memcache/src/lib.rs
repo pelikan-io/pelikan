@@ -20,7 +20,7 @@ pub use protocol_common::*;
 
 pub use common::expiry::TimeType;
 use logger::Klog;
-use metriken::{metric, Counter, Heatmap};
+use metriken::{metric, Counter, AtomicHistogram};
 
 const CRLF: &[u8] = b"\r\n";
 
@@ -55,12 +55,9 @@ pub static GET_KEY_MISS: Counter = Counter::new();
     name = "get_cardinality",
     description = "distribution of key cardinality for get requests"
 )]
-pub static GET_CARDINALITY: Heatmap = Heatmap::new(
-    0,
-    8,
+pub static GET_CARDINALITY: AtomicHistogram = AtomicHistogram::new(
+    7,
     20,
-    core::time::Duration::from_secs(60),
-    core::time::Duration::from_secs(1),
 );
 
 /*

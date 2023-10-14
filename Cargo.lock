@@ -27,7 +27,7 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "net",
  "protocol-admin",
  "protocol-common",
@@ -519,7 +519,7 @@ dependencies = [
  "boring",
  "clocksource",
  "macros",
- "metriken",
+ "metriken 0.3.0",
  "net",
  "ringlog",
  "serde",
@@ -1008,7 +1008,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0ff337aee5a51159480a1c9bc225f36a7d87543023aa118d5843ece2f125bccb"
 dependencies = [
  "clocksource",
- "histogram",
+ "histogram 0.7.4",
  "parking_lot",
  "thiserror",
 ]
@@ -1044,6 +1044,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e673d137229619d5c2c8903b6ed5852b43636c0017ff2e66b1aafb8ccf04b80b"
 dependencies = [
  "serde",
+ "thiserror",
+]
+
+[[package]]
+name = "histogram"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bbe54c811e0443ccedc269b633a9495a03e04c20082b26f6c1cc4d27bfd0678"
+dependencies = [
  "thiserror",
 ]
 
@@ -1372,6 +1381,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "metriken"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "20cdbc5c288bcf449bdf639e712c24305ec3bcd5765b80f6f1bbd38038ba89ac"
+dependencies = [
+ "histogram 0.8.0",
+ "linkme",
+ "metriken-derive",
+ "once_cell",
+ "parking_lot",
+ "phf",
+]
+
+[[package]]
 name = "metriken-derive"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1507,7 +1530,7 @@ dependencies = [
  "config",
  "libc",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "momento",
  "net",
  "protocol-admin",
@@ -1539,7 +1562,7 @@ dependencies = [
  "boring-sys",
  "foreign-types-shared",
  "libc",
- "metriken",
+ "metriken 0.3.0",
  "mio 0.8.5",
 ]
 
@@ -1792,7 +1815,7 @@ dependencies = [
  "common",
  "config",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "protocol-ping",
  "proxy",
 ]
@@ -1808,7 +1831,7 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "protocol-ping",
  "server",
 ]
@@ -1940,7 +1963,7 @@ dependencies = [
  "config",
  "criterion 0.3.6",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "protocol-common",
  "storage-types",
 ]
@@ -1980,7 +2003,7 @@ dependencies = [
  "common",
  "criterion 0.3.6",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "nom",
  "protocol-common",
 ]
@@ -1993,7 +2016,7 @@ dependencies = [
  "config",
  "criterion 0.3.6",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "protocol-common",
  "storage-types",
 ]
@@ -2006,7 +2029,7 @@ dependencies = [
  "common",
  "logger",
  "memchr",
- "metriken",
+ "metriken 0.3.0",
  "nom",
  "protocol-common",
  "thiserror",
@@ -2018,7 +2041,7 @@ version = "0.3.1"
 dependencies = [
  "common",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "protocol-common",
 ]
 
@@ -2033,7 +2056,7 @@ dependencies = [
  "crossbeam-channel",
  "entrystore",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "net",
  "protocol-admin",
  "protocol-common",
@@ -2131,7 +2154,7 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "protocol-resp",
  "server",
 ]
@@ -2190,7 +2213,7 @@ dependencies = [
  "ahash",
  "clocksource",
  "log",
- "metriken",
+ "metriken 0.2.3",
  "mpmc",
 ]
 
@@ -2331,7 +2354,7 @@ dependencies = [
  "clocksource",
  "criterion 0.3.6",
  "datatier",
- "metriken",
+ "metriken 0.3.0",
  "rand",
  "rand_chacha",
  "rand_xoshiro",
@@ -2351,7 +2374,7 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "protocol-memcache",
  "server",
 ]
@@ -2418,7 +2441,7 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "net",
  "protocol-admin",
  "protocol-common",
@@ -2435,7 +2458,7 @@ dependencies = [
  "bytes 1.3.0",
  "common",
  "log",
- "metriken",
+ "metriken 0.3.0",
  "net",
  "protocol-common",
 ]
@@ -2627,22 +2650,22 @@ checksum = "949517c0cf1bf4ee812e2e07e08ab448e3ae0d23472aee8a06c985f0c8815b16"
 
 [[package]]
 name = "thiserror"
-version = "1.0.38"
+version = "1.0.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a9cd18aa97d5c45c6603caea1da6628790b37f7a34b6ca89522331c5180fed0"
+checksum = "1177e8c6d7ede7afde3585fd2513e611227efd6481bd78d2e82ba1ce16557ed4"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.38"
+version = "1.0.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fb327af4685e4d03fa8cbcf1716380da910eeb2bb8be417e7f9fd3fb164f36f"
+checksum = "10712f02019e9288794769fba95cd6847df9874d49d871d062172f9dd41bc4cc"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.107",
+ "syn 2.0.27",
 ]
 
 [[package]]
@@ -2654,7 +2677,7 @@ dependencies = [
  "common",
  "config",
  "logger",
- "metriken",
+ "metriken 0.3.0",
  "protocol-thrift",
  "proxy",
 ]
@@ -2974,7 +2997,7 @@ version = "1.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "97fee6b57c6a41524a810daee9286c02d7752c4253064d0b05472833a438f675"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "static_assertions",
 ]
 
