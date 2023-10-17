@@ -17,6 +17,7 @@ libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
 net = { path = "../../net" }
+parking_lot = { workspace = true }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-common = { path = "../../protocol/common" }
 session = { path = "../../session" }

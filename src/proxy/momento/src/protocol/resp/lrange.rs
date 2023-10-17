@@ -24,7 +24,8 @@ pub async fn lrange(
             Duration::from_millis(200),
             client.list_fetch(cache_name, req.key()),
         )
-        .await?? else {
+        .await??
+        else {
             response_buf.extend_from_slice(b"*0\r\n");
 
             return Ok(());

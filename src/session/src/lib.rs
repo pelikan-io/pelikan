@@ -27,7 +27,6 @@ use common::time::Nanoseconds;
 use core::borrow::{Borrow, BorrowMut};
 use core::fmt::Debug;
 use core::marker::PhantomData;
-use core::time::Duration;
 use metriken::*;
 use protocol_common::Compose;
 use protocol_common::Parse;
@@ -78,8 +77,7 @@ pub static SESSION_SEND_BYTE: Counter = Counter::new();
     name = "request_latency",
     description = "distribution of request latencies in nanoseconds"
 )]
-pub static REQUEST_LATENCY: Heatmap =
-    Heatmap::new(0, 8, 32, Duration::from_secs(60), Duration::from_secs(1));
+pub static REQUEST_LATENCY: AtomicHistogram = AtomicHistogram::new(7, 32);
 
 type Instant = common::time::Instant<Nanoseconds<u64>>;
 

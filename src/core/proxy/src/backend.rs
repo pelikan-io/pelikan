@@ -12,8 +12,7 @@ use std::collections::VecDeque;
     name = "backend_event_depth",
     description = "distribution of the number of events received per iteration of the event loop"
 )]
-pub static BACKEND_EVENT_DEPTH: Heatmap =
-    Heatmap::new(0, 8, 17, Duration::from_secs(60), Duration::from_secs(1));
+pub static BACKEND_EVENT_DEPTH: AtomicHistogram = AtomicHistogram::new(7, 17);
 
 #[metric(
     name = "backend_event_error",
@@ -211,14 +210,12 @@ where
                 error!("Error polling");
             }
 
-            let timestamp = Instant::now();
-
             let count = events.iter().count();
             BACKEND_EVENT_TOTAL.add(count as _);
             if count == self.nevent {
                 BACKEND_EVENT_MAX_REACHED.increment();
             } else {
-                let _ = BACKEND_EVENT_DEPTH.increment(timestamp, count as _);
+                let _ = BACKEND_EVENT_DEPTH.increment(count as _);
             }
 
             // process all events
