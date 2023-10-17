@@ -697,9 +697,6 @@ impl Admin {
 
             let name = metric.name();
 
-            if name.starts_with("log_") {
-                continue;
-            }
             if let Some(counter) = any.downcast_ref::<Counter>() {
                 if metric.metadata().is_empty() {
                     data.push(format!(
@@ -863,10 +860,6 @@ pub fn human_formatted_stats() -> Vec<String> {
     let snapshots = SNAPSHOTS.read();
 
     for metric in &metriken::metrics() {
-        if metric.name().starts_with("log_") {
-            continue;
-        }
-
         let any = match metric.as_any() {
             Some(any) => any,
             None => {
