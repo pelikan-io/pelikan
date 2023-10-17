@@ -3,9 +3,6 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use std::time::UNIX_EPOCH;
-use std::time::SystemTime;
-use std::collections::HashMap;
-use parking_lot::RwLock;
 use ::net::event::{Event, Source};
 use ::net::*;
 use common::signal::Signal;
@@ -23,118 +20,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use switchboard::{Queues, Waker};
 use tiny_http::{Method, Request, Response};
-
-type HistogramSnapshots = HashMap<String, metriken::histogram::Snapshot>;
-
-static SNAPSHOTS: Lazy<Arc<RwLock<Snapshots>>> =
-    Lazy::new(|| Arc::new(RwLock::new(Snapshots::new())));
-
-pub struct Snapshots {
-    timestamp: SystemTime,
-    previous: HistogramSnapshots,
-    deltas: HistogramSnapshots,
-}
-
-impl Default for Snapshots {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Snapshots {
-    pub fn new() -> Self {
-        let timestamp = SystemTime::now();
-
-        let mut current = HashMap::new();
-
-        for metric in metriken::metrics().iter() {
-            let any = if let Some(any) = metric.as_any() {
-                any
-            } else {
-                continue;
-            };
-
-            let key = metric.name().to_string();
-
-            let snapshot = if let Some(histogram) = any.downcast_ref::<metriken::AtomicHistogram>()
-            {
-                histogram.snapshot()
-            } else if let Some(histogram) = any.downcast_ref::<metriken::RwLockHistogram>() {
-                histogram.snapshot()
-            } else {
-                None
-            };
-
-            if let Some(snapshot) = snapshot {
-                current.insert(key, snapshot);
-            }
-        }
-
-        let deltas = current.clone();
-
-        Self {
-            timestamp,
-            previous: current,
-            deltas,
-        }
-    }
-
-    pub fn update(&mut self) {
-        self.timestamp = SystemTime::now();
-
-        let mut current = HashMap::new();
-
-        for metric in metriken::metrics().iter() {
-            let any = if let Some(any) = metric.as_any() {
-                any
-            } else {
-                continue;
-            };
-
-            let key = metric.name().to_string();
-
-            let snapshot = if let Some(histogram) = any.downcast_ref::<metriken::AtomicHistogram>()
-            {
-                histogram.snapshot()
-            } else if let Some(histogram) = any.downcast_ref::<metriken::RwLockHistogram>() {
-                histogram.snapshot()
-            } else {
-                None
-            };
-
-            if let Some(snapshot) = snapshot {
-                if let Some(previous) = self.previous.get(&key) {
-                    self.deltas
-                        .insert(key.clone(), snapshot.wrapping_sub(previous).unwrap());
-                }
-
-                current.insert(key, snapshot);
-            }
-        }
-
-        self.previous = current;
-    }
-
-    pub fn percentiles(&self, metric: &str) -> Vec<(String, f64, u64)> {
-        let mut result = Vec::new();
-
-        let percentiles: Vec<f64> = PERCENTILES
-            .iter()
-            .map(|(_, percentile)| *percentile)
-            .collect();
-
-        if let Some(snapshot) = self.deltas.get(metric) {
-            if let Ok(percentiles) = snapshot.percentiles(&percentiles) {
-                for ((label, _), (percentile, bucket)) in PERCENTILES.iter().zip(percentiles.iter())
-                {
-                    result.push((label.to_string(), *percentile, bucket.end()));
-                }
-            }
-        }
-
-        result
-    }
-}
 
 #[metric(name = "admin_request_parse")]
 pub static ADMIN_REQUEST_PARSE: Counter = Counter::new();
@@ -609,133 +494,6 @@ impl Admin {
         }
     }
 
-    /// A "human-readable" exposition format which outputs one stat per line,
-    /// with a LF used as the end of line symbol.
-    ///
-    /// ```text
-    /// get: 0
-    /// get_cardinality_p25: 0
-    /// get_cardinality_p50: 0
-    /// get_cardinality_p75: 0
-    /// get_cardinality_p90: 0
-    /// get_cardinality_p9999: 0
-    /// get_cardinality_p999: 0
-    /// get_cardinality_p99: 0
-    /// get_ex: 0
-    /// get_key: 0
-    /// get_key_hit: 0
-    /// get_key_miss: 0
-    /// ```
-    fn human_stats(&self) -> String {
-        let data = human_formatted_stats();
-        data.join("\n") + "\n"
-    }
-
-    /// JSON stats output which follows the conventions found in Finagle and
-    /// TwitterServer libraries. Percentiles are appended to the metric name,
-    /// eg: `request_latency_p999` for the 99.9th percentile. For more details
-    /// about the Finagle / TwitterServer format see:
-    /// https://twitter.github.io/twitter-server/Features.html#metrics
-    ///
-    /// ```text
-    /// {"get": 0,"get_cardinality_p25": 0,"get_cardinality_p50": 0, ... }
-    /// ```
-    fn json_stats(&self) -> String {
-        let data = human_formatted_stats();
-
-        "{".to_string() + &data.join(",") + "}"
-    }
-
-    /// Prometheus / OpenTelemetry compatible stats output. Each stat is
-    /// annotated with a type. Percentiles use the label 'percentile' to
-    /// indicate which percentile corresponds to the value:
-    ///
-    /// ```text
-    /// # TYPE get counter
-    /// get 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p25"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p50"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p75"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p90"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p99"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p999"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p9999"} 0
-    /// # TYPE get_ex counter
-    /// get_ex 0
-    /// # TYPE get_key counter
-    /// get_key 0
-    /// # TYPE get_key_hit counter
-    /// get_key_hit 0
-    /// # TYPE get_key_miss counter
-    /// get_key_miss 0
-    /// ```
-    fn prometheus_stats(&self) -> String {
-        let mut data = Vec::new();
-
-        let snapshots = SNAPSHOTS.read();
-
-        let timestamp = snapshots
-            .timestamp
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-
-        for metric in &metriken::metrics() {
-            let any = match metric.as_any() {
-                Some(any) => any,
-                None => {
-                    continue;
-                }
-            };
-
-            let name = metric.name();
-
-            if let Some(counter) = any.downcast_ref::<Counter>() {
-                if metric.metadata().is_empty() {
-                    data.push(format!(
-                        "# TYPE {name}_total counter\n{name}_total {}",
-                        counter.value()
-                    ));
-                } else {
-                    data.push(format!(
-                        "# TYPE {name} counter\n{} {}",
-                        metric.formatted(metriken::Format::Prometheus),
-                        counter.value()
-                    ));
-                }
-            } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
-                data.push(format!(
-                    "# TYPE {name} gauge\n{} {}",
-                    metric.formatted(metriken::Format::Prometheus),
-                    gauge.value()
-                ));
-            } else if any.downcast_ref::<AtomicHistogram>().is_some()
-                || any.downcast_ref::<RwLockHistogram>().is_some()
-            {
-                for (_label, percentile, value) in snapshots.percentiles(metric.name()) {
-                    data.push(format!(
-                        "# TYPE {name} gauge\n{name}{{percentile=\"{:02}\"}} {value} {timestamp}",
-                        percentile,
-                    ));
-                }
-            }
-        }
-
-        data.sort();
-        data.dedup();
-        let mut content = data.join("\n");
-        content += "\n";
-        let parts: Vec<&str> = content.split('/').collect();
-        parts.join("_")
-    }
-
     /// Handle a HTTP request
     fn handle_http_request(&self, request: Request) {
         let url = request.url();
@@ -746,7 +504,7 @@ impl Admin {
             // stats in the Prometheus format
             "/metrics" => match request.method() {
                 Method::Get => {
-                    let _ = request.respond(Response::from_string(self.prometheus_stats()));
+                    let _ = request.respond(Response::from_string(prometheus_stats()));
                 }
                 _ => {
                     let _ = request.respond(Response::empty(400));
@@ -756,7 +514,7 @@ impl Admin {
             // for maximum compatibility with various internal conventions
             "/metrics.json" | "/vars.json" | "/admin/metrics.json" => match request.method() {
                 Method::Get => {
-                    let _ = request.respond(Response::from_string(self.json_stats()));
+                    let _ = request.respond(Response::from_string(json_stats()));
                 }
                 _ => {
                     let _ = request.respond(Response::empty(400));
@@ -766,7 +524,7 @@ impl Admin {
             // on internal conventions
             "/vars" => match request.method() {
                 Method::Get => {
-                    let _ = request.respond(Response::from_string(self.human_stats()));
+                    let _ = request.respond(Response::from_string(human_stats()));
                 }
                 _ => {
                     let _ = request.respond(Response::empty(400));
@@ -853,8 +611,135 @@ impl Admin {
     }
 }
 
+/// A "human-readable" exposition format which outputs one stat per line,
+/// with a LF used as the end of line symbol.
+///
+/// ```text
+/// get: 0
+/// get_cardinality_p25: 0
+/// get_cardinality_p50: 0
+/// get_cardinality_p75: 0
+/// get_cardinality_p90: 0
+/// get_cardinality_p9999: 0
+/// get_cardinality_p999: 0
+/// get_cardinality_p99: 0
+/// get_ex: 0
+/// get_key: 0
+/// get_key_hit: 0
+/// get_key_miss: 0
+/// ```
+pub fn human_stats() -> String {
+    let data = human_formatted_stats();
+    data.join("\n") + "\n"
+}
+
+/// JSON stats output which follows the conventions found in Finagle and
+/// TwitterServer libraries. Percentiles are appended to the metric name,
+/// eg: `request_latency_p999` for the 99.9th percentile. For more details
+/// about the Finagle / TwitterServer format see:
+/// https://twitter.github.io/twitter-server/Features.html#metrics
+///
+/// ```text
+/// {"get": 0,"get_cardinality_p25": 0,"get_cardinality_p50": 0, ... }
+/// ```
+pub fn json_stats() -> String {
+    let data = human_formatted_stats();
+
+    "{".to_string() + &data.join(",") + "}"
+}
+
+/// Prometheus / OpenTelemetry compatible stats output. Each stat is
+/// annotated with a type. Percentiles use the label 'percentile' to
+/// indicate which percentile corresponds to the value:
+///
+/// ```text
+/// # TYPE get counter
+/// get 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p25"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p50"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p75"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p90"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p99"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p999"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p9999"} 0
+/// # TYPE get_ex counter
+/// get_ex 0
+/// # TYPE get_key counter
+/// get_key 0
+/// # TYPE get_key_hit counter
+/// get_key_hit 0
+/// # TYPE get_key_miss counter
+/// get_key_miss 0
+/// ```
+pub fn prometheus_stats() -> String {
+    let mut data = Vec::new();
+
+    let snapshots = SNAPSHOTS.read();
+
+    let timestamp = snapshots
+        .timestamp()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+
+    for metric in &metriken::metrics() {
+        let any = match metric.as_any() {
+            Some(any) => any,
+            None => {
+                continue;
+            }
+        };
+
+        let name = metric.name();
+
+        if let Some(counter) = any.downcast_ref::<Counter>() {
+            if metric.metadata().is_empty() {
+                data.push(format!(
+                    "# TYPE {name}_total counter\n{name}_total {}",
+                    counter.value()
+                ));
+            } else {
+                data.push(format!(
+                    "# TYPE {name} counter\n{} {}",
+                    metric.formatted(metriken::Format::Prometheus),
+                    counter.value()
+                ));
+            }
+        } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
+            data.push(format!(
+                "# TYPE {name} gauge\n{} {}",
+                metric.formatted(metriken::Format::Prometheus),
+                gauge.value()
+            ));
+        } else if any.downcast_ref::<AtomicHistogram>().is_some()
+            || any.downcast_ref::<RwLockHistogram>().is_some()
+        {
+            for (_label, percentile, value) in snapshots.percentiles(metric.name()) {
+                data.push(format!(
+                    "# TYPE {name} gauge\n{name}{{percentile=\"{:02}\"}} {value} {timestamp}",
+                    percentile,
+                ));
+            }
+        }
+    }
+
+    data.sort();
+    data.dedup();
+    let mut content = data.join("\n");
+    content += "\n";
+    let parts: Vec<&str> = content.split('/').collect();
+    parts.join("_")
+}
+
 // human formatted stats that can be exposed as human stats or converted to json
-pub fn human_formatted_stats() -> Vec<String> {
+fn human_formatted_stats() -> Vec<String> {
     let mut data = Vec::new();
 
     let snapshots = SNAPSHOTS.read();

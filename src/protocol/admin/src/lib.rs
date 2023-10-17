@@ -5,8 +5,10 @@
 pub use protocol_common::*;
 
 mod admin;
+mod snapshots;
 
 pub use admin::*;
+pub use snapshots::*;
 
 pub static PERCENTILES: &[(&str, f64)] = &[
     ("p25", 25.0),

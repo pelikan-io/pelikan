@@ -1929,6 +1929,7 @@ dependencies = [
  "criterion 0.3.6",
  "logger",
  "metriken",
+ "parking_lot",
  "protocol-common",
  "storage-types",
 ]
