@@ -20,7 +20,7 @@ pub use protocol_common::*;
 
 pub use common::expiry::TimeType;
 use logger::Klog;
-use metriken::{metric, Counter, AtomicHistogram};
+use metriken::{metric, AtomicHistogram, Counter};
 
 const CRLF: &[u8] = b"\r\n";
 
@@ -55,10 +55,7 @@ pub static GET_KEY_MISS: Counter = Counter::new();
     name = "get_cardinality",
     description = "distribution of key cardinality for get requests"
 )]
-pub static GET_CARDINALITY: AtomicHistogram = AtomicHistogram::new(
-    7,
-    20,
-);
+pub static GET_CARDINALITY: AtomicHistogram = AtomicHistogram::new(7, 20);
 
 /*
  * GETS

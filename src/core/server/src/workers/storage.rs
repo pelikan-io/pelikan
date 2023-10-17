@@ -14,8 +14,7 @@ pub static STORAGE_EVENT_LOOP: Counter = Counter::new();
     name = "storage_queue_depth",
     description = "the distribution of the depth of the storage queue on each loop"
 )]
-pub static STORAGE_QUEUE_DEPTH: AtomicHistogram =
-    AtomicHistogram::new(7, 20);
+pub static STORAGE_QUEUE_DEPTH: AtomicHistogram = AtomicHistogram::new(7, 20);
 
 pub struct StorageWorkerBuilder<Request, Response, Storage> {
     nevent: usize,

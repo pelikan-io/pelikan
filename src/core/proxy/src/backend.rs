@@ -12,8 +12,7 @@ use std::collections::VecDeque;
     name = "backend_event_depth",
     description = "distribution of the number of events received per iteration of the event loop"
 )]
-pub static BACKEND_EVENT_DEPTH: AtomicHistogram =
-    AtomicHistogram::new(7, 17);
+pub static BACKEND_EVENT_DEPTH: AtomicHistogram = AtomicHistogram::new(7, 17);
 
 #[metric(
     name = "backend_event_error",

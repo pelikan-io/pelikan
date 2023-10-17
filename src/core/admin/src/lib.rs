@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::time::UNIX_EPOCH;
 use ::net::event::{Event, Source};
 use ::net::*;
 use common::signal::Signal;
@@ -18,6 +17,7 @@ use std::collections::VecDeque;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
 use std::time::Duration;
+use std::time::UNIX_EPOCH;
 use switchboard::{Queues, Waker};
 use tiny_http::{Method, Request, Response};
 
@@ -762,7 +762,9 @@ fn human_formatted_stats() -> Vec<String> {
             let value = gauge.value();
 
             data.push(format!("\"{name}\": {value}"));
-        } else if any.downcast_ref::<AtomicHistogram>().is_some() || any.downcast_ref::<RwLockHistogram>().is_some() {
+        } else if any.downcast_ref::<AtomicHistogram>().is_some()
+            || any.downcast_ref::<RwLockHistogram>().is_some()
+        {
             let percentiles = snapshots.percentiles(metric.name());
 
             for (label, _percentile, value) in percentiles {

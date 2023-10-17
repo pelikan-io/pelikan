@@ -9,8 +9,7 @@ use crate::*;
     name = "frontend_event_depth",
     description = "distribution of the number of events received per iteration of the event loop"
 )]
-pub static FRONTEND_EVENT_DEPTH: AtomicHistogram =
-    AtomicHistogram::new(7, 17);
+pub static FRONTEND_EVENT_DEPTH: AtomicHistogram = AtomicHistogram::new(7, 17);
 
 #[metric(
     name = "frontend_event_error",

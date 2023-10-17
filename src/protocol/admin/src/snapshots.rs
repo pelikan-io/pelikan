@@ -1,9 +1,9 @@
-use std::time::SystemTime;
-use std::sync::Arc;
+use crate::*;
+use metriken::Lazy;
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use metriken::Lazy;
-use crate::*;
+use std::sync::Arc;
+use std::time::SystemTime;
 
 type HistogramSnapshots = HashMap<String, metriken::histogram::Snapshot>;
 

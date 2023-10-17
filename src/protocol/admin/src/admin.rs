@@ -146,17 +146,12 @@ pub fn memcache_stats() -> String {
         if let Some(counter) = any.downcast_ref::<Counter>() {
             data.push(format!("STAT {} {}\r\n", metric.name(), counter.value()));
         } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
-             data.push(format!("STAT {} {}\r\n", metric.name(), gauge.value()));    
+            data.push(format!("STAT {} {}\r\n", metric.name(), gauge.value()));
         } else if any.downcast_ref::<AtomicHistogram>().is_some()
             || any.downcast_ref::<RwLockHistogram>().is_some()
         {
             for (label, _percentile, value) in snapshots.percentiles(metric.name()) {
-                data.push(format!(
-                   "STAT {}_{} {}\r\n",
-                   metric.name(),
-                   label,
-                   value,
-               ));
+                data.push(format!("STAT {}_{} {}\r\n", metric.name(), label, value,));
             }
         }
     }

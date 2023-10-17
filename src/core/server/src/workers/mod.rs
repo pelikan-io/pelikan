@@ -17,8 +17,7 @@ use storage::*;
     name = "worker_event_depth",
     description = "distribution of the number of events received per iteration of the event loop"
 )]
-pub static WORKER_EVENT_DEPTH: AtomicHistogram =
-    AtomicHistogram::new(7, 17);
+pub static WORKER_EVENT_DEPTH: AtomicHistogram = AtomicHistogram::new(7, 17);
 
 #[metric(
     name = "worker_event_error",

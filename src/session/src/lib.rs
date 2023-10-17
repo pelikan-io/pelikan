@@ -78,8 +78,7 @@ pub static SESSION_SEND_BYTE: Counter = Counter::new();
     name = "request_latency",
     description = "distribution of request latencies in nanoseconds"
 )]
-pub static REQUEST_LATENCY: AtomicHistogram =
-    AtomicHistogram::new(7, 32);
+pub static REQUEST_LATENCY: AtomicHistogram = AtomicHistogram::new(7, 32);
 
 type Instant = common::time::Instant<Nanoseconds<u64>>;
 

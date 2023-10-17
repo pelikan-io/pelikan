@@ -28,7 +28,10 @@ pub fn tls_acceptor(config: &dyn TlsConfig) -> Result<Option<TlsTcpAcceptor>, Io
     if config.private_key().is_some()
         ^ (config.certificate_chain().is_some() || config.certificate().is_some())
     {
-        return Err(IoError::new(IoErrorKind::Other, "incomplete tls configuration"));
+        return Err(IoError::new(
+            IoErrorKind::Other,
+            "incomplete tls configuration",
+        ));
     }
 
     // load the private key
