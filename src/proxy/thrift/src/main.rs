@@ -61,11 +61,13 @@ fn main() {
                 metrics.push(format!("{:<31} counter", metric.name()));
             } else if any.downcast_ref::<Gauge>().is_some() {
                 metrics.push(format!("{:<31} gauge", metric.name()));
-            // } else if any.downcast_ref::<Heatmap>().is_some() {
-            //     for (label, _) in PERCENTILES {
-            //         let name = format!("{}_{}", metric.name(), label);
-            //         metrics.push(format!("{name:<31} percentile"));
-            //     }
+            } else if any.downcast_ref::<AtomicHistogram>().is_some()
+                || any.downcast_ref::<RwLockHistogram>().is_some()
+            {
+                for (label, _) in PERCENTILES {
+                    let name = format!("{}_{}", metric.name(), label);
+                    metrics.push(format!("{name:<31} percentile"));
+                }
             } else {
                 continue;
             }
