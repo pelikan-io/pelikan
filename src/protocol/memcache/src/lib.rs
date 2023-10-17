@@ -16,7 +16,7 @@ pub use request::*;
 pub use response::*;
 pub use storage::*;
 
-pub use protocol_common::*;
+pub use protocol_common::{Compose, Parse, ParseOk};
 
 pub use common::expiry::TimeType;
 use logger::Klog;
@@ -29,8 +29,6 @@ pub enum MemcacheError {
     ClientError(ClientError),
     ServerError(ServerError),
 }
-
-type Instant = common::time::Instant<common::time::Nanoseconds<u64>>;
 
 /*
  * GET

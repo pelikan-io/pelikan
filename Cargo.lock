@@ -2400,7 +2400,6 @@ name = "server"
 version = "0.3.1"
 dependencies = [
  "admin",
- "clocksource",
  "common",
  "config",
  "crossbeam-channel",

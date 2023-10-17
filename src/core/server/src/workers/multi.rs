@@ -136,8 +136,6 @@ where
                 error!("Error polling");
             }
 
-            let timestamp = Instant::now();
-
             let count = events.iter().count();
             WORKER_EVENT_TOTAL.add(count as _);
             if count == self.nevent {

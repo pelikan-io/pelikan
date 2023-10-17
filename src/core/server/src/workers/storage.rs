@@ -107,8 +107,6 @@ where
                 error!("Error polling");
             }
 
-            let timestamp = Instant::now();
-
             if !events.is_empty() {
                 self.waker.reset();
 

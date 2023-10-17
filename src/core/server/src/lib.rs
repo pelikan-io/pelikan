@@ -119,8 +119,6 @@ use workers::WorkersBuilder;
 
 pub use process::{Process, ProcessBuilder};
 
-type Instant = clocksource::Instant<clocksource::Nanoseconds<u64>>;
-
 // TODO(bmartin): this *should* be plenty safe, the queue should rarely ever be
 // full, and a single wakeup should drain at least one message and make room for
 // the response. A stat to prove that this is sufficient would be good.
