@@ -2,6 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use std::time::UNIX_EPOCH;
+use std::time::SystemTime;
+use std::collections::HashMap;
+use parking_lot::RwLock;
 use ::net::event::{Event, Source};
 use ::net::*;
 use common::signal::Signal;
@@ -19,6 +23,118 @@ use std::sync::Arc;
 use std::time::Duration;
 use switchboard::{Queues, Waker};
 use tiny_http::{Method, Request, Response};
+
+type HistogramSnapshots = HashMap<String, metriken::histogram::Snapshot>;
+
+static SNAPSHOTS: Lazy<Arc<RwLock<Snapshots>>> =
+    Lazy::new(|| Arc::new(RwLock::new(Snapshots::new())));
+
+pub struct Snapshots {
+    timestamp: SystemTime,
+    previous: HistogramSnapshots,
+    deltas: HistogramSnapshots,
+}
+
+impl Default for Snapshots {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Snapshots {
+    pub fn new() -> Self {
+        let timestamp = SystemTime::now();
+
+        let mut current = HashMap::new();
+
+        for metric in metriken::metrics().iter() {
+            let any = if let Some(any) = metric.as_any() {
+                any
+            } else {
+                continue;
+            };
+
+            let key = metric.name().to_string();
+
+            let snapshot = if let Some(histogram) = any.downcast_ref::<metriken::AtomicHistogram>()
+            {
+                histogram.snapshot()
+            } else if let Some(histogram) = any.downcast_ref::<metriken::RwLockHistogram>() {
+                histogram.snapshot()
+            } else {
+                None
+            };
+
+            if let Some(snapshot) = snapshot {
+                current.insert(key, snapshot);
+            }
+        }
+
+        let deltas = current.clone();
+
+        Self {
+            timestamp,
+            previous: current,
+            deltas,
+        }
+    }
+
+    pub fn update(&mut self) {
+        self.timestamp = SystemTime::now();
+
+        let mut current = HashMap::new();
+
+        for metric in metriken::metrics().iter() {
+            let any = if let Some(any) = metric.as_any() {
+                any
+            } else {
+                continue;
+            };
+
+            let key = metric.name().to_string();
+
+            let snapshot = if let Some(histogram) = any.downcast_ref::<metriken::AtomicHistogram>()
+            {
+                histogram.snapshot()
+            } else if let Some(histogram) = any.downcast_ref::<metriken::RwLockHistogram>() {
+                histogram.snapshot()
+            } else {
+                None
+            };
+
+            if let Some(snapshot) = snapshot {
+                if let Some(previous) = self.previous.get(&key) {
+                    self.deltas
+                        .insert(key.clone(), snapshot.wrapping_sub(previous).unwrap());
+                }
+
+                current.insert(key, snapshot);
+            }
+        }
+
+        self.previous = current;
+    }
+
+    pub fn percentiles(&self, metric: &str) -> Vec<(String, f64, u64)> {
+        let mut result = Vec::new();
+
+        let percentiles: Vec<f64> = PERCENTILES
+            .iter()
+            .map(|(_, percentile)| *percentile)
+            .collect();
+
+        if let Some(snapshot) = self.deltas.get(metric) {
+            if let Ok(percentiles) = snapshot.percentiles(&percentiles) {
+                for ((label, _), (percentile, bucket)) in PERCENTILES.iter().zip(percentiles.iter())
+                {
+                    result.push((label.to_string(), *percentile, bucket.end()));
+                }
+            }
+        }
+
+        result
+    }
+}
 
 #[metric(name = "admin_request_parse")]
 pub static ADMIN_REQUEST_PARSE: Counter = Counter::new();
@@ -511,24 +627,7 @@ impl Admin {
     /// get_key_miss: 0
     /// ```
     fn human_stats(&self) -> String {
-        let mut data = Vec::new();
-
-        for metric in &metriken::metrics() {
-            let any = match metric.as_any() {
-                Some(any) => any,
-                None => {
-                    continue;
-                }
-            };
-
-            if let Some(counter) = any.downcast_ref::<Counter>() {
-                data.push(format!("{}: {}", metric.name(), counter.value()));
-            } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
-                data.push(format!("{}: {}", metric.name(), gauge.value()));
-            }
-        }
-
-        data.sort();
+        let data = human_formatted_stats();
         data.join("\n") + "\n"
     }
 
@@ -542,31 +641,9 @@ impl Admin {
     /// {"get": 0,"get_cardinality_p25": 0,"get_cardinality_p50": 0, ... }
     /// ```
     fn json_stats(&self) -> String {
-        let head = "{".to_owned();
+        let data = human_formatted_stats();
 
-        let mut data = Vec::new();
-
-        for metric in &metriken::metrics() {
-            let any = match metric.as_any() {
-                Some(any) => any,
-                None => {
-                    continue;
-                }
-            };
-
-            if let Some(counter) = any.downcast_ref::<Counter>() {
-                data.push(format!("\"{}\": {}", metric.name(), counter.value()));
-            } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
-                data.push(format!("\"{}\": {}", metric.name(), gauge.value()));
-            }
-        }
-
-        data.sort();
-        let body = data.join(",");
-        let mut content = head;
-        content += &body;
-        content += "}";
-        content
+        "{".to_string() + &data.join(",") + "}"
     }
 
     /// Prometheus / OpenTelemetry compatible stats output. Each stat is
@@ -602,6 +679,14 @@ impl Admin {
     fn prometheus_stats(&self) -> String {
         let mut data = Vec::new();
 
+        let snapshots = SNAPSHOTS.read();
+
+        let timestamp = snapshots
+            .timestamp
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+
         for metric in &metriken::metrics() {
             let any = match metric.as_any() {
                 Some(any) => any,
@@ -610,23 +695,44 @@ impl Admin {
                 }
             };
 
+            let name = metric.name();
+
+            if name.starts_with("log_") {
+                continue;
+            }
             if let Some(counter) = any.downcast_ref::<Counter>() {
-                data.push(format!(
-                    "# TYPE {} counter\n{} {}",
-                    metric.name(),
-                    metric.name(),
-                    counter.value()
-                ));
+                if metric.metadata().is_empty() {
+                    data.push(format!(
+                        "# TYPE {name}_total counter\n{name}_total {}",
+                        counter.value()
+                    ));
+                } else {
+                    data.push(format!(
+                        "# TYPE {name} counter\n{} {}",
+                        metric.formatted(metriken::Format::Prometheus),
+                        counter.value()
+                    ));
+                }
             } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
                 data.push(format!(
-                    "# TYPE {} gauge\n{} {}",
-                    metric.name(),
-                    metric.name(),
+                    "# TYPE {name} gauge\n{} {}",
+                    metric.formatted(metriken::Format::Prometheus),
                     gauge.value()
                 ));
+            } else if any.downcast_ref::<AtomicHistogram>().is_some()
+                || any.downcast_ref::<RwLockHistogram>().is_some()
+            {
+                for (_label, percentile, value) in snapshots.percentiles(metric.name()) {
+                    data.push(format!(
+                        "# TYPE {name} gauge\n{name}{{percentile=\"{:02}\"}} {value} {timestamp}",
+                        percentile,
+                    ));
+                }
             }
         }
+
         data.sort();
+        data.dedup();
         let mut content = data.join("\n");
         content += "\n";
         let parts: Vec<&str> = content.split('/').collect();
@@ -748,6 +854,48 @@ impl Admin {
             let _ = self.log_drain.flush();
         }
     }
+}
+
+// human formatted stats that can be exposed as human stats or converted to json
+pub fn human_formatted_stats() -> Vec<String> {
+    let mut data = Vec::new();
+
+    let snapshots = SNAPSHOTS.read();
+
+    for metric in &metriken::metrics() {
+        if metric.name().starts_with("log_") {
+            continue;
+        }
+
+        let any = match metric.as_any() {
+            Some(any) => any,
+            None => {
+                continue;
+            }
+        };
+
+        let name = metric.name();
+
+        if let Some(counter) = any.downcast_ref::<Counter>() {
+            let value = counter.value();
+
+            data.push(format!("\"{name}\": {value}"));
+        } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
+            let value = gauge.value();
+
+            data.push(format!("\"{name}\": {value}"));
+        } else if any.downcast_ref::<AtomicHistogram>().is_some() || any.downcast_ref::<RwLockHistogram>().is_some() {
+            let percentiles = snapshots.percentiles(metric.name());
+
+            for (label, _percentile, value) in percentiles {
+                data.push(format!("\"{name}/{label}\": {value}",));
+            }
+        }
+    }
+
+    data.sort();
+
+    data
 }
 
 common::metrics::test_no_duplicates!();

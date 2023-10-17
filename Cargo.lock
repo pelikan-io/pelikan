@@ -27,8 +27,9 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "net",
+ "parking_lot",
  "protocol-admin",
  "protocol-common",
  "session",
@@ -519,7 +520,7 @@ dependencies = [
  "boring",
  "clocksource",
  "macros",
- "metriken 0.3.0",
+ "metriken",
  "net",
  "ringlog",
  "serde",
@@ -1002,18 +1003,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
 
 [[package]]
-name = "heatmap"
-version = "0.7.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ff337aee5a51159480a1c9bc225f36a7d87543023aa118d5843ece2f125bccb"
-dependencies = [
- "clocksource",
- "histogram 0.7.4",
- "parking_lot",
- "thiserror",
-]
-
-[[package]]
 name = "heck"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1035,16 +1024,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee512640fe35acbfb4bb779db6f0d80704c2cacfa2e39b601ef3e3f47d1ae4c7"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "histogram"
-version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e673d137229619d5c2c8903b6ed5852b43636c0017ff2e66b1aafb8ccf04b80b"
-dependencies = [
- "serde",
- "thiserror",
 ]
 
 [[package]]
@@ -1368,25 +1347,11 @@ dependencies = [
 
 [[package]]
 name = "metriken"
-version = "0.2.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d081482206e965281c71f40f1899160b9578bb8f7688b7821b144a43bc3e701a"
-dependencies = [
- "heatmap",
- "linkme",
- "metriken-derive",
- "once_cell",
- "parking_lot",
- "phf",
-]
-
-[[package]]
-name = "metriken"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20cdbc5c288bcf449bdf639e712c24305ec3bcd5765b80f6f1bbd38038ba89ac"
 dependencies = [
- "histogram 0.8.0",
+ "histogram",
  "linkme",
  "metriken-derive",
  "once_cell",
@@ -1530,7 +1495,7 @@ dependencies = [
  "config",
  "libc",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "momento",
  "net",
  "protocol-admin",
@@ -1562,7 +1527,7 @@ dependencies = [
  "boring-sys",
  "foreign-types-shared",
  "libc",
- "metriken 0.3.0",
+ "metriken",
  "mio 0.8.5",
 ]
 
@@ -1815,7 +1780,7 @@ dependencies = [
  "common",
  "config",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "protocol-ping",
  "proxy",
 ]
@@ -1831,7 +1796,7 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "protocol-ping",
  "server",
 ]
@@ -1963,7 +1928,7 @@ dependencies = [
  "config",
  "criterion 0.3.6",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "protocol-common",
  "storage-types",
 ]
@@ -2003,7 +1968,7 @@ dependencies = [
  "common",
  "criterion 0.3.6",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "nom",
  "protocol-common",
 ]
@@ -2016,7 +1981,7 @@ dependencies = [
  "config",
  "criterion 0.3.6",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "protocol-common",
  "storage-types",
 ]
@@ -2029,7 +1994,7 @@ dependencies = [
  "common",
  "logger",
  "memchr",
- "metriken 0.3.0",
+ "metriken",
  "nom",
  "protocol-common",
  "thiserror",
@@ -2041,7 +2006,7 @@ version = "0.3.1"
 dependencies = [
  "common",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "protocol-common",
 ]
 
@@ -2056,7 +2021,7 @@ dependencies = [
  "crossbeam-channel",
  "entrystore",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "net",
  "protocol-admin",
  "protocol-common",
@@ -2154,7 +2119,7 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "protocol-resp",
  "server",
 ]
@@ -2206,14 +2171,14 @@ dependencies = [
 
 [[package]]
 name = "ringlog"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c90d3d1e4db43daedfdae26373e7b4cb4f56b26f217fc8f661e4f439827b4a46"
+checksum = "987665e9638b6e3c9bf753fd2da5058c8fa0e734221582d8790e3b7d0e1c3394"
 dependencies = [
  "ahash",
  "clocksource",
  "log",
- "metriken 0.2.3",
+ "metriken",
  "mpmc",
 ]
 
@@ -2354,7 +2319,7 @@ dependencies = [
  "clocksource",
  "criterion 0.3.6",
  "datatier",
- "metriken 0.3.0",
+ "metriken",
  "rand",
  "rand_chacha",
  "rand_xoshiro",
@@ -2374,7 +2339,7 @@ dependencies = [
  "criterion 0.3.6",
  "entrystore",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "protocol-memcache",
  "server",
 ]
@@ -2441,7 +2406,7 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "net",
  "protocol-admin",
  "protocol-common",
@@ -2458,7 +2423,7 @@ dependencies = [
  "bytes 1.3.0",
  "common",
  "log",
- "metriken 0.3.0",
+ "metriken",
  "net",
  "protocol-common",
 ]
@@ -2677,7 +2642,7 @@ dependencies = [
  "common",
  "config",
  "logger",
- "metriken 0.3.0",
+ "metriken",
  "protocol-thrift",
  "proxy",
 ]
