@@ -6,6 +6,7 @@ repository = "https://github.com/pelikan-io/pelikan"
 license = "Apache-2.0"
 
 [workspace]
+resolver = "2"
 members = [
     "src/common",
     "src/config",
