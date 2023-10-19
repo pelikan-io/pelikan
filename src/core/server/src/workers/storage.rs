@@ -14,8 +14,7 @@ pub static STORAGE_EVENT_LOOP: Counter = Counter::new();
     name = "storage_queue_depth",
     description = "the distribution of the depth of the storage queue on each loop"
 )]
-pub static STORAGE_QUEUE_DEPTH: Heatmap =
-    Heatmap::new(0, 8, 20, Duration::from_secs(60), Duration::from_secs(1));
+pub static STORAGE_QUEUE_DEPTH: AtomicHistogram = AtomicHistogram::new(7, 20);
 
 pub struct StorageWorkerBuilder<Request, Response, Storage> {
     nevent: usize,
@@ -108,8 +107,6 @@ where
                 error!("Error polling");
             }
 
-            let timestamp = Instant::now();
-
             if !events.is_empty() {
                 self.waker.reset();
 
@@ -117,7 +114,7 @@ where
 
                 self.data_queue.try_recv_all(&mut messages);
 
-                let _ = STORAGE_QUEUE_DEPTH.increment(timestamp, messages.len() as _);
+                let _ = STORAGE_QUEUE_DEPTH.increment(messages.len() as _);
 
                 for message in messages.drain(..) {
                     let sender = message.sender();

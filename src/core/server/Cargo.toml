@@ -12,7 +12,6 @@ license = { workspace = true }
 [dependencies]
 admin = { path = "../admin" }
 common = { path = "../../common" }
-clocksource = { workspace = true }
 config = { path = "../../config" }
 crossbeam-channel = { workspace = true }
 entrystore = { path = "../../entrystore" }
