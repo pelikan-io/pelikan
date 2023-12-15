@@ -27,7 +27,7 @@
 extern crate ringlog;
 
 // external crate includes
-use clocksource::Seconds;
+use clocksource::coarse::{Duration, Instant};
 
 // includes from core/std
 use core::hash::{BuildHasher, Hasher};
@@ -36,6 +36,8 @@ use std::convert::TryInto;
 // NOTE: this represents the versioning of the internal data layout and must be
 // incremented when breaking changes are made to the datastructures
 const VERSION: u64 = 0;
+
+const NANOS_PER_SEC: u64 = 1_000_000_000;
 
 // submodules
 mod builder;
@@ -62,10 +64,6 @@ pub use item::Item;
 
 // publicly exported items from external crates
 pub use storage_types::Value;
-
-// type aliases
-pub(crate) type Duration = clocksource::Duration<Seconds<u32>>;
-pub(crate) type Instant = clocksource::Instant<Seconds<u32>>;
 
 // items from submodules which are imported for convenience to the crate level
 pub(crate) use crate::rand::*;
