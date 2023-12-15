@@ -71,7 +71,7 @@ impl Expiry {
     }
 
     pub fn as_duration(&self) -> precise::Duration {
-        precise::Duration::from_secs(self.as_secs().into())
+        precise::Duration::from_secs(self.as_secs())
     }
 
     pub fn as_coarse_duration(&self) -> coarse::Duration {
