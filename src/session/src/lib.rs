@@ -23,7 +23,7 @@ pub use server::ServerSession;
 use std::os::unix::prelude::AsRawFd;
 
 use ::net::*;
-use common::time::Nanoseconds;
+use clocksource::precise::Instant;
 use core::borrow::{Borrow, BorrowMut};
 use core::fmt::Debug;
 use core::marker::PhantomData;
@@ -78,8 +78,6 @@ pub static SESSION_SEND_BYTE: Counter = Counter::new();
     description = "distribution of request latencies in nanoseconds"
 )]
 pub static REQUEST_LATENCY: AtomicHistogram = AtomicHistogram::new(7, 32);
-
-type Instant = common::time::Instant<Nanoseconds<u64>>;
 
 // The size of one kilobyte, in bytes
 const KB: usize = 1024;

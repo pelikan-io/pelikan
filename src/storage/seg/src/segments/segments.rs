@@ -205,7 +205,7 @@ impl Segments {
                             Ok(next_to_merge) => {
                                 debug!("merged ttl_bucket: {} seg: {}", bucket_id, start);
                                 ttl_bucket.set_next_to_merge(next_to_merge);
-                                EVICT_TIME.add(now.elapsed().as_nanos() as _);
+                                EVICT_TIME.add(now.elapsed().as_secs() as u64 * NANOS_PER_SEC);
                                 return Ok(());
                             }
                             Err(_) => {
@@ -217,11 +217,11 @@ impl Segments {
                     }
                 }
                 SEGMENT_EVICT_EX.increment();
-                EVICT_TIME.add(now.elapsed().as_nanos() as _);
+                EVICT_TIME.add(now.elapsed().as_secs() as u64 * NANOS_PER_SEC);
                 Err(SegmentsError::NoEvictableSegments)
             }
             Policy::None => {
-                EVICT_TIME.add(now.elapsed().as_nanos() as _);
+                EVICT_TIME.add(now.elapsed().as_secs() as u64 * NANOS_PER_SEC);
                 Err(SegmentsError::NoEvictableSegments)
             }
             _ => {
@@ -232,7 +232,7 @@ impl Segments {
                         .map_err(|_| SegmentsError::EvictFailure);
 
                     if result.is_err() {
-                        EVICT_TIME.add(now.elapsed().as_nanos() as _);
+                        EVICT_TIME.add(now.elapsed().as_secs() as u64 * NANOS_PER_SEC);
                         return result;
                     }
 
@@ -242,11 +242,11 @@ impl Segments {
                         ttl_bucket.set_head(self.headers[id_idx].next_seg());
                     }
                     self.push_free(id);
-                    EVICT_TIME.add(now.elapsed().as_nanos() as _);
+                    EVICT_TIME.add(now.elapsed().as_secs() as u64 * NANOS_PER_SEC);
                     Ok(())
                 } else {
                     SEGMENT_EVICT_EX.increment();
-                    EVICT_TIME.add(now.elapsed().as_nanos() as _);
+                    EVICT_TIME.add(now.elapsed().as_secs() as u64 * NANOS_PER_SEC);
                     Err(SegmentsError::NoEvictableSegments)
                 }
             }

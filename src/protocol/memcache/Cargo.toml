@@ -13,6 +13,7 @@ path = "benches/request_parsing.rs"
 harness = false
 
 [dependencies]
+clocksource = { workspace = true }
 common = { path = "../../common" }
 logger = { path = "../../logger" }
 metriken = { workspace = true }

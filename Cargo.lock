@@ -185,9 +185,9 @@ checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
 name = "awaken"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd279f60d540c599125bfe1ac89293a411f8fed25fedbfbf3dc114eb6f0dc6df"
+checksum = "e0e5ca6a22c7592d882e26ea5b84d5653265b83a93e0280b74aee42cc912f21d"
 dependencies = [
  "libc",
  "mio 0.8.8",
@@ -547,13 +547,11 @@ checksum = "cd7cc57abe963c6d3b9d8be5b06ba7c8957a930305ca90304f24ef040aa6f961"
 
 [[package]]
 name = "clocksource"
-version = "0.6.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b90cc4cec392a6d97223f008b5da7a3c2c71aa6d5ffdf0e3e14d8b2432738387"
+checksum = "f3ca503ea4a169812981018ee2810f4e4157b0c9006f5dc4a582df637b415c2e"
 dependencies = [
- "lazy_static",
  "libc",
- "mach",
  "time",
  "winapi 0.3.9",
 ]
@@ -776,6 +774,15 @@ dependencies = [
  "libc",
  "memmap2",
  "tempfile",
+]
+
+[[package]]
+name = "deranged"
+version = "0.3.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eb30d70a07a3b04884d2677f06bec33509dc67ca60d92949e5535352d3191dc"
+dependencies = [
+ "powerfmt",
 ]
 
 [[package]]
@@ -1350,15 +1357,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mach"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b823e83b2affd8f40a9ee8c29dbc56404c1e34cd2710921f2801e2cf29527afa"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "macros"
 version = "0.3.1"
 dependencies = [
@@ -1646,15 +1644,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "num_threads"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
-dependencies = [
- "libc",
-]
-
-[[package]]
 name = "object"
 version = "0.32.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1880,6 +1869,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "powerfmt"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+
+[[package]]
 name = "ppv-lite86"
 version = "0.2.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2016,6 +2011,7 @@ dependencies = [
 name = "protocol-memcache"
 version = "0.3.1"
 dependencies = [
+ "clocksource",
  "common",
  "criterion 0.3.6",
  "logger",
@@ -2228,9 +2224,9 @@ dependencies = [
 
 [[package]]
 name = "ringlog"
-version = "0.3.2"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "325bf804f14769bdcd0bcf437a9ac2af50d12986e969df4448205397684ca5dc"
+checksum = "62f6feb600000517343cd8345ebb7bb455c7bef208ae4fb6de57c6ef04c7fcdd"
 dependencies = [
  "ahash",
  "clocksource",
@@ -2477,6 +2473,7 @@ name = "session"
 version = "0.3.1"
 dependencies = [
  "bytes 1.5.0",
+ "clocksource",
  "common",
  "log",
  "metriken",
@@ -2582,9 +2579,9 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "switchboard"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3578ed09f106e5254e636e6218d1dde3c2bab900f76f44c15e136c3161778fc"
+checksum = "81b68be1047904c7ce69a790fc28a0888004169c3699a055721aa114a7e1c29d"
 dependencies = [
  "awaken",
  "crossbeam-queue",
@@ -2690,21 +2687,32 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.14"
+version = "0.3.30"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c3f9a28b618c3a6b9251b6908e9c99e04b9e5c02e6581ccbb67d59c34ef7f9b"
+checksum = "c4a34ab300f2dee6e562c10a046fc05e358b29f9bf92277f30c3c8d82275f6f5"
 dependencies = [
+ "deranged",
  "itoa 1.0.3",
- "libc",
- "num_threads",
+ "powerfmt",
+ "serde",
+ "time-core",
  "time-macros",
 ]
 
 [[package]]
-name = "time-macros"
-version = "0.2.4"
+name = "time-core"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42657b1a6f4d817cda8e7a0ace261fe0cc946cf3a80314390b22cc61ae080792"
+checksum = "ef927ca75afb808a4d64dd374f00a2adf8d0fcff8e7b184af886c3c87ec4a3f3"
+
+[[package]]
+name = "time-macros"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4ad70d68dba9e1f8aceda7aa6711965dfec1cac869f311a51bd08b3a2ccbce20"
+dependencies = [
+ "time-core",
+]
 
 [[package]]
 name = "tiny_http"
