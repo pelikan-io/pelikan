@@ -206,12 +206,12 @@ impl HashTable {
     /// `7 * 2^(power - 3) * (1 + overflow_factor)` items.
     pub fn new(power: u8, overflow_factor: f64) -> HashTable {
         if overflow_factor < 0.0 {
-            fatal!("hashtable overflow factor must be >= 0.0");
+            panic!("hashtable overflow factor must be >= 0.0");
         }
 
         // overflow factor is effectively bounded by the max chain length
         if overflow_factor > MAX_CHAIN_LEN as f64 {
-            fatal!("hashtable overflow factor must be <= {}", MAX_CHAIN_LEN);
+            panic!("hashtable overflow factor must be <= {}", MAX_CHAIN_LEN);
         }
 
         let slots = 1_u64 << power;
@@ -271,6 +271,7 @@ impl HashTable {
             if get_tag(*item_info) == tag {
                 let current_item = segments.get_item(*item_info).unwrap();
                 if current_item.key() != key {
+                    #[cfg(feature = "metrics")]
                     HASH_TAG_COLLISION.increment();
                 } else {
                     // update item frequency
@@ -313,6 +314,7 @@ impl HashTable {
             if get_tag(*item_info) == tag {
                 let current_item = segments.get_item(*item_info).unwrap();
                 if current_item.key() != key {
+                    #[cfg(feature = "metrics")]
                     HASH_TAG_COLLISION.increment();
                 } else {
                     let item = Item::new(
@@ -367,9 +369,13 @@ impl HashTable {
             if get_tag(*item_info) == tag {
                 if get_seg_id(*item_info) == Some(old_seg) && get_offset(*item_info) == old_offset {
                     *item_info = build_item_info(tag, new_seg, new_offset);
+
+                    #[cfg(feature = "metrics")]
                     ITEM_RELINK.increment();
+
                     return Ok(());
                 } else {
+                    #[cfg(feature = "metrics")]
                     HASH_TAG_COLLISION.increment();
                 }
             }
@@ -388,6 +394,7 @@ impl HashTable {
                 if get_seg_id(*item_info) == Some(seg) && get_offset(*item_info) == offset {
                     return true;
                 } else {
+                    #[cfg(feature = "metrics")]
                     HASH_TAG_COLLISION.increment();
                 }
             }
@@ -407,6 +414,7 @@ impl HashTable {
         ttl_buckets: &mut TtlBuckets,
         segments: &mut Segments,
     ) -> Result<(), ()> {
+        #[cfg(feature = "metrics")]
         HASH_INSERT.increment();
 
         let hash = self.hash(item.key());
@@ -431,6 +439,7 @@ impl HashTable {
                 continue;
             }
             if segments.get_item(*item_info).unwrap().key() != item.key() {
+                #[cfg(feature = "metrics")]
                 HASH_TAG_COLLISION.increment();
             } else {
                 // update existing key
@@ -442,7 +451,9 @@ impl HashTable {
         }
 
         if let Some(removed_item) = removed {
+            #[cfg(feature = "metrics")]
             ITEM_REPLACE.increment();
+
             let _ = segments.remove_item(removed_item, ttl_buckets, self);
         }
 
@@ -473,7 +484,9 @@ impl HashTable {
             self.data[(hash & self.mask) as usize].data[0] += 1 << CAS_BIT_SHIFT;
             Ok(())
         } else {
+            #[cfg(feature = "metrics")]
             HASH_INSERT_EX.increment();
+
             Err(())
         }
     }
@@ -491,7 +504,7 @@ impl HashTable {
         key: &[u8],
         cas: u32,
         segments: &mut Segments,
-    ) -> Result<(), SegError> {
+    ) -> Result<(), SegcacheError> {
         let hash = self.hash(key);
         let tag = tag_from_hash(hash);
         let bucket_id = hash & self.mask;
@@ -502,6 +515,7 @@ impl HashTable {
             if get_tag(*item_info) == tag {
                 let item = segments.get_item(*item_info).unwrap();
                 if item.key() != key {
+                    #[cfg(feature = "metrics")]
                     HASH_TAG_COLLISION.increment();
                 } else {
                     // update item frequency
@@ -520,13 +534,13 @@ impl HashTable {
                         self.data[bucket_id as usize].data[0] += 1 << CAS_BIT_SHIFT;
                         return Ok(());
                     } else {
-                        return Err(SegError::Exists);
+                        return Err(SegcacheError::Exists);
                     }
                 }
             }
         }
 
-        Err(SegError::NotFound)
+        Err(SegcacheError::NotFound)
     }
 
     /// Removes the item with the given key
@@ -547,10 +561,14 @@ impl HashTable {
             if get_tag(*item_info) == tag {
                 let item = segments.get_item(*item_info).unwrap();
                 if item.key() != key {
+                    #[cfg(feature = "metrics")]
                     HASH_TAG_COLLISION.increment();
+
                     continue;
                 } else {
+                    #[cfg(feature = "metrics")]
                     HASH_REMOVE.increment();
+
                     removed = Some(*item_info);
                     *item_info = 0;
                     break;
@@ -559,7 +577,9 @@ impl HashTable {
         }
 
         if let Some(removed_item) = removed {
+            #[cfg(feature = "metrics")]
             ITEM_DELETE.increment();
+
             let _ = segments.remove_item(removed_item, ttl_buckets, self);
             true
         } else {
@@ -571,6 +591,7 @@ impl HashTable {
     pub fn evict(&mut self, key: &[u8], offset: i32, segment: &mut Segment) -> bool {
         let result = self.remove_from(key, offset, segment);
         if result {
+            #[cfg(feature = "metrics")]
             ITEM_EVICT.increment();
         }
         result
@@ -580,6 +601,7 @@ impl HashTable {
     pub fn expire(&mut self, key: &[u8], offset: i32, segment: &mut Segment) -> bool {
         let result = self.remove_from(key, offset, segment);
         if result {
+            #[cfg(feature = "metrics")]
             ITEM_EXPIRE.increment();
         }
         result
@@ -602,7 +624,9 @@ impl HashTable {
             if get_seg_id(current_item_info) != Some(segment.id())
                 || get_offset(current_item_info) != offset as u64
             {
+                #[cfg(feature = "metrics")]
                 HASH_TAG_COLLISION.increment();
+
                 continue;
             }
 
@@ -618,7 +642,9 @@ impl HashTable {
 
     /// Internal function used to calculate a hash value for a key
     fn hash(&self, key: &[u8]) -> u64 {
+        #[cfg(feature = "metrics")]
         HASH_LOOKUP.increment();
+
         let mut hasher = self.hash_builder.build_hasher();
         hasher.write(key);
         hasher.finish()

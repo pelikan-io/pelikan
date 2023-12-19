@@ -24,7 +24,7 @@
 
 // macro includes
 #[macro_use]
-extern crate ringlog;
+extern crate log;
 
 // external crate includes
 use clocksource::Seconds;
@@ -43,25 +43,26 @@ mod error;
 mod eviction;
 mod hashtable;
 mod item;
-mod metrics;
 mod rand;
-mod seg;
+mod segcache;
 mod segments;
 mod ttl_buckets;
+mod value;
+
+#[cfg(feature = "metrics")]
+mod metrics;
 
 // tests
 #[cfg(test)]
 mod tests;
 
 // publicly exported items from submodules
-pub use crate::seg::Seg;
+pub use crate::segcache::Segcache;
 pub use builder::Builder;
-pub use error::SegError;
+pub use error::SegcacheError;
 pub use eviction::Policy;
 pub use item::Item;
-
-// publicly exported items from external crates
-pub use storage_types::Value;
+pub use value::Value;
 
 // type aliases
 pub(crate) type Duration = clocksource::Duration<Seconds<u32>>;
@@ -71,6 +72,8 @@ pub(crate) type Instant = clocksource::Instant<Seconds<u32>>;
 pub(crate) use crate::rand::*;
 pub(crate) use hashtable::*;
 pub(crate) use item::*;
-pub(crate) use metrics::*;
 pub(crate) use segments::*;
 pub(crate) use ttl_buckets::*;
+
+#[cfg(feature = "metrics")]
+pub(crate) use metrics::*;

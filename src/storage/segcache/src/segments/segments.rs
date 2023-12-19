@@ -87,8 +87,11 @@ impl Segments {
             }
         }
 
-        SEGMENT_CURRENT.set(segments as _);
-        SEGMENT_FREE.set(segments as _);
+        #[cfg(feature = "metrics")]
+        {
+            SEGMENT_CURRENT.set(segments as _);
+            SEGMENT_FREE.set(segments as _);
+        }
 
         Ok(Self {
             headers,
@@ -182,9 +185,12 @@ impl Segments {
         ttl_buckets: &mut TtlBuckets,
         hashtable: &mut HashTable,
     ) -> Result<(), SegmentsError> {
+        #[cfg(feature = "metrics")]
         let now = Instant::now();
+
         match self.evict.policy() {
             Policy::Merge { .. } => {
+                #[cfg(feature = "metrics")]
                 SEGMENT_EVICT.increment();
 
                 let mut seg_idx = self.evict.random();
@@ -205,34 +211,50 @@ impl Segments {
                             Ok(next_to_merge) => {
                                 debug!("merged ttl_bucket: {} seg: {}", bucket_id, start);
                                 ttl_bucket.set_next_to_merge(next_to_merge);
+
+                                #[cfg(feature = "metrics")]
                                 EVICT_TIME.add(now.elapsed().as_nanos() as _);
+
                                 return Ok(());
                             }
                             Err(_) => {
+                                #[cfg(feature = "metrics")]
                                 SEGMENT_EVICT_EX.increment();
+
                                 ttl_bucket.set_next_to_merge(None);
                                 continue;
                             }
                         }
                     }
                 }
-                SEGMENT_EVICT_EX.increment();
-                EVICT_TIME.add(now.elapsed().as_nanos() as _);
+
+                #[cfg(feature = "metrics")]
+                {
+                    SEGMENT_EVICT_EX.increment();
+                    EVICT_TIME.add(now.elapsed().as_nanos() as _);
+                }
+
                 Err(SegmentsError::NoEvictableSegments)
             }
             Policy::None => {
+                #[cfg(feature = "metrics")]
                 EVICT_TIME.add(now.elapsed().as_nanos() as _);
+
                 Err(SegmentsError::NoEvictableSegments)
             }
             _ => {
+                #[cfg(feature = "metrics")]
                 SEGMENT_EVICT.increment();
+
                 if let Some(id) = self.least_valuable_seg(ttl_buckets) {
                     let result = self
                         .clear_segment(id, hashtable, false)
                         .map_err(|_| SegmentsError::EvictFailure);
 
                     if result.is_err() {
+                        #[cfg(feature = "metrics")]
                         EVICT_TIME.add(now.elapsed().as_nanos() as _);
+
                         return result;
                     }
 
@@ -242,11 +264,18 @@ impl Segments {
                         ttl_bucket.set_head(self.headers[id_idx].next_seg());
                     }
                     self.push_free(id);
+
+                    #[cfg(feature = "metrics")]
                     EVICT_TIME.add(now.elapsed().as_nanos() as _);
+
                     Ok(())
                 } else {
-                    SEGMENT_EVICT_EX.increment();
-                    EVICT_TIME.add(now.elapsed().as_nanos() as _);
+                    #[cfg(feature = "metrics")]
+                    {
+                        SEGMENT_EVICT_EX.increment();
+                        EVICT_TIME.add(now.elapsed().as_nanos() as _);
+                    }
+
                     Err(SegmentsError::NoEvictableSegments)
                 }
             }
@@ -363,8 +392,12 @@ impl Segments {
     /// Returns a segment to the free queue, to be used after clearing the
     /// segment.
     pub(crate) fn push_free(&mut self, id: NonZeroU32) {
-        SEGMENT_RETURN.increment();
-        SEGMENT_FREE.increment();
+        #[cfg(feature = "metrics")]
+        {
+            SEGMENT_RETURN.increment();
+            SEGMENT_FREE.increment();
+        }
+
         // unlinks the next segment
         self.unlink(id);
 
@@ -389,9 +422,13 @@ impl Segments {
         if self.free == 0 {
             None
         } else {
-            SEGMENT_REQUEST.increment();
-            SEGMENT_REQUEST_SUCCESS.increment();
-            SEGMENT_FREE.decrement();
+            #[cfg(feature = "metrics")]
+            {
+                SEGMENT_REQUEST.increment();
+                SEGMENT_REQUEST_SUCCESS.increment();
+                SEGMENT_FREE.decrement();
+            }
+
             self.free -= 1;
             let id = self.free_q;
             assert!(id.is_some());
@@ -694,6 +731,7 @@ impl Segments {
         start: NonZeroU32,
         hashtable: &mut HashTable,
     ) -> Result<Option<NonZeroU32>, SegmentsError> {
+        #[cfg(feature = "metrics")]
         SEGMENT_MERGE.increment();
 
         let dst_id = start;
@@ -805,6 +843,7 @@ impl Segments {
         start: NonZeroU32,
         hashtable: &mut HashTable,
     ) -> Result<Option<NonZeroU32>, SegmentsError> {
+        #[cfg(feature = "metrics")]
         SEGMENT_MERGE.increment();
 
         let dst_id = start;

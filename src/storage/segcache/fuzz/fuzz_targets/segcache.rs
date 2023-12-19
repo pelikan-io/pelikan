@@ -7,7 +7,7 @@ use libfuzzer_sys::fuzz_target;
 
 use core::time::Duration;
 
-use seg::*;
+use segcache::*;
 
 const DEBUG_PRINTS: bool = false;
 
@@ -18,7 +18,7 @@ const OVERFLOW_FACTOR: f64 = 1.0;
 
 fuzz_target!(|data: &[u8]| {
     // println!("----------");
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(SEG_SIZE)
         .heap_size(HEAP_SIZE)
         .hash_power(HASH_POWER)

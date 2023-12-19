@@ -29,7 +29,7 @@ fn sizes() {
 
 #[test]
 fn init() {
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(4096)
         .heap_size(4096 * 64)
         .build()
@@ -43,7 +43,7 @@ fn get_free_seg() {
     let segments = 64;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .build()
@@ -62,7 +62,7 @@ fn get() {
     let segments = 64;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .build()
@@ -86,7 +86,7 @@ fn cas() {
     let segments = 64;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .build()
@@ -96,12 +96,12 @@ fn cas() {
     assert!(cache.get(b"coffee").is_none());
     assert_eq!(
         cache.cas(b"coffee", b"hot", None, ttl, 0),
-        Err(SegError::NotFound)
+        Err(SegcacheError::NotFound)
     );
     assert!(cache.insert(b"coffee", b"hot", None, ttl).is_ok());
     assert_eq!(
         cache.cas(b"coffee", b"iced", None, ttl, 0),
-        Err(SegError::Exists)
+        Err(SegcacheError::Exists)
     );
     let item = cache.get(b"coffee").unwrap();
     assert_eq!(cache.cas(b"coffee", b"iced", None, ttl, item.cas()), Ok(()));
@@ -114,7 +114,7 @@ fn overwrite() {
     let segments = 64;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .build()
@@ -161,7 +161,7 @@ fn delete() {
     let segments = 64;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .build()
@@ -191,7 +191,7 @@ fn collisions_2() {
     let segments = 2;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .hash_power(3)
@@ -219,7 +219,7 @@ fn collisions() {
     let segments = 64;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .hash_power(3)
@@ -257,7 +257,7 @@ fn full_cache_long() {
     let value_size = 512;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .hash_power(16)
@@ -296,7 +296,7 @@ fn full_cache_long_2() {
     let value_size = 1;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .hash_power(16)
@@ -332,7 +332,7 @@ fn expiration() {
     let segment_size = 2 * 1024;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .hash_power(16)
@@ -387,7 +387,7 @@ fn clear() {
     let segments = 64;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .build()
@@ -416,7 +416,7 @@ fn wrapping_add() {
     let segments = 64;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .build()
@@ -455,7 +455,7 @@ fn saturating_sub() {
     let segments = 64;
     let heap_size = segments * segment_size as usize;
 
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .build()
@@ -492,7 +492,7 @@ fn saturating_sub() {
 // the corrupted length caused a panic on the asserts, which correctly detected
 // the bad state.
 fn fuzz_1() {
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(1024)
         .heap_size(8 * 1024)
         .hash_power(3)
@@ -536,7 +536,7 @@ fn fuzz_1() {
 // behavior as fuzz_1 test, but also exposed that we had a tracking issue for
 // dead bytes when recycling a segment when live items dropped to zero.
 fn fuzz_2() {
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(1024)
         .heap_size(8 * 1024)
         .hash_power(5)

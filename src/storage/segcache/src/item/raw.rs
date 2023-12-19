@@ -9,7 +9,7 @@
 
 use super::header::ValueType;
 use crate::item::*;
-use crate::SegError;
+use crate::SegcacheError;
 use crate::Value;
 
 /// The raw byte-level representation of an item
@@ -184,7 +184,7 @@ impl RawItem {
             << 3
     }
 
-    pub(crate) fn wrapping_add(&mut self, rhs: u64) -> Result<(), SegError> {
+    pub(crate) fn wrapping_add(&mut self, rhs: u64) -> Result<(), SegcacheError> {
         match self.value() {
             Value::U64(v) => unsafe {
                 let new = v.wrapping_add(rhs);
@@ -195,11 +195,11 @@ impl RawItem {
                 );
                 Ok(())
             },
-            _ => Err(SegError::NotNumeric),
+            _ => Err(SegcacheError::NotNumeric),
         }
     }
 
-    pub(crate) fn saturating_sub(&mut self, rhs: u64) -> Result<(), SegError> {
+    pub(crate) fn saturating_sub(&mut self, rhs: u64) -> Result<(), SegcacheError> {
         match self.value() {
             Value::U64(v) => unsafe {
                 let new = v.saturating_sub(rhs);
@@ -210,7 +210,7 @@ impl RawItem {
                 );
                 Ok(())
             },
-            _ => Err(SegError::NotNumeric),
+            _ => Err(SegcacheError::NotNumeric),
         }
     }
 }

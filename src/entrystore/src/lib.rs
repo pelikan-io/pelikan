@@ -8,10 +8,10 @@
 //! [`EntryStore`] and [`protocol::memcache::MemcacheStorage`].
 
 mod noop;
-mod seg;
+mod segcache;
 
 pub use self::noop::*;
-pub use self::seg::*;
+pub use self::segcache::*;
 
 /// A trait defining the basic requirements of a type which may be used for
 /// storage.

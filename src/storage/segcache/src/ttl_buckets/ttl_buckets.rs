@@ -125,7 +125,10 @@ impl TtlBuckets {
         }
         let duration = start.elapsed();
         debug!("expired: {} segments in {:?}", expired, duration);
+
+        #[cfg(feature = "metrics")]
         EXPIRE_TIME.add(duration.as_nanos() as _);
+
         expired
     }
 
@@ -138,7 +141,10 @@ impl TtlBuckets {
         segments.set_flush_at(Instant::now());
         let duration = start.elapsed();
         debug!("expired: {} segments in {:?}", cleared, duration);
+
+        #[cfg(feature = "metrics")]
         CLEAR_TIME.add(duration.as_nanos() as _);
+
         cleared
     }
 }
