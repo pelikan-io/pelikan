@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use pelikan_storage_seg::*;
+use segcache::*;
 
 use std::time::Duration;
 
@@ -11,7 +11,7 @@ fn integration_basic() {
     let ttl = Duration::ZERO;
     let heap_size = 2 * 256;
     let segment_size = 256;
-    let mut cache = Seg::builder()
+    let mut cache = Segcache::builder()
         .segment_size(segment_size)
         .heap_size(heap_size)
         .hash_power(16)
