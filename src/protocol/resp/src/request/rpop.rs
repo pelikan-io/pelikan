@@ -4,8 +4,11 @@
 
 use super::*;
 
-counter!(RPOP);
-counter!(RPOP_EX);
+#[metric(name = "rpop")]
+pub static RPOP: Counter = Counter::new();
+
+#[metric(name = "rpop_ex")]
+pub static RPOP_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListPopBack {

@@ -31,7 +31,7 @@ use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
 use switchboard::{Queues, Waker};
 
-type Instant = metriken::time::Instant<metriken::time::Nanoseconds<u64>>;
+type Instant = clocksource::Instant<clocksource::Nanoseconds<u64>>;
 
 mod backend;
 mod frontend;

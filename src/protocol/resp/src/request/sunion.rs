@@ -7,8 +7,11 @@ use std::sync::Arc;
 
 use super::*;
 
-counter!(SUNION);
-counter!(SUNION_EX);
+#[metric(name = "sunion")]
+pub static SUNION: Counter = Counter::new();
+
+#[metric(name = "sunion_ex")]
+pub static SUNION_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SetUnion {

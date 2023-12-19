@@ -97,7 +97,7 @@ where
             if let Some(timestamp) = timestamp {
                 let now = Instant::now();
                 let latency = now - timestamp;
-                REQUEST_LATENCY.increment(now, latency.as_nanos(), 1);
+                let _ = REQUEST_LATENCY.increment(latency.as_nanos());
             }
         } else {
             // we have bytes in our response, we need to add it on the
@@ -129,7 +129,7 @@ where
                     amt -= front.1;
                     if let Some(ts) = front.0 {
                         let latency = now - ts;
-                        REQUEST_LATENCY.increment(now, latency.as_nanos(), 1);
+                        let _ = REQUEST_LATENCY.increment(latency.as_nanos());
                     }
                 }
             } else {

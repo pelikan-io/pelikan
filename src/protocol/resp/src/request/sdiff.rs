@@ -7,8 +7,11 @@ use std::sync::Arc;
 
 use super::*;
 
-counter!(SDIFF);
-counter!(SDIFF_EX);
+#[metric(name = "sdiff")]
+pub static SDIFF: Counter = Counter::new();
+
+#[metric(name = "sdiff_ex")]
+pub static SDIFF_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SetDiff {

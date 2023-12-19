@@ -6,11 +6,20 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-counter!(HMGET);
-counter!(HMGET_EX);
-counter!(HMGET_FIELD);
-counter!(HMGET_FIELD_HIT);
-counter!(HMGET_FIELD_MISS);
+#[metric(name = "hmget")]
+pub static HMGET: Counter = Counter::new();
+
+#[metric(name = "hmget_ex")]
+pub static HMGET_EX: Counter = Counter::new();
+
+#[metric(name = "hmget_field")]
+pub static HMGET_FIELD: Counter = Counter::new();
+
+#[metric(name = "hmget_field_hit")]
+pub static HMGET_FIELD_HIT: Counter = Counter::new();
+
+#[metric(name = "hmget_field_miss")]
+pub static HMGET_FIELD_MISS: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashMultiGet {

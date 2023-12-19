@@ -5,10 +5,17 @@
 use super::*;
 use std::io::{Error, ErrorKind};
 
-counter!(SISMEMBER);
-counter!(SISMEMBER_EX);
-counter!(SISMEMBER_HIT);
-counter!(SISMEMBER_MISS);
+#[metric(name = "sismember")]
+pub static SISMEMBER: Counter = Counter::new();
+
+#[metric(name = "sismember_ex")]
+pub static SISMEMBER_EX: Counter = Counter::new();
+
+#[metric(name = "sismember_hit")]
+pub static SISMEMBER_HIT: Counter = Counter::new();
+
+#[metric(name = "sismember_miss")]
+pub static SISMEMBER_MISS: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SetIsMember {

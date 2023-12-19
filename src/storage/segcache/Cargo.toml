@@ -1,0 +1,43 @@
+[package]
+name = "segcache"
+version = "0.1.0"
+description = "Pelikan segment-structured cache"
+authors = ["Brian Martin <brian@pelikan.io>"]
+
+edition = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[[bench]]
+name = "benchmark"
+path = "benches/benchmark.rs"
+harness = false
+
+[features]
+
+# enables setting/checking magic strings
+magic = []
+
+# enables metrics
+metrics = ["metriken"]
+
+# metafeatures
+debug = ["magic"]
+
+# default set of enabled features
+default = ["metrics"]
+
+[dependencies]
+ahash = { workspace = true }
+clocksource = { workspace = true }
+datatier = { workspace = true }
+log = { workspace = true }
+metriken = { workspace = true, optional = true }
+rand = { workspace = true , features = ["small_rng", "getrandom"] }
+rand_chacha = { workspace = true }
+rand_xoshiro = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = "0.3.4"

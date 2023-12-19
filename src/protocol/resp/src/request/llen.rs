@@ -4,8 +4,11 @@
 
 use super::*;
 
-counter!(LLEN);
-counter!(LLEN_EX);
+#[metric(name = "llen")]
+pub static LLEN: Counter = Counter::new();
+
+#[metric(name = "llen_ex")]
+pub static LLEN_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListLen {

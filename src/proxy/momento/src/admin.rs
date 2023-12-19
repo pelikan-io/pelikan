@@ -5,9 +5,14 @@
 use crate::*;
 use session::Buf;
 
-gauge!(ADMIN_CONN_CURR);
-counter!(ADMIN_CONN_ACCEPT);
-counter!(ADMIN_CONN_CLOSE);
+#[metric(name = "admin_conn_curr")]
+pub static ADMIN_CONN_CURR: Gauge = Gauge::new();
+
+#[metric(name = "admin_conn_accept")]
+pub static ADMIN_CONN_ACCEPT: Counter = Counter::new();
+
+#[metric(name = "admin_conn_close")]
+pub static ADMIN_CONN_CLOSE: Counter = Counter::new();
 
 pub(crate) async fn admin(mut log_drain: Box<dyn logger::Drain>, admin_listener: TcpListener) {
     loop {
@@ -120,54 +125,6 @@ async fn handle_admin_client(mut socket: tokio::net::TcpStream) {
 }
 
 async fn stats_response(socket: &mut tokio::net::TcpStream) -> Result<(), Error> {
-    let mut data = Vec::new();
-    for metric in &metriken::metrics() {
-        let any = match metric.as_any() {
-            Some(any) => any,
-            None => {
-                continue;
-            }
-        };
-
-        // we need to filter some irrelvant metrics that
-        // are defined in crates we depend on
-        if metric.name().starts_with("add")
-            || metric.name().starts_with("append")
-            || metric.name().starts_with("cas")
-            || metric.name().starts_with("decr")
-            || metric.name().starts_with("delete")
-            || metric.name().starts_with("gets")
-            || metric.name().starts_with("incr")
-            || metric.name().starts_with("get_cardinality")
-            || metric.name().starts_with("ping")
-            || metric.name().starts_with("pipeline_depth")
-            || metric.name().starts_with("prepend")
-            || metric.name().starts_with("replace")
-            || metric.name().starts_with("request_latency")
-        {
-            continue;
-        }
-
-        if let Some(counter) = any.downcast_ref::<Counter>() {
-            data.push(format!("STAT {} {}\r\n", metric.name(), counter.value()));
-        } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
-            data.push(format!("STAT {} {}\r\n", metric.name(), gauge.value()));
-        } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
-            for (label, value) in PERCENTILES {
-                let percentile = heatmap.percentile(*value).map(|b| b.high()).unwrap_or(0);
-                data.push(format!(
-                    "STAT {}_{} {}\r\n",
-                    metric.name(),
-                    label,
-                    percentile
-                ));
-            }
-        }
-    }
-
-    data.sort();
-    for line in data {
-        socket.write_all(line.as_bytes()).await?;
-    }
-    socket.write_all(b"END\r\n").await
+    let message = protocol_admin::memcache_stats();
+    socket.write_all(message.as_bytes()).await
 }

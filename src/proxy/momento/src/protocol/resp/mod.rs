@@ -7,6 +7,7 @@ use std::future::Future;
 use momento::response::MomentoError;
 pub use protocol_resp::{Request, RequestParser};
 
+mod del;
 mod get;
 mod hdel;
 mod hexists;
@@ -49,6 +50,7 @@ pub use self::sismember::*;
 pub use self::smembers::*;
 pub use self::srem::*;
 pub use self::sunion::*;
+pub use del::*;
 pub use get::*;
 pub use hdel::*;
 pub use hexists::*;

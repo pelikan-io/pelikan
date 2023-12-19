@@ -10,7 +10,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [features]
-debug = ["seg/debug"]
+debug = ["segcache/debug"]
 
 [dependencies]
 common = { path = "../common" }
@@ -19,4 +19,4 @@ protocol-common = { path = "../protocol/common" }
 protocol-memcache = { path = "../protocol/memcache" }
 protocol-ping = { path = "../protocol/ping" }
 protocol-resp = { path = "../protocol/resp" }
-seg = { path = "../storage/seg" }
+segcache = { path = "../storage/segcache" }

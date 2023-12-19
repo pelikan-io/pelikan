@@ -7,8 +7,11 @@ use std::sync::Arc;
 
 use super::*;
 
-counter!(SINTER);
-counter!(SINTER_EX);
+#[metric(name = "sinter")]
+pub static SINTER: Counter = Counter::new();
+
+#[metric(name = "sinter_ex")]
+pub static SINTER_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SetIntersect {
