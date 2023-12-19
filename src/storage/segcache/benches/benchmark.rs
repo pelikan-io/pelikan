@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use pelikan_storage_seg::*;
+use segcache::*;
 use rand::RngCore;
 use rand::SeedableRng;
 
@@ -25,7 +25,7 @@ fn get_benchmark(c: &mut Criterion) {
         let (keys, _values) = key_values(*key_size, 1_000_000, 0, 0);
 
         // launch the server
-        let mut cache = Seg::builder()
+        let mut cache = Segcache::builder()
             .hash_power(16)
             .heap_size(64 * MB)
             .segment_size(MB as i32)
@@ -82,7 +82,7 @@ fn set_benchmark(c: &mut Criterion) {
             let (keys, values) = key_values(*key_size, 1_000_000, *value_size, 10_000);
 
             // launch the server
-            let mut cache = Seg::builder()
+            let mut cache = Segcache::builder()
                 .hash_power(16)
                 .heap_size(64 * MB)
                 .segment_size(MB as i32)
