@@ -44,7 +44,7 @@ mod eviction;
 mod hashtable;
 mod item;
 mod rand;
-mod seg;
+mod segcache;
 mod segments;
 mod ttl_buckets;
 mod value;
@@ -57,7 +57,7 @@ mod metrics;
 mod tests;
 
 // publicly exported items from submodules
-pub use crate::seg::Segcache;
+pub use crate::segcache::Segcache;
 pub use builder::Builder;
 pub use error::SegcacheError;
 pub use eviction::Policy;

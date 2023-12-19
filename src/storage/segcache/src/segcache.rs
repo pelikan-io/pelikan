@@ -26,7 +26,7 @@ impl Segcache {
     /// `Segcache` instance.
     ///
     /// ```
-    /// use pelikan_storage_seg::{Policy, Segcache};
+    /// use segcache::{Policy, Segcache};
     ///
     /// const MB: usize = 1024 * 1024;
     ///
@@ -46,7 +46,7 @@ impl Segcache {
     /// feature enabled.
     ///
     /// ```
-    /// use pelikan_storage_seg::{Policy, Segcache};
+    /// use segcache::{Policy, Segcache};
     ///
     /// let mut cache = Segcache::builder().build().expect("failed to create cache");
     /// assert_eq!(cache.items(), 0);
@@ -60,7 +60,7 @@ impl Segcache {
     /// Get the item in the `Segcache` with the provided key
     ///
     /// ```
-    /// use pelikan_storage_seg::{Policy, Segcache};
+    /// use segcache::{Policy, Segcache};
     /// use std::time::Duration;
     ///
     /// let mut cache = Segcache::builder().build().expect("failed to create cache");
@@ -78,7 +78,7 @@ impl Segcache {
     /// increasing the item frequency - useful for combined operations that
     /// check for presence - eg replace is a get + set
     /// ```
-    /// use pelikan_storage_seg::{Policy, Segcache};
+    /// use segcache::{Policy, Segcache};
     ///
     /// let mut cache = Segcache::builder().build().expect("failed to create cache");
     /// assert!(cache.get_no_freq_incr(b"coffee").is_none());
@@ -90,7 +90,7 @@ impl Segcache {
     /// Insert a new item into the cache. May return an error indicating that
     /// the insert was not successful.
     /// ```
-    /// use pelikan_storage_seg::{Policy, Segcache};
+    /// use segcache::{Policy, Segcache};
     /// use std::time::Duration;
     ///
     /// let mut cache = Segcache::builder().build().expect("failed to create cache");
@@ -199,7 +199,7 @@ impl Segcache {
     /// matches the current value for that item.
     ///
     /// ```
-    /// use pelikan_storage_seg::{Policy, Segcache, SegcacheError};
+    /// use segcache::{Policy, Segcache, SegcacheError};
     /// use std::time::Duration;
     ///
     /// let mut cache = Segcache::builder().build().expect("failed to create cache");
@@ -241,7 +241,7 @@ impl Segcache {
     /// Remove the item with the given key, returns a bool indicating if it was
     /// removed.
     /// ```
-    /// use pelikan_storage_seg::{Policy, Segcache, SegcacheError};
+    /// use segcache::{Policy, Segcache, SegcacheError};
     /// use std::time::Duration;
     ///
     /// let mut cache = Segcache::builder().build().expect("failed to create cache");
@@ -264,7 +264,7 @@ impl Segcache {
     /// Loops through the TTL Buckets to handle eager expiration, returns the
     /// number of segments expired
     /// ```
-    /// use pelikan_storage_seg::{Policy, Segcache, SegcacheError};
+    /// use segcache::{Policy, Segcache, SegcacheError};
     /// use std::time::Duration;
     ///
     /// let mut cache = Segcache::builder().build().expect("failed to create cache");
