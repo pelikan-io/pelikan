@@ -11,7 +11,7 @@
 //! header. This reduces object metadata by 88% compared to Memcached.
 //!
 //! A blog post about the overall design can be found here:
-//! <https://twitter.github.io/pelikan/2021/segcache.html>
+//! <https://pelikan.io/2021/segcache.html>
 //!
 //! Goals:
 //! * high-throughput item storage
