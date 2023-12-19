@@ -3,9 +3,9 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use segcache::*;
 use rand::RngCore;
 use rand::SeedableRng;
+use segcache::*;
 
 use std::time::Duration;
 
