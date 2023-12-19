@@ -15,7 +15,6 @@ use core::time::Duration;
 use logger::configure_logging;
 use logger::Drain;
 use metriken::*;
-use momento::response::*;
 use momento::*;
 use net::TCP_RECV_BYTE;
 use protocol_admin::*;
@@ -84,30 +83,71 @@ pub static PERCENTILES: &[(&str, f64)] = &[
     ("p9999", 99.99),
 ];
 
-counter!(ADMIN_REQUEST_PARSE);
-counter!(ADMIN_RESPONSE_COMPOSE);
+#[metric(name = "admin_request_parse")]
+pub static ADMIN_REQUEST_PARSE: Counter = Counter::new();
 
-counter!(BACKEND_REQUEST);
-counter!(BACKEND_EX);
-counter!(BACKEND_EX_RATE_LIMITED);
-counter!(BACKEND_EX_TIMEOUT);
+#[metric(name = "admin_response_compose")]
+pub static ADMIN_RESPONSE_COMPOSE: Counter = Counter::new();
 
-counter!(RU_UTIME);
-counter!(RU_STIME);
-gauge!(RU_MAXRSS);
-gauge!(RU_IXRSS);
-gauge!(RU_IDRSS);
-gauge!(RU_ISRSS);
-counter!(RU_MINFLT);
-counter!(RU_MAJFLT);
-counter!(RU_NSWAP);
-counter!(RU_INBLOCK);
-counter!(RU_OUBLOCK);
-counter!(RU_MSGSND);
-counter!(RU_MSGRCV);
-counter!(RU_NSIGNALS);
-counter!(RU_NVCSW);
-counter!(RU_NIVCSW);
+#[metric(name = "backend_request")]
+pub static BACKEND_REQUEST: Counter = Counter::new();
+
+#[metric(name = "backend_ex")]
+pub static BACKEND_EX: Counter = Counter::new();
+
+#[metric(name = "backend_ex_rate_limited")]
+pub static BACKEND_EX_RATE_LIMITED: Counter = Counter::new();
+
+#[metric(name = "backend_ex_timeout")]
+pub static BACKEND_EX_TIMEOUT: Counter = Counter::new();
+
+#[metric(name = "ru_utime")]
+pub static RU_UTIME: Counter = Counter::new();
+
+#[metric(name = "ru_stime")]
+pub static RU_STIME: Counter = Counter::new();
+
+#[metric(name = "ru_maxrss")]
+pub static RU_MAXRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_ixrss")]
+pub static RU_IXRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_idrss")]
+pub static RU_IDRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_isrss")]
+pub static RU_ISRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_minflt")]
+pub static RU_MINFLT: Counter = Counter::new();
+
+#[metric(name = "ru_majflt")]
+pub static RU_MAJFLT: Counter = Counter::new();
+
+#[metric(name = "ru_nswap")]
+pub static RU_NSWAP: Counter = Counter::new();
+
+#[metric(name = "ru_inblock")]
+pub static RU_INBLOCK: Counter = Counter::new();
+
+#[metric(name = "ru_oublock")]
+pub static RU_OUBLOCK: Counter = Counter::new();
+
+#[metric(name = "ru_msgsnd")]
+pub static RU_MSGSND: Counter = Counter::new();
+
+#[metric(name = "ru_msgrcv")]
+pub static RU_MSGRCV: Counter = Counter::new();
+
+#[metric(name = "ru_nsignals")]
+pub static RU_NSIGNALS: Counter = Counter::new();
+
+#[metric(name = "ru_nvcsw")]
+pub static RU_NVCSW: Counter = Counter::new();
+
+#[metric(name = "ru_nivcsw")]
+pub static RU_NIVCSW: Counter = Counter::new();
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // custom panic hook to terminate whole process after unwinding
@@ -205,7 +245,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 metrics.push(format!("{:<31} counter", metric.name()));
             } else if any.downcast_ref::<Gauge>().is_some() {
                 metrics.push(format!("{:<31} gauge", metric.name()));
-            } else if any.downcast_ref::<Heatmap>().is_some() {
+            } else if any.downcast_ref::<AtomicHistogram>().is_some()
+                || any.downcast_ref::<RwLockHistogram>().is_some()
+            {
                 for (label, _) in PERCENTILES {
                     let name = format!("{}_{}", metric.name(), label);
                     metrics.push(format!("{name:<31} percentile"));
@@ -255,17 +297,21 @@ async fn spawn(
 
     // initialize the Momento cache client
     if std::env::var("MOMENTO_AUTHENTICATION").is_err() {
-        error!("environment variable `MOMENTO_AUTHENTICATION` is not set");
-        let _ = log_drain.flush();
+        eprintln!("environment variable `MOMENTO_AUTHENTICATION` is not set");
         std::process::exit(1);
     }
     let auth_token =
         std::env::var("MOMENTO_AUTHENTICATION").expect("MOMENTO_AUTHENTICATION must be set");
-    let client_builder = match SimpleCacheClientBuilder::new(auth_token, DEFAULT_TTL) {
+    let credential_provider = CredentialProviderBuilder::from_string(auth_token)
+        .build()
+        .unwrap_or_else(|e| {
+            eprintln!("failed to initialize credential provider. error: {e}");
+            std::process::exit(1);
+        });
+    let client_builder = match SimpleCacheClientBuilder::new(credential_provider, DEFAULT_TTL) {
         Ok(c) => c,
         Err(e) => {
-            error!("could not create cache client: {}", e);
-            let _ = log_drain.flush();
+            eprintln!("could not create cache client: {}", e);
             std::process::exit(1);
         }
     };

@@ -4,8 +4,11 @@
 
 use super::*;
 
-counter!(LTRIM);
-counter!(LTRIM_EX);
+#[metric(name = "ltrim")]
+pub static LTRIM: Counter = Counter::new();
+
+#[metric(name = "ltrim_ex")]
+pub static LTRIM_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListTrim {

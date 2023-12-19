@@ -8,6 +8,7 @@
 use super::*;
 use protocol_common::*;
 
+use protocol_memcache::Value;
 use protocol_memcache::*;
 
 use std::time::Duration;

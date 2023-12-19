@@ -4,10 +4,17 @@
 
 use super::*;
 
-counter!(LINDEX);
-counter!(LINDEX_EX);
-counter!(LINDEX_HIT);
-counter!(LINDEX_MISS);
+#[metric(name = "lindex")]
+pub static LINDEX: Counter = Counter::new();
+
+#[metric(name = "lindex_ex")]
+pub static LINDEX_EX: Counter = Counter::new();
+
+#[metric(name = "lindex_hit")]
+pub static LINDEX_HIT: Counter = Counter::new();
+
+#[metric(name = "lindex_miss")]
+pub static LINDEX_MISS: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct ListIndex {

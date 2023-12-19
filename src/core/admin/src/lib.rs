@@ -17,53 +17,108 @@ use std::collections::VecDeque;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
 use std::time::Duration;
+use std::time::UNIX_EPOCH;
 use switchboard::{Queues, Waker};
 use tiny_http::{Method, Request, Response};
 
-counter!(ADMIN_REQUEST_PARSE);
-counter!(ADMIN_RESPONSE_COMPOSE);
-counter!(ADMIN_EVENT_ERROR);
-counter!(ADMIN_EVENT_WRITE);
-counter!(ADMIN_EVENT_READ);
-counter!(ADMIN_EVENT_LOOP);
-counter!(ADMIN_EVENT_TOTAL);
+#[metric(name = "admin_request_parse")]
+pub static ADMIN_REQUEST_PARSE: Counter = Counter::new();
 
-counter!(RU_UTIME);
-counter!(RU_STIME);
-gauge!(RU_MAXRSS);
-gauge!(RU_IXRSS);
-gauge!(RU_IDRSS);
-gauge!(RU_ISRSS);
-counter!(RU_MINFLT);
-counter!(RU_MAJFLT);
-counter!(RU_NSWAP);
-counter!(RU_INBLOCK);
-counter!(RU_OUBLOCK);
-counter!(RU_MSGSND);
-counter!(RU_MSGRCV);
-counter!(RU_NSIGNALS);
-counter!(RU_NVCSW);
-counter!(RU_NIVCSW);
+#[metric(name = "admin_response_compose")]
+pub static ADMIN_RESPONSE_COMPOSE: Counter = Counter::new();
 
-counter!(
-    ADMIN_SESSION_ACCEPT,
-    "total number of attempts to accept a session"
-);
-counter!(
-    ADMIN_SESSION_ACCEPT_EX,
-    "number of times accept resulted in an exception, ignoring attempts that would block"
-);
-counter!(
-    ADMIN_SESSION_ACCEPT_OK,
-    "number of times a session was accepted successfully"
-);
+#[metric(name = "admin_event_error")]
+pub static ADMIN_EVENT_ERROR: Counter = Counter::new();
 
-counter!(
-    ADMIN_SESSION_CLOSE,
-    "total number of times a session was closed"
-);
+#[metric(name = "admin_event_read")]
+pub static ADMIN_EVENT_READ: Counter = Counter::new();
 
-gauge!(ADMIN_SESSION_CURR, "current number of admin sessions");
+#[metric(name = "admin_event_write")]
+pub static ADMIN_EVENT_WRITE: Counter = Counter::new();
+
+#[metric(name = "admin_event_loop")]
+pub static ADMIN_EVENT_LOOP: Counter = Counter::new();
+
+#[metric(name = "admin_event_total")]
+pub static ADMIN_EVENT_TOTAL: Counter = Counter::new();
+
+#[metric(name = "ru_utime")]
+pub static RU_UTIME: Counter = Counter::new();
+
+#[metric(name = "ru_stime")]
+pub static RU_STIME: Counter = Counter::new();
+
+#[metric(name = "ru_maxrss")]
+pub static RU_MAXRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_ixrss")]
+pub static RU_IXRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_idrss")]
+pub static RU_IDRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_isrss")]
+pub static RU_ISRSS: Gauge = Gauge::new();
+
+#[metric(name = "ru_minflt")]
+pub static RU_MINFLT: Counter = Counter::new();
+
+#[metric(name = "ru_majflt")]
+pub static RU_MAJFLT: Counter = Counter::new();
+
+#[metric(name = "ru_nswap")]
+pub static RU_NSWAP: Counter = Counter::new();
+
+#[metric(name = "ru_inblock")]
+pub static RU_INBLOCK: Counter = Counter::new();
+
+#[metric(name = "ru_oublock")]
+pub static RU_OUBLOCK: Counter = Counter::new();
+
+#[metric(name = "ru_msgsnd")]
+pub static RU_MSGSND: Counter = Counter::new();
+
+#[metric(name = "ru_msgrcv")]
+pub static RU_MSGRCV: Counter = Counter::new();
+
+#[metric(name = "ru_nsignals")]
+pub static RU_NSIGNALS: Counter = Counter::new();
+
+#[metric(name = "ru_nvcsw")]
+pub static RU_NVCSW: Counter = Counter::new();
+
+#[metric(name = "ru_nivcsw")]
+pub static RU_NIVCSW: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_accept",
+    description = "total number of attempts to accept a session"
+)]
+pub static ADMIN_SESSION_ACCEPT: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_accept_ex",
+    description = "number of times accept resulted in an exception, ignoring attempts that would block"
+)]
+pub static ADMIN_SESSION_ACCEPT_EX: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_accept_ok",
+    description = "number of times a session was accepted successfully"
+)]
+pub static ADMIN_SESSION_ACCEPT_OK: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_close",
+    description = "total number of times a session was closed"
+)]
+pub static ADMIN_SESSION_CLOSE: Counter = Counter::new();
+
+#[metric(
+    name = "admin_session_curr",
+    description = "current number of admin sessions"
+)]
+pub static ADMIN_SESSION_CURR: Gauge = Gauge::new();
 
 // consts
 
@@ -439,167 +494,6 @@ impl Admin {
         }
     }
 
-    /// A "human-readable" exposition format which outputs one stat per line,
-    /// with a LF used as the end of line symbol.
-    ///
-    /// ```text
-    /// get: 0
-    /// get_cardinality_p25: 0
-    /// get_cardinality_p50: 0
-    /// get_cardinality_p75: 0
-    /// get_cardinality_p90: 0
-    /// get_cardinality_p9999: 0
-    /// get_cardinality_p999: 0
-    /// get_cardinality_p99: 0
-    /// get_ex: 0
-    /// get_key: 0
-    /// get_key_hit: 0
-    /// get_key_miss: 0
-    /// ```
-    fn human_stats(&self) -> String {
-        let mut data = Vec::new();
-
-        for metric in &metriken::metrics() {
-            let any = match metric.as_any() {
-                Some(any) => any,
-                None => {
-                    continue;
-                }
-            };
-
-            if let Some(counter) = any.downcast_ref::<Counter>() {
-                data.push(format!("{}: {}", metric.name(), counter.value()));
-            } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
-                data.push(format!("{}: {}", metric.name(), gauge.value()));
-            } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
-                for (label, value) in PERCENTILES {
-                    let percentile = heatmap.percentile(*value).map(|b| b.high()).unwrap_or(0);
-                    data.push(format!("{}_{}: {}", metric.name(), label, percentile));
-                }
-            }
-        }
-
-        data.sort();
-        data.join("\n") + "\n"
-    }
-
-    /// JSON stats output which follows the conventions found in Finagle and
-    /// TwitterServer libraries. Percentiles are appended to the metric name,
-    /// eg: `request_latency_p999` for the 99.9th percentile. For more details
-    /// about the Finagle / TwitterServer format see:
-    /// https://twitter.github.io/twitter-server/Features.html#metrics
-    ///
-    /// ```text
-    /// {"get": 0,"get_cardinality_p25": 0,"get_cardinality_p50": 0, ... }
-    /// ```
-    fn json_stats(&self) -> String {
-        let head = "{".to_owned();
-
-        let mut data = Vec::new();
-
-        for metric in &metriken::metrics() {
-            let any = match metric.as_any() {
-                Some(any) => any,
-                None => {
-                    continue;
-                }
-            };
-
-            if let Some(counter) = any.downcast_ref::<Counter>() {
-                data.push(format!("\"{}\": {}", metric.name(), counter.value()));
-            } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
-                data.push(format!("\"{}\": {}", metric.name(), gauge.value()));
-            } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
-                for (label, value) in PERCENTILES {
-                    let percentile = heatmap.percentile(*value).map(|b| b.high()).unwrap_or(0);
-                    data.push(format!("\"{}_{}\": {}", metric.name(), label, percentile));
-                }
-            }
-        }
-
-        data.sort();
-        let body = data.join(",");
-        let mut content = head;
-        content += &body;
-        content += "}";
-        content
-    }
-
-    /// Prometheus / OpenTelemetry compatible stats output. Each stat is
-    /// annotated with a type. Percentiles use the label 'percentile' to
-    /// indicate which percentile corresponds to the value:
-    ///
-    /// ```text
-    /// # TYPE get counter
-    /// get 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p25"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p50"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p75"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p90"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p99"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p999"} 0
-    /// # TYPE get_cardinality gauge
-    /// get_cardinality{percentile="p9999"} 0
-    /// # TYPE get_ex counter
-    /// get_ex 0
-    /// # TYPE get_key counter
-    /// get_key 0
-    /// # TYPE get_key_hit counter
-    /// get_key_hit 0
-    /// # TYPE get_key_miss counter
-    /// get_key_miss 0
-    /// ```
-    fn prometheus_stats(&self) -> String {
-        let mut data = Vec::new();
-
-        for metric in &metriken::metrics() {
-            let any = match metric.as_any() {
-                Some(any) => any,
-                None => {
-                    continue;
-                }
-            };
-
-            if let Some(counter) = any.downcast_ref::<Counter>() {
-                data.push(format!(
-                    "# TYPE {} counter\n{} {}",
-                    metric.name(),
-                    metric.name(),
-                    counter.value()
-                ));
-            } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
-                data.push(format!(
-                    "# TYPE {} gauge\n{} {}",
-                    metric.name(),
-                    metric.name(),
-                    gauge.value()
-                ));
-            } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
-                for (label, value) in PERCENTILES {
-                    let percentile = heatmap.percentile(*value).map(|b| b.high()).unwrap_or(0);
-                    data.push(format!(
-                        "# TYPE {} gauge\n{}{{percentile=\"{}\"}} {}",
-                        metric.name(),
-                        metric.name(),
-                        label,
-                        percentile
-                    ));
-                }
-            }
-        }
-        data.sort();
-        let mut content = data.join("\n");
-        content += "\n";
-        let parts: Vec<&str> = content.split('/').collect();
-        parts.join("_")
-    }
-
     /// Handle a HTTP request
     fn handle_http_request(&self, request: Request) {
         let url = request.url();
@@ -610,7 +504,7 @@ impl Admin {
             // stats in the Prometheus format
             "/metrics" => match request.method() {
                 Method::Get => {
-                    let _ = request.respond(Response::from_string(self.prometheus_stats()));
+                    let _ = request.respond(Response::from_string(prometheus_stats()));
                 }
                 _ => {
                     let _ = request.respond(Response::empty(400));
@@ -620,7 +514,7 @@ impl Admin {
             // for maximum compatibility with various internal conventions
             "/metrics.json" | "/vars.json" | "/admin/metrics.json" => match request.method() {
                 Method::Get => {
-                    let _ = request.respond(Response::from_string(self.json_stats()));
+                    let _ = request.respond(Response::from_string(json_stats()));
                 }
                 _ => {
                     let _ = request.respond(Response::empty(400));
@@ -630,7 +524,7 @@ impl Admin {
             // on internal conventions
             "/vars" => match request.method() {
                 Method::Get => {
-                    let _ = request.respond(Response::from_string(self.human_stats()));
+                    let _ = request.respond(Response::from_string(human_stats()));
                 }
                 _ => {
                     let _ = request.respond(Response::empty(400));
@@ -715,6 +609,173 @@ impl Admin {
             let _ = self.log_drain.flush();
         }
     }
+}
+
+/// A "human-readable" exposition format which outputs one stat per line,
+/// with a LF used as the end of line symbol.
+///
+/// ```text
+/// get: 0
+/// get_cardinality_p25: 0
+/// get_cardinality_p50: 0
+/// get_cardinality_p75: 0
+/// get_cardinality_p90: 0
+/// get_cardinality_p9999: 0
+/// get_cardinality_p999: 0
+/// get_cardinality_p99: 0
+/// get_ex: 0
+/// get_key: 0
+/// get_key_hit: 0
+/// get_key_miss: 0
+/// ```
+pub fn human_stats() -> String {
+    let data = human_formatted_stats();
+    data.join("\n") + "\n"
+}
+
+/// JSON stats output which follows the conventions found in Finagle and
+/// TwitterServer libraries. Percentiles are appended to the metric name,
+/// eg: `request_latency_p999` for the 99.9th percentile. For more details
+/// about the Finagle / TwitterServer format see:
+/// https://twitter.github.io/twitter-server/Features.html#metrics
+///
+/// ```text
+/// {"get": 0,"get_cardinality_p25": 0,"get_cardinality_p50": 0, ... }
+/// ```
+pub fn json_stats() -> String {
+    let data = human_formatted_stats();
+
+    "{".to_string() + &data.join(",") + "}"
+}
+
+/// Prometheus / OpenTelemetry compatible stats output. Each stat is
+/// annotated with a type. Percentiles use the label 'percentile' to
+/// indicate which percentile corresponds to the value:
+///
+/// ```text
+/// # TYPE get counter
+/// get 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p25"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p50"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p75"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p90"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p99"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p999"} 0
+/// # TYPE get_cardinality gauge
+/// get_cardinality{percentile="p9999"} 0
+/// # TYPE get_ex counter
+/// get_ex 0
+/// # TYPE get_key counter
+/// get_key 0
+/// # TYPE get_key_hit counter
+/// get_key_hit 0
+/// # TYPE get_key_miss counter
+/// get_key_miss 0
+/// ```
+pub fn prometheus_stats() -> String {
+    let mut data = Vec::new();
+
+    let snapshots = SNAPSHOTS.read();
+
+    let timestamp = snapshots
+        .timestamp()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
+
+    for metric in &metriken::metrics() {
+        let any = match metric.as_any() {
+            Some(any) => any,
+            None => {
+                continue;
+            }
+        };
+
+        let name = metric.name();
+
+        if let Some(counter) = any.downcast_ref::<Counter>() {
+            if metric.metadata().is_empty() {
+                data.push(format!(
+                    "# TYPE {name}_total counter\n{name}_total {}",
+                    counter.value()
+                ));
+            } else {
+                data.push(format!(
+                    "# TYPE {name} counter\n{} {}",
+                    metric.formatted(metriken::Format::Prometheus),
+                    counter.value()
+                ));
+            }
+        } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
+            data.push(format!(
+                "# TYPE {name} gauge\n{} {}",
+                metric.formatted(metriken::Format::Prometheus),
+                gauge.value()
+            ));
+        } else if any.downcast_ref::<AtomicHistogram>().is_some()
+            || any.downcast_ref::<RwLockHistogram>().is_some()
+        {
+            for (_label, percentile, value) in snapshots.percentiles(metric.name()) {
+                data.push(format!(
+                    "# TYPE {name} gauge\n{name}{{percentile=\"{:02}\"}} {value} {timestamp}",
+                    percentile,
+                ));
+            }
+        }
+    }
+
+    data.sort();
+    data.dedup();
+    let mut content = data.join("\n");
+    content += "\n";
+    let parts: Vec<&str> = content.split('/').collect();
+    parts.join("_")
+}
+
+// human formatted stats that can be exposed as human stats or converted to json
+fn human_formatted_stats() -> Vec<String> {
+    let mut data = Vec::new();
+
+    let snapshots = SNAPSHOTS.read();
+
+    for metric in &metriken::metrics() {
+        let any = match metric.as_any() {
+            Some(any) => any,
+            None => {
+                continue;
+            }
+        };
+
+        let name = metric.name();
+
+        if let Some(counter) = any.downcast_ref::<Counter>() {
+            let value = counter.value();
+
+            data.push(format!("\"{name}\": {value}"));
+        } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
+            let value = gauge.value();
+
+            data.push(format!("\"{name}\": {value}"));
+        } else if any.downcast_ref::<AtomicHistogram>().is_some()
+            || any.downcast_ref::<RwLockHistogram>().is_some()
+        {
+            let percentiles = snapshots.percentiles(metric.name());
+
+            for (label, _percentile, value) in percentiles {
+                data.push(format!("\"{name}/{label}\": {value}",));
+            }
+        }
+    }
+
+    data.sort();
+
+    data
 }
 
 common::metrics::test_no_duplicates!();

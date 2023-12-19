@@ -6,10 +6,17 @@ use super::*;
 use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 
-counter!(HKEYS);
-counter!(HKEYS_EX);
-counter!(HKEYS_HIT);
-counter!(HKEYS_MISS);
+#[metric(name = "hkeys")]
+pub static HKEYS: Counter = Counter::new();
+
+#[metric(name = "hkeys_ex")]
+pub static HKEYS_EX: Counter = Counter::new();
+
+#[metric(name = "hkeys_hit")]
+pub static HKEYS_HIT: Counter = Counter::new();
+
+#[metric(name = "hkeys_miss")]
+pub static HKEYS_MISS: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct HashKeys {

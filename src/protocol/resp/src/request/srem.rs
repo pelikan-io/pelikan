@@ -7,8 +7,11 @@ use std::sync::Arc;
 
 use super::*;
 
-counter!(SREM);
-counter!(SREM_EX);
+#[metric(name = "srem")]
+pub static SREM: Counter = Counter::new();
+
+#[metric(name = "srem_ex")]
+pub static SREM_EX: Counter = Counter::new();
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct SetRem {

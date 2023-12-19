@@ -121,45 +121,43 @@ impl Compose for AdminResponse {
                 4
             }
             Self::Stats => {
-                let mut size = 0;
-                let mut data = Vec::new();
-                for metric in &metriken::metrics() {
-                    let any = match metric.as_any() {
-                        Some(any) => any,
-                        None => {
-                            continue;
-                        }
-                    };
-
-                    if let Some(counter) = any.downcast_ref::<Counter>() {
-                        data.push(format!("STAT {} {}\r\n", metric.name(), counter.value()));
-                    } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
-                        data.push(format!("STAT {} {}\r\n", metric.name(), gauge.value()));
-                    } else if let Some(heatmap) = any.downcast_ref::<Heatmap>() {
-                        for (label, value) in PERCENTILES {
-                            let percentile =
-                                heatmap.percentile(*value).map(|b| b.high()).unwrap_or(0);
-                            data.push(format!(
-                                "STAT {}_{} {}\r\n",
-                                metric.name(),
-                                label,
-                                percentile
-                            ));
-                        }
-                    }
-                }
-
-                data.sort();
-                for line in data {
-                    size += line.as_bytes().len();
-                    buf.put_slice(line.as_bytes());
-                }
-                buf.put_slice(b"END\r\n");
-                size + 5
+                let message = memcache_stats();
+                buf.put_slice(message.as_bytes());
+                message.len()
             }
             Self::Version(v) => v.compose(buf),
         }
     }
+}
+
+pub fn memcache_stats() -> String {
+    let snapshots = SNAPSHOTS.read();
+
+    let mut data = Vec::new();
+
+    for metric in &metriken::metrics() {
+        let any = match metric.as_any() {
+            Some(any) => any,
+            None => {
+                continue;
+            }
+        };
+
+        if let Some(counter) = any.downcast_ref::<Counter>() {
+            data.push(format!("STAT {} {}\r\n", metric.name(), counter.value()));
+        } else if let Some(gauge) = any.downcast_ref::<Gauge>() {
+            data.push(format!("STAT {} {}\r\n", metric.name(), gauge.value()));
+        } else if any.downcast_ref::<AtomicHistogram>().is_some()
+            || any.downcast_ref::<RwLockHistogram>().is_some()
+        {
+            for (label, _percentile, value) in snapshots.percentiles(metric.name()) {
+                data.push(format!("STAT {}_{} {}\r\n", metric.name(), label, value,));
+            }
+        }
+    }
+
+    data.sort();
+    data.join("\r\n") + "END\r\n"
 }
 
 #[cfg(test)]

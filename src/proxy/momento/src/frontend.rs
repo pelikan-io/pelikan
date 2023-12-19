@@ -32,6 +32,14 @@ pub(crate) async fn handle_memcache_client(
                 let request = request.into_inner();
 
                 match request {
+                    memcache::Request::Delete(r) => {
+                        if memcache::delete(&mut client, &cache_name, &mut socket, &r)
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
                     memcache::Request::Get(r) => {
                         if memcache::get(&mut client, &cache_name, &mut socket, r.keys())
                             .await
@@ -108,6 +116,9 @@ pub(crate) async fn handle_resp_client(
 
         let result: ProxyResult = async {
             match &request {
+                resp::Request::Del(r) => {
+                    resp::del(&mut client, &cache_name, &mut response_buf, r).await?
+                }
                 resp::Request::Get(r) => {
                     resp::get(&mut client, &cache_name, &mut response_buf, r.key()).await?
                 }

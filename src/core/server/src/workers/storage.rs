@@ -4,15 +4,17 @@
 
 use crate::*;
 
-counter!(
-    STORAGE_EVENT_LOOP,
-    "the number of times the event loop has run"
-);
-heatmap!(
-    STORAGE_QUEUE_DEPTH,
-    1_000_000,
-    "the distribution of the depth of the storage queue on each loop"
-);
+#[metric(
+    name = "storage_event_loop",
+    description = "the number of times the event loop has run"
+)]
+pub static STORAGE_EVENT_LOOP: Counter = Counter::new();
+
+#[metric(
+    name = "storage_queue_depth",
+    description = "the distribution of the depth of the storage queue on each loop"
+)]
+pub static STORAGE_QUEUE_DEPTH: AtomicHistogram = AtomicHistogram::new(7, 20);
 
 pub struct StorageWorkerBuilder<Request, Response, Storage> {
     nevent: usize,
@@ -105,8 +107,6 @@ where
                 error!("Error polling");
             }
 
-            let timestamp = Instant::now();
-
             if !events.is_empty() {
                 self.waker.reset();
 
@@ -114,7 +114,7 @@ where
 
                 self.data_queue.try_recv_all(&mut messages);
 
-                STORAGE_QUEUE_DEPTH.increment(timestamp, messages.len() as _, 1);
+                let _ = STORAGE_QUEUE_DEPTH.increment(messages.len() as _);
 
                 for message in messages.drain(..) {
                     let sender = message.sender();
