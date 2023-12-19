@@ -1,8 +1,5 @@
 use metriken::*;
 
-#[doc(hidden)]
-pub use macros::to_lowercase;
-
 /// Creates a test that verifies that no two metrics have the same name.
 #[macro_export]
 #[rustfmt::skip]

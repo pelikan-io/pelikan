@@ -15,7 +15,6 @@ members = [
     "src/core/server",
     "src/entrystore",
     "src/logger",
-    "src/macros",
     "src/net",
     "src/protocol/admin",
     "src/protocol/common",
