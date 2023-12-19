@@ -12,7 +12,6 @@ license = { workspace = true }
 [dependencies]
 boring = { workspace = true }
 clocksource = { workspace = true }
-macros = { path = "../macros" }
 metriken = { workspace = true }
 net = { path = "../net" }
 ringlog = { workspace = true }
