@@ -50,7 +50,7 @@ jobs:
           protocol/ping,
           protocol/resp,
           protocol/thrift,
-          storage/seg,
+          storage/segcache,
         ]
     name: fuzz-${{ matrix.os }}-${{ matrix.target }}
     runs-on: ${{ matrix.os }}
