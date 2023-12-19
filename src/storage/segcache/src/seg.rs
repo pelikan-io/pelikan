@@ -14,24 +14,24 @@ const RESERVE_RETRIES: usize = 3;
 /// segment-structured design that stores data in fixed-size segments, grouping
 /// objects with nearby expiration time into the same segment, and lifting most
 /// per-object metadata into the shared segment header.
-pub struct Seg {
+pub struct Segcache {
     pub(crate) hashtable: HashTable,
     pub(crate) segments: Segments,
     pub(crate) ttl_buckets: TtlBuckets,
     pub(crate) time: Instant,
 }
 
-impl Seg {
+impl Segcache {
     /// Returns a new `Builder` which is used to configure and construct a
-    /// `Seg` instance.
+    /// `Segcache` instance.
     ///
     /// ```
-    /// use pelikan_storage_seg::{Policy, Seg};
+    /// use pelikan_storage_seg::{Policy, Segcache};
     ///
     /// const MB: usize = 1024 * 1024;
     ///
     /// // create a heap using 1MB segments
-    /// let cache = Seg::builder()
+    /// let cache = Segcache::builder()
     ///     .heap_size(64 * MB)
     ///     .segment_size(1 * MB as i32)
     ///     .hash_power(16)
@@ -41,14 +41,14 @@ impl Seg {
         Builder::default()
     }
 
-    /// Gets a count of items in the `Seg` instance. This is an expensive
+    /// Gets a count of items in the `Segcache` instance. This is an expensive
     /// operation and is only enabled for tests and builds with the `debug`
     /// feature enabled.
     ///
     /// ```
-    /// use pelikan_storage_seg::{Policy, Seg};
+    /// use pelikan_storage_seg::{Policy, Segcache};
     ///
-    /// let mut cache = Seg::builder().build().expect("failed to create cache");
+    /// let mut cache = Segcache::builder().build().expect("failed to create cache");
     /// assert_eq!(cache.items(), 0);
     /// ```
     #[cfg(any(test, feature = "debug"))]
@@ -57,13 +57,13 @@ impl Seg {
         self.segments.items()
     }
 
-    /// Get the item in the `Seg` with the provided key
+    /// Get the item in the `Segcache` with the provided key
     ///
     /// ```
-    /// use pelikan_storage_seg::{Policy, Seg};
+    /// use pelikan_storage_seg::{Policy, Segcache};
     /// use std::time::Duration;
     ///
-    /// let mut cache = Seg::builder().build().expect("failed to create cache");
+    /// let mut cache = Segcache::builder().build().expect("failed to create cache");
     /// assert!(cache.get(b"coffee").is_none());
     ///
     /// cache.insert(b"coffee", b"strong", None, Duration::ZERO);
@@ -74,13 +74,13 @@ impl Seg {
         self.hashtable.get(key, self.time, &mut self.segments)
     }
 
-    /// Get the item in the `Seg` with the provided key without
+    /// Get the item in the `Segcache` with the provided key without
     /// increasing the item frequency - useful for combined operations that
     /// check for presence - eg replace is a get + set
     /// ```
-    /// use pelikan_storage_seg::{Policy, Seg};
+    /// use pelikan_storage_seg::{Policy, Segcache};
     ///
-    /// let mut cache = Seg::builder().build().expect("failed to create cache");
+    /// let mut cache = Segcache::builder().build().expect("failed to create cache");
     /// assert!(cache.get_no_freq_incr(b"coffee").is_none());
     /// ```
     pub fn get_no_freq_incr(&mut self, key: &[u8]) -> Option<Item> {
@@ -90,10 +90,10 @@ impl Seg {
     /// Insert a new item into the cache. May return an error indicating that
     /// the insert was not successful.
     /// ```
-    /// use pelikan_storage_seg::{Policy, Seg};
+    /// use pelikan_storage_seg::{Policy, Segcache};
     /// use std::time::Duration;
     ///
-    /// let mut cache = Seg::builder().build().expect("failed to create cache");
+    /// let mut cache = Segcache::builder().build().expect("failed to create cache");
     /// assert!(cache.get(b"drink").is_none());
     ///
     /// cache.insert(b"drink", b"coffee", None, Duration::ZERO);
@@ -110,7 +110,7 @@ impl Seg {
         value: T,
         optional: Option<&[u8]>,
         ttl: std::time::Duration,
-    ) -> Result<(), SegError> {
+    ) -> Result<(), SegcacheError> {
         let value: Value = value.into();
 
         // default optional data is empty
@@ -136,7 +136,7 @@ impl Seg {
                     break;
                 }
                 Err(TtlBucketsError::ItemOversized { size }) => {
-                    return Err(SegError::ItemOversized { size });
+                    return Err(SegcacheError::ItemOversized { size });
                 }
                 Err(TtlBucketsError::NoFreeSegments) => {
                     if self
@@ -162,7 +162,7 @@ impl Seg {
                     SEGMENT_REQUEST_FAILURE.increment();
                 }
 
-                return Err(SegError::NoFreeSegments);
+                return Err(SegcacheError::NoFreeSegments);
             }
             retries -= 1;
         }
@@ -189,7 +189,7 @@ impl Seg {
                 &mut self.ttl_buckets,
                 &mut self.hashtable,
             );
-            Err(SegError::HashTableInsertEx)
+            Err(SegcacheError::HashTableInsertEx)
         } else {
             Ok(())
         }
@@ -199,22 +199,22 @@ impl Seg {
     /// matches the current value for that item.
     ///
     /// ```
-    /// use pelikan_storage_seg::{Policy, Seg, SegError};
+    /// use pelikan_storage_seg::{Policy, Segcache, SegcacheError};
     /// use std::time::Duration;
     ///
-    /// let mut cache = Seg::builder().build().expect("failed to create cache");
+    /// let mut cache = Segcache::builder().build().expect("failed to create cache");
     ///
     /// // If the item is not in the cache, CAS will fail as 'NotFound'
     /// assert_eq!(
     ///     cache.cas(b"drink", b"coffee", None, Duration::ZERO, 0),
-    ///     Err(SegError::NotFound)
+    ///     Err(SegcacheError::NotFound)
     /// );
     ///
     /// // If a stale CAS value is provided, CAS will fail as 'Exists'
     /// cache.insert(b"drink", b"coffee", None, Duration::ZERO);
     /// assert_eq!(
     ///     cache.cas(b"drink", b"coffee", None, Duration::ZERO, 0),
-    ///     Err(SegError::Exists)
+    ///     Err(SegcacheError::Exists)
     /// );
     ///
     /// // Getting the CAS value and then performing the operation ensures
@@ -231,7 +231,7 @@ impl Seg {
         optional: Option<&[u8]>,
         ttl: std::time::Duration,
         cas: u32,
-    ) -> Result<(), SegError> {
+    ) -> Result<(), SegcacheError> {
         match self.hashtable.try_update_cas(key, cas, &mut self.segments) {
             Ok(()) => self.insert(key, value, optional, ttl),
             Err(e) => Err(e),
@@ -241,10 +241,10 @@ impl Seg {
     /// Remove the item with the given key, returns a bool indicating if it was
     /// removed.
     /// ```
-    /// use pelikan_storage_seg::{Policy, Seg, SegError};
+    /// use pelikan_storage_seg::{Policy, Segcache, SegcacheError};
     /// use std::time::Duration;
     ///
-    /// let mut cache = Seg::builder().build().expect("failed to create cache");
+    /// let mut cache = Segcache::builder().build().expect("failed to create cache");
     ///
     /// // If the item is not in the cache, delete will return false
     /// assert_eq!(cache.delete(b"coffee"), false);
@@ -264,10 +264,10 @@ impl Seg {
     /// Loops through the TTL Buckets to handle eager expiration, returns the
     /// number of segments expired
     /// ```
-    /// use pelikan_storage_seg::{Policy, Seg, SegError};
+    /// use pelikan_storage_seg::{Policy, Segcache, SegcacheError};
     /// use std::time::Duration;
     ///
-    /// let mut cache = Seg::builder().build().expect("failed to create cache");
+    /// let mut cache = Segcache::builder().build().expect("failed to create cache");
     ///
     /// // Insert an item with a short ttl
     /// cache.insert(b"coffee", b"strong", None, Duration::from_secs(5));
@@ -297,22 +297,22 @@ impl Seg {
     /// Checks the integrity of all segments
     /// *NOTE*: this operation is relatively expensive
     #[cfg(feature = "debug")]
-    pub fn check_integrity(&mut self) -> Result<(), SegError> {
+    pub fn check_integrity(&mut self) -> Result<(), SegcacheError> {
         if self.segments.check_integrity(&mut self.hashtable) {
             Ok(())
         } else {
-            Err(SegError::DataCorrupted)
+            Err(SegcacheError::DataCorrupted)
         }
     }
 
     /// Perform a wrapping addition on the value stored at the supplied key.
     /// Returns an error if the key is invalid, the item is not found, or the
     /// stored value is not a numeric type.
-    pub fn wrapping_add(&mut self, key: &[u8], rhs: u64) -> Result<Item, SegError> {
+    pub fn wrapping_add(&mut self, key: &[u8], rhs: u64) -> Result<Item, SegcacheError> {
         let mut item = self
             .hashtable
             .get(key, self.time, &mut self.segments)
-            .ok_or(SegError::NotFound)?;
+            .ok_or(SegcacheError::NotFound)?;
         item.wrapping_add(rhs)?;
         Ok(item)
     }
@@ -320,11 +320,11 @@ impl Seg {
     /// Perform a saturating subtraction on the value stored at the supplied
     /// key. Returns an error if the key is invalid, the item is not found, or
     /// the stored value is not a numeric type.
-    pub fn saturating_sub(&mut self, key: &[u8], rhs: u64) -> Result<Item, SegError> {
+    pub fn saturating_sub(&mut self, key: &[u8], rhs: u64) -> Result<Item, SegcacheError> {
         let mut item = self
             .hashtable
             .get(key, self.time, &mut self.segments)
-            .ok_or(SegError::NotFound)?;
+            .ok_or(SegcacheError::NotFound)?;
         item.saturating_sub(rhs)?;
         Ok(item)
     }

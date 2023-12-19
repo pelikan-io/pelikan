@@ -41,10 +41,10 @@ impl Storage for Seg {
                 let o = item.optional().unwrap_or(&[0, 0, 0, 0]);
                 let flags = u32::from_be_bytes([o[0], o[1], o[2], o[3]]);
                 match item.value() {
-                    pelikan_storage_seg::Value::Bytes(b) => {
+                    segcache::Value::Bytes(b) => {
                         values.push(Value::new(item.key(), flags, None, b));
                     }
-                    pelikan_storage_seg::Value::U64(v) => {
+                    segcache::Value::U64(v) => {
                         values.push(Value::new(
                             item.key(),
                             flags,
@@ -67,10 +67,10 @@ impl Storage for Seg {
                 let o = item.optional().unwrap_or(&[0, 0, 0, 0]);
                 let flags = u32::from_be_bytes([o[0], o[1], o[2], o[3]]);
                 match item.value() {
-                    pelikan_storage_seg::Value::Bytes(b) => {
+                    segcache::Value::Bytes(b) => {
                         values.push(Value::new(item.key(), flags, Some(item.cas().into()), b));
                     }
-                    pelikan_storage_seg::Value::U64(v) => {
+                    segcache::Value::U64(v) => {
                         values.push(Value::new(
                             item.key(),
                             flags,
@@ -264,11 +264,11 @@ impl Storage for Seg {
     fn incr(&mut self, incr: &Incr) -> Response {
         match self.data.wrapping_add(incr.key(), incr.value()) {
             Ok(item) => match item.value() {
-                pelikan_storage_seg::Value::U64(v) => Response::numeric(v, incr.noreply()),
+                segcache::Value::U64(v) => Response::numeric(v, incr.noreply()),
                 _ => Response::server_error(""),
             },
-            Err(SegError::NotFound) => Response::not_found(incr.noreply()),
-            Err(SegError::NotNumeric) => Response::error(),
+            Err(SegcacheError::NotFound) => Response::not_found(incr.noreply()),
+            Err(SegcacheError::NotNumeric) => Response::error(),
             Err(_) => Response::server_error(""),
         }
     }
@@ -276,11 +276,11 @@ impl Storage for Seg {
     fn decr(&mut self, decr: &Decr) -> Response {
         match self.data.saturating_sub(decr.key(), decr.value()) {
             Ok(item) => match item.value() {
-                pelikan_storage_seg::Value::U64(v) => Response::numeric(v, decr.noreply()),
+                segcache::Value::U64(v) => Response::numeric(v, decr.noreply()),
                 _ => Response::server_error(""),
             },
-            Err(SegError::NotFound) => Response::not_found(decr.noreply()),
-            Err(SegError::NotNumeric) => Response::error(),
+            Err(SegcacheError::NotFound) => Response::not_found(decr.noreply()),
+            Err(SegcacheError::NotNumeric) => Response::error(),
             Err(_) => Response::server_error(""),
         }
     }
@@ -323,8 +323,8 @@ impl Storage for Seg {
                     cas.cas() as u32,
                 ) {
                     Ok(_) => Response::stored(cas.noreply()),
-                    Err(SegError::NotFound) => Response::not_found(cas.noreply()),
-                    Err(SegError::Exists) => Response::exists(cas.noreply()),
+                    Err(SegcacheError::NotFound) => Response::not_found(cas.noreply()),
+                    Err(SegcacheError::Exists) => Response::exists(cas.noreply()),
                     Err(_) => Response::error(),
                 }
             } else {
@@ -336,8 +336,8 @@ impl Storage for Seg {
                     cas.cas() as u32,
                 ) {
                     Ok(_) => Response::stored(cas.noreply()),
-                    Err(SegError::NotFound) => Response::not_found(cas.noreply()),
-                    Err(SegError::Exists) => Response::exists(cas.noreply()),
+                    Err(SegcacheError::NotFound) => Response::not_found(cas.noreply()),
+                    Err(SegcacheError::Exists) => Response::exists(cas.noreply()),
                     Err(_) => Response::error(),
                 }
             }
@@ -350,8 +350,8 @@ impl Storage for Seg {
                 cas.cas() as u32,
             ) {
                 Ok(_) => Response::stored(cas.noreply()),
-                Err(SegError::NotFound) => Response::not_found(cas.noreply()),
-                Err(SegError::Exists) => Response::exists(cas.noreply()),
+                Err(SegcacheError::NotFound) => Response::not_found(cas.noreply()),
+                Err(SegcacheError::Exists) => Response::exists(cas.noreply()),
                 Err(_) => Response::error(),
             }
         };

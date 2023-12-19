@@ -57,9 +57,9 @@ mod metrics;
 mod tests;
 
 // publicly exported items from submodules
-pub use crate::seg::Seg;
+pub use crate::seg::Segcache;
 pub use builder::Builder;
-pub use error::SegError;
+pub use error::SegcacheError;
 pub use eviction::Policy;
 pub use item::Item;
 pub use value::Value;

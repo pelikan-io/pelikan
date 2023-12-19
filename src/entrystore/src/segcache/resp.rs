@@ -26,8 +26,8 @@ impl Storage for Seg {
     fn get(&mut self, get: &Get) -> Response {
         if let Some(item) = self.data.get(get.key()) {
             match item.value() {
-                pelikan_storage_seg::Value::Bytes(b) => Response::bulk_string(b),
-                pelikan_storage_seg::Value::U64(v) => {
+                segcache::Value::Bytes(b) => Response::bulk_string(b),
+                segcache::Value::U64(v) => {
                     Response::bulk_string(format!("{v}").as_bytes())
                 }
             }
@@ -37,7 +37,7 @@ impl Storage for Seg {
     }
 
     fn set(&mut self, set: &Set) -> Response {
-        let ttl = match set.expire_time().unwrap_or(ExpireTime::default()) {
+        let ttl = match set.expire_time().unwrap_or_default() {
             ExpireTime::Seconds(n) => n,
             _ => 0,
         };

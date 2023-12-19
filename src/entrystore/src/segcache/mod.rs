@@ -4,13 +4,14 @@
 
 //! Segment-structured storage which implements efficient proactive eviction.
 //! This storage type is suitable for use in simple key-value cache backends.
-//! See: [`::seg`] crate for more details behind the underlying storage design.
+//! See: [`::segcache`] crate for more details behind the underlying storage
+//! design.
 
 use crate::EntryStore;
 
 use config::seg::Eviction;
 use config::SegConfig;
-use pelikan_storage_seg::{Policy, SegError};
+use segcache::{Policy, SegcacheError};
 
 mod memcache;
 mod resp;
@@ -18,7 +19,7 @@ mod resp;
 /// A wrapper around [`seg::Seg`] which implements `EntryStore` and storage
 /// protocol traits.
 pub struct Seg {
-    data: pelikan_storage_seg::Seg,
+    data: segcache::Segcache,
 }
 
 impl Seg {
@@ -43,7 +44,7 @@ impl Seg {
         };
 
         // build the datastructure from the config
-        let data = pelikan_storage_seg::Seg::builder()
+        let data = segcache::Segcache::builder()
             .hash_power(config.hash_power())
             .overflow_factor(config.overflow_factor())
             .heap_size(config.heap_size())

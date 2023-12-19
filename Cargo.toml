@@ -33,7 +33,7 @@ members = [
     "src/session",
     "src/storage/bloom",
     "src/storage/datatier",
-    "src/storage/seg",
+    "src/storage/segcache",
     "src/storage/types",
 ]
 

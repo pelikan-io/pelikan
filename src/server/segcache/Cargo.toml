@@ -1,5 +1,5 @@
 [package]
-name = "segcache"
+name = "pelikan-segcache"
 description = "a Memcache protocol server with segment-structured storage"
 authors = ["Brian Martin <brian@pelikan.io>"]
 

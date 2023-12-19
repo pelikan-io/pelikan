@@ -790,11 +790,11 @@ version = "0.3.1"
 dependencies = [
  "common",
  "config",
- "pelikan-storage-seg",
  "protocol-common",
  "protocol-memcache",
  "protocol-ping",
  "protocol-resp",
+ "segcache",
 ]
 
 [[package]]
@@ -1717,19 +1717,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b17cddbe7ec3f8bc800887bab5e717348c95ea2ca0b1bf0837fb964dc67099"
 
 [[package]]
-name = "pelikan-storage-seg"
-version = "0.1.0"
+name = "pelikan-segcache"
+version = "0.3.1"
 dependencies = [
- "ahash",
- "clocksource",
+ "backtrace",
+ "clap 4.4.6",
+ "common",
+ "config",
  "criterion 0.3.6",
- "datatier",
- "log",
+ "entrystore",
+ "logger",
  "metriken",
- "rand",
- "rand_chacha",
- "rand_xoshiro",
- "thiserror",
+ "protocol-memcache",
+ "server",
 ]
 
 [[package]]
@@ -2386,18 +2386,18 @@ dependencies = [
 
 [[package]]
 name = "segcache"
-version = "0.3.1"
+version = "0.1.0"
 dependencies = [
- "backtrace",
- "clap 4.4.6",
- "common",
- "config",
+ "ahash",
+ "clocksource",
  "criterion 0.3.6",
- "entrystore",
- "logger",
+ "datatier",
+ "log",
  "metriken",
- "protocol-memcache",
- "server",
+ "rand",
+ "rand_chacha",
+ "rand_xoshiro",
+ "thiserror",
 ]
 
 [[package]]

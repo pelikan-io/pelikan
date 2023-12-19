@@ -11,7 +11,7 @@ mod reserved;
 #[cfg(any(feature = "magic", feature = "debug"))]
 pub(crate) use header::ITEM_MAGIC_SIZE;
 
-use crate::SegError;
+use crate::SegcacheError;
 use crate::Value;
 
 pub(crate) use header::{ItemHeader, ITEM_HDR_SIZE};
@@ -63,13 +63,13 @@ impl Item {
 
     /// Perform a wrapping addition on the value. Returns an error if the item
     /// is not a numeric type.
-    pub fn wrapping_add(&mut self, rhs: u64) -> Result<(), SegError> {
+    pub fn wrapping_add(&mut self, rhs: u64) -> Result<(), SegcacheError> {
         self.raw.wrapping_add(rhs)
     }
 
     /// Perform a saturating subtraction on the value. Returns an error if the
     /// item is not a numeric type.
-    pub fn saturating_sub(&mut self, rhs: u64) -> Result<(), SegError> {
+    pub fn saturating_sub(&mut self, rhs: u64) -> Result<(), SegcacheError> {
         self.raw.saturating_sub(rhs)
     }
 }
