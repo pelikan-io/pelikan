@@ -13,5 +13,5 @@ bytes = { workspace = true }
 common = { path = "../common" }
 log = { workspace = true }
 metriken = { workspace = true }
-pelikan-net = { path = "../net" }
+pelikan-net = { workspace = true }
 protocol-common = { path = "../protocol/common" }

@@ -13,6 +13,6 @@ license = { workspace = true }
 boring = { workspace = true }
 clocksource = { workspace = true }
 metriken = { workspace = true }
-pelikan-net = { path = "../net" }
+pelikan-net = { workspace = true }
 ringlog = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
