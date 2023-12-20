@@ -16,7 +16,7 @@ use logger::configure_logging;
 use logger::Drain;
 use metriken::*;
 use momento::*;
-use net::TCP_RECV_BYTE;
+use pelikan_net::TCP_RECV_BYTE;
 use protocol_admin::*;
 use session::*;
 use std::borrow::{Borrow, BorrowMut};

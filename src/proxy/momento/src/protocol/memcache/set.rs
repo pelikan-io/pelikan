@@ -4,7 +4,7 @@
 
 use crate::klog::{klog_set, Status};
 use crate::{Error, *};
-use ::net::*;
+use pelikan_net::*;
 use protocol_memcache::*;
 
 pub async fn set(

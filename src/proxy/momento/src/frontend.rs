@@ -4,7 +4,7 @@
 
 use crate::protocol::*;
 use crate::*;
-use net::TCP_SEND_BYTE;
+use pelikan_net::TCP_SEND_BYTE;
 use session::Buf;
 
 pub(crate) async fn handle_memcache_client(

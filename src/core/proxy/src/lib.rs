@@ -11,8 +11,6 @@ extern crate logger;
 #[macro_use]
 extern crate metriken;
 
-use ::net::event::{Event, Source};
-use ::net::*;
 use admin::AdminBuilder;
 use common::signal::Signal;
 use common::ssl::tls_acceptor;
@@ -24,6 +22,8 @@ use crossbeam_channel::{bounded, Receiver, Sender};
 use entrystore::EntryStore;
 use logger::Drain;
 use metriken::*;
+use pelikan_net::event::{Event, Source};
+use pelikan_net::*;
 use protocol_common::{Compose, Execute, Parse};
 use session::{Buf, ServerSession, Session};
 use slab::Slab;

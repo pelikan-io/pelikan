@@ -1,6 +1,6 @@
 use crate::klog::{klog_1, Status};
 use crate::{Error, *};
-use ::net::*;
+use pelikan_net::*;
 use protocol_memcache::*;
 
 pub async fn delete(

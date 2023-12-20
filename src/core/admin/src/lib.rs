@@ -2,14 +2,14 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use ::net::event::{Event, Source};
-use ::net::*;
 use common::signal::Signal;
 use common::ssl::tls_acceptor;
 use config::{AdminConfig, TlsConfig};
 use crossbeam_channel::Receiver;
 use logger::*;
 use metriken::*;
+use pelikan_net::event::{Event, Source};
+use pelikan_net::*;
 use protocol_admin::*;
 use session::{Buf, ServerSession, Session};
 use slab::Slab;
@@ -143,7 +143,7 @@ pub struct Admin {
     backlog: VecDeque<Token>,
     http_server: Option<tiny_http::Server>,
     /// The actual network listener for the ASCII Admin Endpoint
-    listener: ::net::Listener,
+    listener: pelikan_net::Listener,
     /// The drain handle for the logger
     log_drain: Box<dyn Drain>,
     /// The maximum number of events to process per call to poll
@@ -167,7 +167,7 @@ pub struct Admin {
 pub struct AdminBuilder {
     backlog: VecDeque<Token>,
     http_server: Option<tiny_http::Server>,
-    listener: ::net::Listener,
+    listener: pelikan_net::Listener,
     nevent: usize,
     poll: Poll,
     sessions: Slab<ServerSession<AdminRequestParser, AdminResponse, AdminRequest>>,
@@ -189,15 +189,15 @@ impl AdminBuilder {
         let tcp_listener = TcpListener::bind(addr)?;
 
         let mut listener = match (config.use_tls(), tls_acceptor(tls_config)?) {
-            (true, Some(tls_acceptor)) => ::net::Listener::from((tcp_listener, tls_acceptor)),
-            _ => ::net::Listener::from(tcp_listener),
+            (true, Some(tls_acceptor)) => pelikan_net::Listener::from((tcp_listener, tls_acceptor)),
+            _ => pelikan_net::Listener::from(tcp_listener),
         };
 
         let poll = Poll::new()?;
         listener.register(poll.registry(), LISTENER_TOKEN, Interest::READABLE)?;
 
         let waker = Arc::new(Waker::from(
-            ::net::Waker::new(poll.registry(), WAKER_TOKEN).unwrap(),
+            pelikan_net::Waker::new(poll.registry(), WAKER_TOKEN).unwrap(),
         ));
 
         let nevent = config.nevent();

@@ -22,7 +22,7 @@ pub use server::ServerSession;
 
 use std::os::unix::prelude::AsRawFd;
 
-use ::net::*;
+use pelikan_net::*;
 use common::time::Nanoseconds;
 use core::borrow::{Borrow, BorrowMut};
 use core::fmt::Debug;
