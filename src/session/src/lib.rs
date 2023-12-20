@@ -22,12 +22,12 @@ pub use server::ServerSession;
 
 use std::os::unix::prelude::AsRawFd;
 
-use pelikan_net::*;
 use common::time::Nanoseconds;
 use core::borrow::{Borrow, BorrowMut};
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use metriken::*;
+use pelikan_net::*;
 use protocol_common::Compose;
 use protocol_common::Parse;
 use std::collections::VecDeque;
