@@ -17,7 +17,7 @@ crossbeam-channel = { workspace = true }
 entrystore = { path = "../../entrystore" }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-pelikan-net = { path = "../../net" }
+pelikan-net = { workspace = true }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-common = { path = "../../protocol/common" }
 session = { path = "../../session" }

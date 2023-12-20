@@ -16,7 +16,7 @@ entrystore = { path = "../../entrystore" }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-pelikan-net = { path = "../../net" }
+pelikan-net = { workspace = true }
 parking_lot = { workspace = true }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-common = { path = "../../protocol/common" }
