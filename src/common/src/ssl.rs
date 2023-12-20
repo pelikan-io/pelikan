@@ -4,7 +4,7 @@
 
 pub use boring::ssl::*;
 
-use net::TlsTcpAcceptor;
+use pelikan_net::TlsTcpAcceptor;
 use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 
 pub trait TlsConfig {

@@ -49,7 +49,7 @@ pub static LISTENER_EVENT_WRITE: Counter = Counter::new();
 pub static LISTENER_SESSION_DISCARD: Counter = Counter::new();
 
 pub struct ListenerBuilder {
-    listener: ::net::Listener,
+    listener: pelikan_net::Listener,
     nevent: usize,
     poll: Poll,
     sessions: Slab<Session>,
@@ -70,16 +70,16 @@ impl ListenerBuilder {
         let tcp_listener = TcpListener::bind(addr)?;
 
         let mut listener = if let Some(tls_acceptor) = tls_acceptor(tls_config)? {
-            ::net::Listener::from((tcp_listener, tls_acceptor))
+            pelikan_net::Listener::from((tcp_listener, tls_acceptor))
         } else {
-            ::net::Listener::from(tcp_listener)
+            pelikan_net::Listener::from(tcp_listener)
         };
 
         let poll = Poll::new()?;
         listener.register(poll.registry(), LISTENER_TOKEN, Interest::READABLE)?;
 
         let waker = Arc::new(Waker::from(
-            ::net::Waker::new(poll.registry(), WAKER_TOKEN).unwrap(),
+            pelikan_net::Waker::new(poll.registry(), WAKER_TOKEN).unwrap(),
         ));
 
         let nevent = config.nevent();
@@ -121,7 +121,7 @@ impl ListenerBuilder {
 
 pub struct Listener {
     /// The actual network listener server
-    listener: ::net::Listener,
+    listener: pelikan_net::Listener,
     /// The maximum number of events to process per call to poll
     nevent: usize,
     /// The actual poll instantance

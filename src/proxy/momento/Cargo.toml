@@ -19,7 +19,7 @@ libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
 momento = "0.32.0"
-net = { path = "../../net" }
+pelikan-net = { path = "../../net" }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-memcache = { path = "../../protocol/memcache" }
 protocol-resp = { path = "../../protocol/resp" }

@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use crate::*;
-use ::net::{TCP_ACCEPT, TCP_CLOSE, TCP_CONN_CURR};
+use pelikan_net::{TCP_ACCEPT, TCP_CLOSE, TCP_CONN_CURR};
 
 pub(crate) async fn listener(
     listener: TcpListener,

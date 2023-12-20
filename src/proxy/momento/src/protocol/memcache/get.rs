@@ -4,8 +4,8 @@
 
 use crate::klog::{klog_1, Status};
 use crate::{Error, *};
-use ::net::*;
 use momento::response::Get as GetResponse;
+use pelikan_net::*;
 use protocol_memcache::*;
 
 pub async fn get(

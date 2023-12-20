@@ -1,6 +1,6 @@
 [package]
-name = "net"
-description = "Networking abstractions for non-blocking event loops"
+name = "pelikan-net"
+description = "Pelikan project's networking abstractions for non-blocking event loops"
 authors = ["Brian Martin <brian@pelikan.io>"]
 
 version = { workspace = true }

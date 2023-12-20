@@ -71,7 +71,7 @@ where
         let poll = Poll::new()?;
 
         let waker = Arc::new(Waker::from(
-            ::net::Waker::new(poll.registry(), WAKER_TOKEN).unwrap(),
+            pelikan_net::Waker::new(poll.registry(), WAKER_TOKEN).unwrap(),
         ));
 
         let nevent = config.nevent();
