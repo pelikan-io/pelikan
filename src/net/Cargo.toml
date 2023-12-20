@@ -2,8 +2,8 @@
 name = "pelikan-net"
 description = "Pelikan project's networking abstractions for non-blocking event loops"
 authors = ["Brian Martin <brian@pelikan.io>"]
+version = "0.1.0"
 
-version = { workspace = true }
 edition = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
