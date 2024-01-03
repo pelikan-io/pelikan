@@ -17,4 +17,4 @@ The design was first published as a conference paper at NSDI’21, titled “Pel
 Segcache: a memory-efficient and scalable in-memory key-value cache for small
 objects”. It received NSDI Community Award, and the code used in the paper is
 merged into Pelikan codebase as of April 2021. A more detailed description can
-be found in the form of a [blog post](https://pelikan.io/2021/segcache.html)
+be found in the form of a [blog post](https://pelikan.io/2021/segcache.html).
