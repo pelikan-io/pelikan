@@ -80,7 +80,6 @@ tiny_http = "0.12.0"
 toml = "0.8.2"
 twox-hash = { version = "1.6.3", default-features = false }
 urlencoding = "2.1.3"
-zookeeper = "0.8.0"
 
 [profile.release]
 opt-level = 3
