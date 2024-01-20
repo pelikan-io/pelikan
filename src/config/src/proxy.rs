@@ -3,10 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
-use zookeeper::{WatchedEvent, Watcher, ZooKeeper};
 
-use core::time::Duration;
 use std::net::{AddrParseError, SocketAddr, ToSocketAddrs};
 
 // constants to define default values
@@ -74,9 +71,6 @@ pub struct Backend {
     #[serde(default = "backend_poolsize")]
     poolsize: usize,
     endpoints: Vec<String>,
-    zk_server: Option<String>,
-    zk_path: Option<String>,
-    zk_endpoint: Option<String>,
 }
 
 // implementation
@@ -161,85 +155,12 @@ impl Backend {
                 }
             }
             Ok(endpoints)
-        } else if let (Some(server), Some(path), endpoint) = (
-            self.zk_server.as_ref(),
-            self.zk_path.as_ref(),
-            self.zk_endpoint.as_ref(),
-        ) {
-            let mut ret = Vec::new();
-            if let Ok(server) = ZooKeeper::connect(server, Duration::from_secs(15), ExitWatcher) {
-                if let Ok(children) = server.get_children(path, true) {
-                    for child in children {
-                        let data = server
-                            .get_data(&format!("{path}/{child}"), true)
-                            .map(|v| {
-                                std::str::from_utf8(&v.0)
-                                    .map_err(|_| {
-                                        std::io::Error::new(
-                                            std::io::ErrorKind::Other,
-                                            "bad data in zknode",
-                                        )
-                                    })
-                                    .unwrap()
-                                    .to_owned()
-                            })
-                            .map_err(|_| {
-                                std::io::Error::new(
-                                    std::io::ErrorKind::Other,
-                                    "failed to get zknodes",
-                                )
-                            })?;
-
-                        let entry: JsonValue = serde_json::from_str(&data).unwrap();
-                        let endpoint = if let Some(endpoint) = endpoint {
-                            &entry["additionalEndpoints"][endpoint]
-                        } else {
-                            &entry["serviceEndpoint"]
-                        };
-                        let host = endpoint["host"].to_string();
-                        let host_parts: Vec<&str> = host.split('"').collect();
-                        let port = endpoint["port"].to_string();
-                        if let Some(host) = host_parts.get(1) {
-                            let host = format!("{host}:{port}");
-                            if let Ok(mut addrs) = host.to_socket_addrs() {
-                                if let Some(socket_addr) = addrs.next() {
-                                    ret.push(socket_addr);
-                                }
-                            }
-                        }
-                    }
-                    if ret.is_empty() {
-                        Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            "no endpoints found via zookeeper",
-                        ))
-                    } else {
-                        Ok(ret)
-                    }
-                } else {
-                    Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "bad data in zknode",
-                    ))
-                }
-            } else {
-                error!("failed to connect to zookeeper");
-                panic!();
-            }
         } else {
             Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "no endpoints provided",
             ))
-            // Vec::new()
         }
-    }
-}
-
-struct ExitWatcher;
-impl Watcher for ExitWatcher {
-    fn handle(&self, _event: WatchedEvent) {
-        std::process::exit(2);
     }
 }
 
@@ -271,9 +192,6 @@ impl Default for Backend {
             nevent: nevent(),
             threads: backend_threads(),
             endpoints: Vec::new(),
-            zk_server: None,
-            zk_path: None,
-            zk_endpoint: None,
             poolsize: backend_poolsize(),
         }
     }
