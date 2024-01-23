@@ -427,19 +427,16 @@ impl Ttl {
             };
 
             // calculate the ttl in seconds
-            let seconds = UnixInstant::now()
-                .checked_duration_since(UnixInstant::EPOCH)
-                .map(|v| v.as_secs() - exptime)
-                .unwrap_or(0);
+            let now = UnixInstant::now().duration_since(UnixInstant::EPOCH).as_secs();
 
-            // zero would be immediate expiration, early return
-            if seconds == 0 {
+            // would immediately expire, early return
+            if now >= exptime {
                 return Self {
                     inner: NonZeroI32::new(-1),
                 };
             }
 
-            seconds as i64
+            (exptime - now) as i64
         } else {
             exptime
         };
