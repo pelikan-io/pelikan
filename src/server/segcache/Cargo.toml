@@ -49,4 +49,4 @@ protocol-memcache = { path = "../../protocol/memcache" }
 server = { path = "../../core/server" }
 
 [dev-dependencies]
-criterion = "0.3"
+criterion = "0.5.1"

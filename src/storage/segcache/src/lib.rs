@@ -27,7 +27,7 @@
 extern crate log;
 
 // external crate includes
-use clocksource::Seconds;
+use clocksource::coarse::{Duration, Instant};
 
 // includes from core/std
 use core::hash::{BuildHasher, Hasher};
@@ -63,10 +63,6 @@ pub use error::SegcacheError;
 pub use eviction::Policy;
 pub use item::Item;
 pub use value::Value;
-
-// type aliases
-pub(crate) type Duration = clocksource::Duration<Seconds<u32>>;
-pub(crate) type Instant = clocksource::Instant<Seconds<u32>>;
 
 // items from submodules which are imported for convenience to the crate level
 pub(crate) use crate::rand::*;

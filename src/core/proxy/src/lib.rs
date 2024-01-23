@@ -12,6 +12,7 @@ extern crate logger;
 extern crate metriken;
 
 use admin::AdminBuilder;
+use clocksource::precise::Instant;
 use common::signal::Signal;
 use common::ssl::tls_acceptor;
 use config::proxy::*;
@@ -30,8 +31,6 @@ use slab::Slab;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
 use switchboard::{Queues, Waker};
-
-type Instant = clocksource::Instant<clocksource::Nanoseconds<u64>>;
 
 mod backend;
 mod frontend;

@@ -17,7 +17,7 @@ twox-hash = { workspace = true, default-features = false }
 rand = { workspace = true, optional = true }
 
 [dev-dependencies]
-criterion = "0.4"
+criterion = "0.5.1"
 
 [[bench]]
 name = "bloom"

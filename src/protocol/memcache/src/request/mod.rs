@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use crate::*;
-use common::time::{Seconds, UnixInstant};
+use clocksource::coarse::UnixInstant;
 use core::fmt::{Display, Formatter};
 use core::num::NonZeroI32;
 use protocol_common::{BufMut, Parse, ParseOk};
@@ -427,9 +427,9 @@ impl Ttl {
             };
 
             // calculate the ttl in seconds
-            let seconds = UnixInstant::from_secs(exptime)
-                .checked_duration_since(UnixInstant::<Seconds<u32>>::recent())
-                .map(|v| v.as_secs())
+            let seconds = UnixInstant::now()
+                .checked_duration_since(UnixInstant::EPOCH)
+                .map(|v| v.as_secs() - exptime)
                 .unwrap_or(0);
 
             // zero would be immediate expiration, early return
