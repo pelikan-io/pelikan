@@ -427,7 +427,9 @@ impl Ttl {
             };
 
             // calculate the ttl in seconds
-            let now = UnixInstant::now().duration_since(UnixInstant::EPOCH).as_secs();
+            let now = UnixInstant::now()
+                .duration_since(UnixInstant::EPOCH)
+                .as_secs();
 
             // would immediately expire, early return
             if now >= exptime {
