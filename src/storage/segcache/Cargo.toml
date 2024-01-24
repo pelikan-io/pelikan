@@ -40,4 +40,4 @@ rand_xoshiro = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-criterion = "0.3.4"
+criterion = "0.5.1"

@@ -20,22 +20,16 @@ pub use buffer::*;
 pub use client::ClientSession;
 pub use server::ServerSession;
 
-use std::os::unix::prelude::AsRawFd;
-
-use common::time::Nanoseconds;
+use clocksource::precise::Instant;
 use core::borrow::{Borrow, BorrowMut};
 use core::fmt::Debug;
 use core::marker::PhantomData;
 use metriken::*;
 use pelikan_net::*;
-use protocol_common::Compose;
-use protocol_common::Parse;
+use protocol_common::{Compose, Parse};
 use std::collections::VecDeque;
-use std::io::Error;
-use std::io::ErrorKind;
-use std::io::Read;
-use std::io::Result;
-use std::io::Write;
+use std::io::{Error, ErrorKind, Read, Result, Write};
+use std::os::unix::prelude::AsRawFd;
 
 #[metric(
     name = "session_buffer_byte",
@@ -78,8 +72,6 @@ pub static SESSION_SEND_BYTE: Counter = Counter::new();
     description = "distribution of request latencies in nanoseconds"
 )]
 pub static REQUEST_LATENCY: AtomicHistogram = AtomicHistogram::new(7, 32);
-
-type Instant = common::time::Instant<Nanoseconds<u64>>;
 
 // The size of one kilobyte, in bytes
 const KB: usize = 1024;

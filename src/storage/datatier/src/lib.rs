@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use blake3::Hash;
-use clocksource::{Instant, Nanoseconds, Seconds, UnixInstant};
+// use clocksource::{Instant, Nanoseconds, Seconds, UnixInstant};
 use core::ops::Range;
 use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
@@ -85,10 +85,10 @@ pub struct Header {
     checksum: [u8; 32],
     magic: [u8; 8],
     version: u64,
-    time_monotonic_s: Instant<Seconds<u32>>,
-    time_unix_s: UnixInstant<Seconds<u32>>,
-    time_monotonic_ns: Instant<Nanoseconds<u64>>,
-    time_unix_ns: UnixInstant<Nanoseconds<u64>>,
+    time_monotonic_s: clocksource::coarse::Instant,
+    time_unix_s: clocksource::coarse::UnixInstant,
+    time_monotonic_ns: clocksource::precise::Instant,
+    time_unix_ns: clocksource::precise::UnixInstant,
     user_version: u64,
     options: u64,
     _pad: [u8; 4008],
@@ -100,10 +100,10 @@ impl Header {
             checksum: [0; 32],
             magic: MAGIC,
             version: VERSION,
-            time_monotonic_s: Instant::<Seconds<u32>>::now(),
-            time_unix_s: UnixInstant::<Seconds<u32>>::now(),
-            time_monotonic_ns: Instant::<Nanoseconds<u64>>::now(),
-            time_unix_ns: UnixInstant::<Nanoseconds<u64>>::now(),
+            time_monotonic_s: clocksource::coarse::Instant::now(),
+            time_unix_s: clocksource::coarse::UnixInstant::now(),
+            time_monotonic_ns: clocksource::precise::Instant::now(),
+            time_unix_ns: clocksource::precise::UnixInstant::now(),
             user_version: 0,
             options: 0,
             _pad: [0; 4008],
@@ -315,19 +315,19 @@ impl MmapFile {
         unsafe { &*(header.as_ptr() as *const Header) }
     }
 
-    pub fn time_monotonic_s(&self) -> Instant<Seconds<u32>> {
+    pub fn time_monotonic_s(&self) -> clocksource::coarse::Instant {
         self.header().time_monotonic_s
     }
 
-    pub fn time_monotonic_ns(&self) -> Instant<Nanoseconds<u64>> {
+    pub fn time_monotonic_ns(&self) -> clocksource::precise::Instant {
         self.header().time_monotonic_ns
     }
 
-    pub fn time_unix_s(&self) -> UnixInstant<Seconds<u32>> {
+    pub fn time_unix_s(&self) -> clocksource::coarse::UnixInstant {
         self.header().time_unix_s
     }
 
-    pub fn time_unix_ns(&self) -> UnixInstant<Nanoseconds<u64>> {
+    pub fn time_unix_ns(&self) -> clocksource::precise::UnixInstant {
         self.header().time_unix_ns
     }
 }
@@ -598,19 +598,19 @@ impl FileBackedMemory {
         unsafe { &*(self.header.as_ptr() as *const Header) }
     }
 
-    pub fn time_monotonic_s(&self) -> Instant<Seconds<u32>> {
+    pub fn time_monotonic_s(&self) -> clocksource::coarse::Instant {
         self.header().time_monotonic_s
     }
 
-    pub fn time_monotonic_ns(&self) -> Instant<Nanoseconds<u64>> {
+    pub fn time_monotonic_ns(&self) -> clocksource::precise::Instant {
         self.header().time_monotonic_ns
     }
 
-    pub fn time_unix_s(&self) -> UnixInstant<Seconds<u32>> {
+    pub fn time_unix_s(&self) -> clocksource::coarse::UnixInstant {
         self.header().time_unix_s
     }
 
-    pub fn time_unix_ns(&self) -> UnixInstant<Nanoseconds<u64>> {
+    pub fn time_unix_ns(&self) -> clocksource::precise::UnixInstant {
         self.header().time_unix_ns
     }
 }

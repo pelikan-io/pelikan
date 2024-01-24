@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use crate::time::*;
 use serde::{Deserialize, Serialize};
 
 use std::time::SystemTime;
@@ -70,11 +69,11 @@ impl Expiry {
         }
     }
 
-    pub fn as_duration(&self) -> Duration<Nanoseconds<u64>> {
-        Duration::<Nanoseconds<u64>>::from_secs(self.as_secs().into())
+    pub fn as_duration(&self) -> clocksource::precise::Duration {
+        clocksource::precise::Duration::from_secs(self.as_secs())
     }
 
-    pub fn as_coarse_duration(&self) -> Duration<Seconds<u32>> {
-        Duration::<Seconds<u32>>::from_secs(self.as_secs())
+    pub fn as_coarse_duration(&self) -> clocksource::coarse::Duration {
+        clocksource::coarse::Duration::from_secs(self.as_secs())
     }
 }

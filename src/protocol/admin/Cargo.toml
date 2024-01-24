@@ -19,4 +19,4 @@ protocol-common = { path = "../../protocol/common" }
 storage-types = { path = "../../storage/types" }
 
 [dev-dependencies]
-criterion = "0.3.4"
+criterion = "0.5.1"
