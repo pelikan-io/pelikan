@@ -58,7 +58,7 @@ log = "0.4.20"
 memmap2 = "0.9.0"
 metriken = "0.3.3"
 metrohash = "1.0.6"
-mio = "0.8.8"
+mio = "0.8.11"
 nom = "7.1.3"
 parking_lot = "0.12.1"
 pelikan-net = { path = "./src/net", version = "0.1.0" }
