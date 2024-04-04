@@ -5,8 +5,6 @@
 use crate::*;
 use std::os::unix::prelude::FromRawFd;
 
-pub use std::net::Shutdown;
-
 #[derive(PartialEq)]
 enum State {
     Connecting,
