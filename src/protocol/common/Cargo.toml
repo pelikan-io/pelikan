@@ -11,8 +11,8 @@ license = { workspace = true }
 
 [dependencies]
 bytes = { workspace = true }
-common = { path = "../../common" }
-config = { path = "../../config" }
+common = { path = "../../common", default-features = false }
+config = { path = "../../config", default-features = false }
 logger = { path = "../../logger" }
 storage-types = { path = "../../storage/types" }
 

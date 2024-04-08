@@ -8,6 +8,6 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-common = { path = "../common" }
-config = { path = "../config" }
+common = { path = "../common", default-features = false }
+config = { path = "../config", default-features = false }
 ringlog = { workspace = true }

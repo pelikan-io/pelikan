@@ -6,5 +6,6 @@ pub mod bytes;
 pub mod expiry;
 pub mod metrics;
 pub mod signal;
+#[cfg(feature = "boringssl")]
 pub mod ssl;
 pub mod traits;

@@ -13,6 +13,10 @@ license = { workspace = true }
 boring = { workspace = true }
 clocksource = { workspace = true }
 metriken = { workspace = true }
-pelikan-net = { workspace = true, features = ["boringssl"] }
+pelikan-net = { workspace = true, default-features = false }
 ringlog = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+
+[features]
+default = ["boringssl"]
+boringssl = ["pelikan-net/boringssl"]
