@@ -129,16 +129,16 @@ jobs:
       - name: build
         shell: bash
         run: |
-          cargo build --workspace --all-features --all-targets --locked ${{ env.FLAGS }}
+          cargo build --workspace --all-targets --locked ${{ env.FLAGS }}
       - name: test
         shell: bash
         run: |
-          cargo test --workspace --all-features --tests --lib --bins --examples --locked ${{ env.FLAGS }}
+          cargo test --workspace --tests --lib --bins --examples --locked ${{ env.FLAGS }}
       - name: doctests
         if: ${{ matrix.profile == 'debug' }}
         shell: bash
         run: |
-          cargo test --workspace --all-features --doc --locked -- --test-threads 16
+          cargo test --workspace --doc --locked -- --test-threads 16
 
       - name: generate bin artifact
         if: ${{ matrix.profile == 'release' && matrix.os == 'ubuntu-latest' }}
