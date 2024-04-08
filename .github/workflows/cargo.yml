@@ -26,6 +26,19 @@ jobs:
         run: |
           cargo check --all-targets
 
+  check-powerset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: swlynch99/cargo-sweep-action@v1
+      - uses: taiki-e/install-action@cargo-hack
+
+      - name: check powerset
+        run: |
+          cargo hack --feature-powerset check --locked
+
   clippy:
     runs-on: ubuntu-latest
     steps:
@@ -116,16 +129,16 @@ jobs:
       - name: build
         shell: bash
         run: |
-          cargo build --workspace --all-features --all-targets --locked ${{ env.FLAGS }}
+          cargo build --workspace --all-targets --locked ${{ env.FLAGS }}
       - name: test
         shell: bash
         run: |
-          cargo test --workspace --all-features --tests --lib --bins --examples --locked ${{ env.FLAGS }}
+          cargo test --workspace --tests --lib --bins --examples --locked ${{ env.FLAGS }}
       - name: doctests
         if: ${{ matrix.profile == 'debug' }}
         shell: bash
         run: |
-          cargo test --workspace --all-features --doc --locked -- --test-threads 16
+          cargo test --workspace --doc --locked -- --test-threads 16
 
       - name: generate bin artifact
         if: ${{ matrix.profile == 'release' && matrix.os == 'ubuntu-latest' }}

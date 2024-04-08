@@ -22,7 +22,7 @@ pub trait TlsConfig {
 /// `TlsTcpAcceptor` wrapped in an option, where the `None` variant indicates
 /// that TLS should not be used.
 pub fn tls_acceptor(config: &dyn TlsConfig) -> Result<Option<TlsTcpAcceptor>, IoError> {
-    let mut builder = TlsTcpAcceptor::mozilla_intermediate_v5()?;
+    let mut builder = TlsTcpAcceptor::builder();
 
     // we use xor here to check if we have an under-specified tls configuration
     if config.private_key().is_some()

@@ -10,6 +10,7 @@ pub struct Connector {
 
 enum ConnectorType {
     Tcp(TcpConnector),
+    #[cfg(any(feature = "boringssl", feature = "openssl"))]
     TlsTcp(TlsTcpConnector),
 }
 
@@ -18,6 +19,7 @@ impl Connector {
     pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<Stream> {
         match &self.inner {
             ConnectorType::Tcp(connector) => Ok(Stream::from(connector.connect(addr)?)),
+            #[cfg(any(feature = "boringssl", feature = "openssl"))]
             ConnectorType::TlsTcp(connector) => Ok(Stream::from(connector.connect(addr)?)),
         }
     }
@@ -31,6 +33,7 @@ impl From<TcpConnector> for Connector {
     }
 }
 
+#[cfg(any(feature = "boringssl", feature = "openssl"))]
 impl From<TlsTcpConnector> for Connector {
     fn from(other: TlsTcpConnector) -> Self {
         Self {
