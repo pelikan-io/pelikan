@@ -24,6 +24,7 @@ impl Default for Implementation {
             return Self::Openssl;
         }
 
+        #[cfg(feature = "boringssl")]
         Self::Boringssl
     }
 }
@@ -199,6 +200,7 @@ pub struct TlsTcpAcceptor {
 }
 
 enum TlsTcpAcceptorImpl {
+    #[cfg(feature = "boringssl")]
     Boringssl(boringssl::TlsTcpAcceptor),
     #[cfg(feature = "openssl")]
     Openssl(openssl::TlsTcpAcceptor),

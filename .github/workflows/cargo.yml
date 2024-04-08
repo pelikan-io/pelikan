@@ -26,6 +26,19 @@ jobs:
         run: |
           cargo check --all-targets
 
+  check-powerset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: swlynch99/cargo-sweep-action@v1
+      - uses: taiki-e/install-action@cargo-hack
+
+      - name: check powerset
+        run: |
+          cargo hack --feature-powerset check --locked
+
   clippy:
     runs-on: ubuntu-latest
     steps:
