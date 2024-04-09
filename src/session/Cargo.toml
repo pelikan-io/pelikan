@@ -11,8 +11,8 @@ license = { workspace = true }
 [dependencies]
 bytes = { workspace = true }
 clocksource = { workspace = true }
-common = { path = "../common" }
+common = { path = "../common", default-features = false }
 log = { workspace = true }
 metriken = { workspace = true }
-pelikan-net = { workspace = true }
-protocol-common = { path = "../protocol/common" }
+pelikan-net = { workspace = true, default-features = false }
+protocol-common = { path = "../protocol/common", default-features = false }
