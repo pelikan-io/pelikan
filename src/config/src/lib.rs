@@ -23,6 +23,7 @@ mod sockio;
 mod stats_log;
 mod tcp;
 pub mod time;
+#[cfg(feature = "boringssl")]
 mod tls;
 mod units;
 mod worker;
@@ -44,5 +45,6 @@ pub use sockio::{Sockio, SockioConfig};
 pub use stats_log::StatsLogConfig;
 pub use tcp::{Tcp, TcpConfig};
 pub use time::{Time, TimeConfig, TimeType};
+#[cfg(feature = "boringssl")]
 pub use tls::{Tls, TlsConfig};
 pub use worker::{Worker, WorkerConfig};

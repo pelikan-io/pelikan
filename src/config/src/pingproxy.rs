@@ -50,6 +50,7 @@ pub struct PingproxyConfig {
 
     #[serde(default)]
     time: Time,
+    #[cfg(feature = "boringssl")]
     #[serde(default)]
     tls: Tls,
 
@@ -126,6 +127,7 @@ impl TimeConfig for PingproxyConfig {
     }
 }
 
+#[cfg(feature = "boringssl")]
 impl TlsConfig for PingproxyConfig {
     fn tls(&self) -> &Tls {
         &self.tls
@@ -183,6 +185,7 @@ impl Default for PingproxyConfig {
             klog: Default::default(),
             sockio: Default::default(),
             tcp: Default::default(),
+            #[cfg(feature = "boringssl")]
             tls: Default::default(),
         }
     }

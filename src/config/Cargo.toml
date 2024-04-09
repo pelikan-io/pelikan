@@ -10,8 +10,12 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-common = { path = "../common" }
+common = { path = "../common", default-features = false }
 log = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 toml = { workspace = true }
+
+[features]
+default = ["boringssl"]
+boringssl = ["common/boringssl"]
