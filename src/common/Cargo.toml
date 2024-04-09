@@ -19,4 +19,4 @@ serde = { workspace = true, features = ["derive"] }
 
 [features]
 default = ["boringssl"]
-boringssl = ["pelikan-net/boringssl"]
+boringssl = ["dep:boring", "pelikan-net/boringssl"]
