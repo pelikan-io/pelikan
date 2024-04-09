@@ -10,7 +10,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-boring = { workspace = true }
+boring = { workspace = true, optional = true }
 clocksource = { workspace = true }
 metriken = { workspace = true }
 pelikan-net = { workspace = true, default-features = false }
