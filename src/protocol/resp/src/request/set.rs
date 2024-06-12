@@ -264,7 +264,7 @@ impl Klog for Set {
             "\"set {} {} {} {}\" {} {}",
             string_key(self.key()),
             FLAG,
-            self.expire_time().unwrap_or(ExpireTime::default()),
+            self.expire_time().unwrap_or_default(),
             self.value().len(),
             code as u32,
             len

@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-type HistogramSnapshots = HashMap<String, metriken::histogram::Snapshot>;
+type HistogramSnapshots = HashMap<String, metriken::histogram::Histogram>;
 
 pub static SNAPSHOTS: Lazy<Arc<RwLock<Snapshots>>> =
     Lazy::new(|| Arc::new(RwLock::new(Snapshots::new())));
@@ -39,9 +39,9 @@ impl Snapshots {
 
             let snapshot = if let Some(histogram) = any.downcast_ref::<metriken::AtomicHistogram>()
             {
-                histogram.snapshot()
+                histogram.load()
             } else if let Some(histogram) = any.downcast_ref::<metriken::RwLockHistogram>() {
-                histogram.snapshot()
+                histogram.load()
             } else {
                 None
             };
@@ -76,9 +76,9 @@ impl Snapshots {
 
             let snapshot = if let Some(histogram) = any.downcast_ref::<metriken::AtomicHistogram>()
             {
-                histogram.snapshot()
+                histogram.load()
             } else if let Some(histogram) = any.downcast_ref::<metriken::RwLockHistogram>() {
-                histogram.snapshot()
+                histogram.load()
             } else {
                 None
             };
