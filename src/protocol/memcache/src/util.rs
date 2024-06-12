@@ -5,8 +5,7 @@
 pub use nom::bytes::streaming::*;
 pub use nom::character::streaming::*;
 pub use nom::error::ErrorKind;
-pub use nom::{AsChar, Err, IResult, InputTakeAtPosition, Needed};
-pub use protocol_common::Compose;
+pub use nom::{AsChar, Err, IResult, InputTakeAtPosition};
 pub use std::io::Write;
 
 use crate::{TimeType, Ttl};

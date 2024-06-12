@@ -27,7 +27,7 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "parking_lot",
  "pelikan-net",
  "protocol-admin",
@@ -515,7 +515,7 @@ version = "0.3.1"
 dependencies = [
  "boring",
  "clocksource",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "pelikan-net",
  "ringlog",
  "serde",
@@ -931,18 +931,18 @@ checksum = "d231dfb89cfffdbc30e7fc41579ed6066ad03abda9e567ccafae602b97ec5024"
 
 [[package]]
 name = "histogram"
-version = "0.8.4"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "de0f59c8ab5f8d1f1dd481174172ce418e2e306d665cdd8057c0bd457c447159"
+checksum = "4b634390eb8a63662e127836d4e2f26d7ae930600d4e05ee0fd85a009eeb1175"
 dependencies = [
  "thiserror",
 ]
 
 [[package]]
 name = "histogram"
-version = "0.9.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b634390eb8a63662e127836d4e2f26d7ae930600d4e05ee0fd85a009eeb1175"
+checksum = "cfe0e7d1b57c929216545b6aa17aff4798bc432b7065ac16a3e03b8dd63d8643"
 dependencies = [
  "thiserror",
 ]
@@ -1129,7 +1129,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if",
- "windows-targets 0.48.5",
+ "windows-targets 0.52.4",
 ]
 
 [[package]]
@@ -1206,19 +1206,6 @@ dependencies = [
 
 [[package]]
 name = "metriken"
-version = "0.3.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9baea67418f728439d5a806bb1d18a4ab84a21388d768c1d400a3e6cc2dc1948"
-dependencies = [
- "histogram 0.8.4",
- "metriken-core",
- "metriken-derive 0.3.4",
- "once_cell",
- "parking_lot",
-]
-
-[[package]]
-name = "metriken"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9a3870ac33c736eb72b163e299d3942ddf8faf78600768ac13973d240593eedf"
@@ -1226,6 +1213,19 @@ dependencies = [
  "histogram 0.9.1",
  "metriken-core",
  "metriken-derive 0.4.1",
+ "once_cell",
+ "parking_lot",
+]
+
+[[package]]
+name = "metriken"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc0bad9aa443621ae4972578da55b7f3c24d930cc1491551a8f989edead4762c"
+dependencies = [
+ "histogram 0.10.2",
+ "metriken-core",
+ "metriken-derive 0.5.1",
  "once_cell",
  "parking_lot",
 ]
@@ -1243,11 +1243,11 @@ dependencies = [
 
 [[package]]
 name = "metriken-derive"
-version = "0.3.4"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1738842f3a54b57e8a665cb2f6eb5e4ad7301089a41655c2cddecf92354a4992"
+checksum = "bb49028ecd37be8a53476b35d5b0bb6647e304d9b9c6836e9a5ba9efa13e1dcf"
 dependencies = [
- "proc-macro-crate",
+ "proc-macro-crate 1.3.1",
  "proc-macro2",
  "quote",
  "syn 1.0.109",
@@ -1255,14 +1255,14 @@ dependencies = [
 
 [[package]]
 name = "metriken-derive"
-version = "0.4.1"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bb49028ecd37be8a53476b35d5b0bb6647e304d9b9c6836e9a5ba9efa13e1dcf"
+checksum = "3643374c9873e69a27e50404db6006ad09f0c1ee944e8ce928d586df077b71db"
 dependencies = [
- "proc-macro-crate",
+ "proc-macro-crate 3.1.0",
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.58",
 ]
 
 [[package]]
@@ -1346,7 +1346,7 @@ dependencies = [
  "config",
  "libc",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "momento",
  "pelikan-net",
  "protocol-admin",
@@ -1532,7 +1532,7 @@ dependencies = [
  "foreign-types-shared 0.1.1",
  "foreign-types-shared 0.3.1",
  "libc",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "mio",
  "openssl",
  "openssl-sys",
@@ -1549,7 +1549,7 @@ dependencies = [
  "criterion",
  "entrystore",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "protocol-memcache",
  "server",
 ]
@@ -1652,7 +1652,7 @@ dependencies = [
  "common",
  "config",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "protocol-ping",
  "proxy",
 ]
@@ -1668,7 +1668,7 @@ dependencies = [
  "criterion",
  "entrystore",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "protocol-ping",
  "server",
 ]
@@ -1730,6 +1730,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "proc-macro-crate"
+version = "3.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6d37c51ca738a55da99dc0c4a34860fd675453b8b36209178c2249bb13651284"
+dependencies = [
+ "toml_edit 0.21.1",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1769,7 +1778,7 @@ dependencies = [
  "config",
  "criterion",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "parking_lot",
  "protocol-common",
  "storage-types",
@@ -1811,7 +1820,7 @@ dependencies = [
  "common",
  "criterion",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "nom",
  "protocol-common",
 ]
@@ -1824,7 +1833,7 @@ dependencies = [
  "config",
  "criterion",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "protocol-common",
  "storage-types",
 ]
@@ -1837,7 +1846,7 @@ dependencies = [
  "common",
  "logger",
  "memchr",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "nom",
  "protocol-common",
  "thiserror",
@@ -1849,7 +1858,7 @@ version = "0.3.1"
 dependencies = [
  "common",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "protocol-common",
 ]
 
@@ -1864,7 +1873,7 @@ dependencies = [
  "crossbeam-channel",
  "entrystore",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "pelikan-net",
  "protocol-admin",
  "protocol-common",
@@ -1958,7 +1967,7 @@ dependencies = [
  "criterion",
  "entrystore",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "protocol-resp",
  "server",
 ]
@@ -2190,7 +2199,7 @@ dependencies = [
  "criterion",
  "datatier",
  "log",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "rand",
  "rand_chacha",
  "rand_xoshiro",
@@ -2248,7 +2257,7 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "pelikan-net",
  "protocol-admin",
  "protocol-common",
@@ -2266,7 +2275,7 @@ dependencies = [
  "clocksource",
  "common",
  "log",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "pelikan-net",
  "protocol-common",
 ]
@@ -2454,7 +2463,7 @@ dependencies = [
  "common",
  "config",
  "logger",
- "metriken 0.3.5",
+ "metriken 0.6.0",
  "protocol-thrift",
  "proxy",
 ]
@@ -2613,6 +2622,17 @@ name = "toml_edit"
 version = "0.19.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b5bb770da30e5cbfde35a2d7b9b8a2c4b8ef89548a7a6aeab5c9a576e3e7421"
+dependencies = [
+ "indexmap 2.2.6",
+ "toml_datetime",
+ "winnow 0.5.40",
+]
+
+[[package]]
+name = "toml_edit"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a8534fd7f78b5405e860340ad6575217ce99f38d4d5c8f2442cb5ecb50090e1"
 dependencies = [
  "indexmap 2.2.6",
  "toml_datetime",

@@ -4,8 +4,7 @@
 
 pub use nom::bytes::streaming::*;
 pub use nom::character::streaming::*;
-pub use nom::{AsChar, Err, IResult, InputTakeAtPosition, Needed};
-pub use protocol_common::Compose;
+pub use nom::{AsChar, Err, IResult, Needed};
 pub use std::io::{Error, ErrorKind, Write};
 
 use crate::message::*;
