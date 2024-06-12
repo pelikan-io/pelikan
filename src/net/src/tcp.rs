@@ -20,8 +20,11 @@ impl TcpStream {
     pub fn connect(addr: SocketAddr) -> Result<Self> {
         let inner = mio::net::TcpStream::connect(addr)?;
 
-        TCP_CONN_CURR.increment();
-        TCP_CONNECT.increment();
+        #[cfg(feature = "metrics")]
+        {
+            TCP_CONN_CURR.increment();
+            TCP_CONNECT.increment();
+        }
 
         Ok(Self {
             inner,
@@ -58,8 +61,11 @@ impl TcpStream {
 
 impl Drop for TcpStream {
     fn drop(&mut self) {
-        TCP_CONN_CURR.decrement();
-        TCP_CLOSE.increment();
+        #[cfg(feature = "metrics")]
+        {
+            TCP_CONN_CURR.decrement();
+            TCP_CLOSE.increment();
+        }
     }
 }
 
@@ -81,7 +87,9 @@ impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         match self.inner.read(buf) {
             Ok(amt) => {
+                #[cfg(feature = "metrics")]
                 TCP_RECV_BYTE.add(amt as _);
+
                 Ok(amt)
             }
             Err(e) => Err(e),
@@ -93,7 +101,9 @@ impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         match self.inner.write(buf) {
             Ok(amt) => {
+                #[cfg(feature = "metrics")]
                 TCP_SEND_BYTE.add(amt as _);
+
                 Ok(amt)
             }
             Err(e) => Err(e),
@@ -177,6 +187,7 @@ impl TcpListener {
             )
         });
 
+        #[cfg(feature = "metrics")]
         if result.is_ok() {
             TCP_ACCEPT.increment();
             TCP_CONN_CURR.increment();

@@ -39,11 +39,16 @@ impl Listener {
     ///
     /// All other errors should be treated as failures.
     pub fn accept(&self) -> Result<Stream> {
+        #[cfg(feature = "metrics")]
         STREAM_ACCEPT.increment();
+
         let result = self._accept();
+
+        #[cfg(feature = "metrics")]
         if result.is_err() {
             STREAM_ACCEPT_EX.increment();
         }
+
         result
     }
 
