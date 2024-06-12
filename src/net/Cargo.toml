@@ -21,7 +21,6 @@ openssl = { workspace = true, optional = true }
 openssl-sys = { workspace = true, optional = true }
 
 [features]
-default = ["boringssl"]
 boringssl = ["boring", "boring-sys"]
 metrics = ["metriken"]
 openssl = ["dep:openssl", "openssl-sys", "openssl/vendored"]
