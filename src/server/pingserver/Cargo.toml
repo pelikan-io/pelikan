@@ -38,7 +38,7 @@ entrystore = { path = "../../entrystore" }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
 protocol-ping = { path = "../../protocol/ping", features = ["server"] }
-server = { path = "../../core/server" }
+server = { path = "../../core/server", features = ["boringssl"] }
 
 [dev-dependencies]
 criterion = "0.5.1"
