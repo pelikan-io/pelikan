@@ -82,7 +82,7 @@ impl Stream {
             StreamType::TlsTcp(s) => s.shutdown().map(|v| v == ShutdownResult::Received),
         };
 
-        metrics! {
+        metric! {
             STREAM_SHUTDOWN.increment();
 
             if result.is_err() {
@@ -96,7 +96,7 @@ impl Stream {
 
 impl Drop for Stream {
     fn drop(&mut self) {
-        metrics! {
+        metric! {
             STREAM_CLOSE.increment();
         }
     }

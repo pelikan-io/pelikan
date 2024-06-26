@@ -42,7 +42,7 @@ impl Listener {
     pub fn accept(&self) -> Result<Stream> {
         let result = self._accept();
 
-        metrics! {
+        metric! {
             STREAM_ACCEPT.increment();
 
             if result.is_err() {

@@ -31,16 +31,16 @@ mod metrics;
 pub use metrics::*;
 
 #[cfg(feature = "metrics")]
-macro_rules! metrics {
+macro_rules! metric {
     { $( $tt:tt )* } => { $( $tt )* }
 }
 
 #[cfg(not(feature = "metrics"))]
-macro_rules! metrics {
+macro_rules! metric {
     { $( $tt:tt)* } => {}
 }
 
-pub(crate) use metrics;
+pub(crate) use metric;
 
 use core::fmt::Debug;
 use core::ops::Deref;
