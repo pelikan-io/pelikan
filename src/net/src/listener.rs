@@ -38,15 +38,16 @@ impl Listener {
     /// the operation should be retried again in the future.
     ///
     /// All other errors should be treated as failures.
+    #[allow(clippy::let_and_return)]
     pub fn accept(&self) -> Result<Stream> {
-        #[cfg(feature = "metrics")]
-        STREAM_ACCEPT.increment();
-
         let result = self._accept();
 
-        #[cfg(feature = "metrics")]
-        if result.is_err() {
-            STREAM_ACCEPT_EX.increment();
+        metrics! {
+            STREAM_ACCEPT.increment();
+
+            if result.is_err() {
+                STREAM_ACCEPT_EX.increment();
+            }
         }
 
         result

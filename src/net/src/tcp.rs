@@ -20,8 +20,7 @@ impl TcpStream {
     pub fn connect(addr: SocketAddr) -> Result<Self> {
         let inner = mio::net::TcpStream::connect(addr)?;
 
-        #[cfg(feature = "metrics")]
-        {
+        metrics! {
             TCP_CONN_CURR.increment();
             TCP_CONNECT.increment();
         }
@@ -61,8 +60,7 @@ impl TcpStream {
 
 impl Drop for TcpStream {
     fn drop(&mut self) {
-        #[cfg(feature = "metrics")]
-        {
+        metrics! {
             TCP_CONN_CURR.decrement();
             TCP_CLOSE.increment();
         }
@@ -87,8 +85,9 @@ impl Read for TcpStream {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         match self.inner.read(buf) {
             Ok(amt) => {
-                #[cfg(feature = "metrics")]
-                TCP_RECV_BYTE.add(amt as _);
+                metrics! {
+                    TCP_RECV_BYTE.add(amt as _);
+                }
 
                 Ok(amt)
             }
@@ -101,8 +100,9 @@ impl Write for TcpStream {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         match self.inner.write(buf) {
             Ok(amt) => {
-                #[cfg(feature = "metrics")]
-                TCP_SEND_BYTE.add(amt as _);
+                metrics! {
+                    TCP_SEND_BYTE.add(amt as _);
+                }
 
                 Ok(amt)
             }
@@ -176,6 +176,7 @@ impl TcpListener {
         Ok(Self { inner })
     }
 
+    #[allow(clippy::let_and_return)]
     pub fn accept(&self) -> Result<(TcpStream, SocketAddr)> {
         let result = self.inner.accept().map(|(stream, addr)| {
             (
@@ -187,10 +188,11 @@ impl TcpListener {
             )
         });
 
-        #[cfg(feature = "metrics")]
-        if result.is_ok() {
-            TCP_ACCEPT.increment();
-            TCP_CONN_CURR.increment();
+        metrics! {
+            if result.is_ok() {
+                TCP_ACCEPT.increment();
+                TCP_CONN_CURR.increment();
+            }
         }
 
         result

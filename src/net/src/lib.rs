@@ -30,6 +30,18 @@ mod metrics;
 #[cfg(feature = "metrics")]
 pub use metrics::*;
 
+#[cfg(feature = "metrics")]
+macro_rules! metrics {
+    { $( $tt:tt )* } => { $( $tt )* }
+}
+
+#[cfg(not(feature = "metrics"))]
+macro_rules! metrics {
+    { $( $tt:tt)* } => {}
+}
+
+pub(crate) use metrics;
+
 use core::fmt::Debug;
 use core::ops::Deref;
 use std::io::{Error, ErrorKind, Read, Write};

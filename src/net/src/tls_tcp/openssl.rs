@@ -50,8 +50,9 @@ impl TlsTcpStream {
             let ptr = self.inner.ssl().as_ptr();
             let ret = unsafe { openssl_sys::SSL_do_handshake(ptr) };
             if ret > 0 {
-                #[cfg(feature = "metrics")]
-                STREAM_HANDSHAKE.increment();
+                metrics! {
+                    STREAM_HANDSHAKE.increment();
+                }
 
                 self.state = TlsState::Negotiated;
 
@@ -63,8 +64,7 @@ impl TlsTcpStream {
                         Err(Error::from(ErrorKind::WouldBlock))
                     }
                     _ => {
-                        #[cfg(feature = "metrics")]
-                        {
+                        metrics! {
                             STREAM_HANDSHAKE.increment();
                             STREAM_HANDSHAKE_EX.increment();
                         }

@@ -74,6 +74,7 @@ impl Stream {
         }
     }
 
+    #[allow(clippy::let_and_return)]
     pub fn shutdown(&mut self) -> Result<bool> {
         let result = match &mut self.inner {
             StreamType::Tcp(s) => s.shutdown(Shutdown::Both).map(|_| true),
@@ -81,12 +82,12 @@ impl Stream {
             StreamType::TlsTcp(s) => s.shutdown().map(|v| v == ShutdownResult::Received),
         };
 
-        #[cfg(feature = "metrics")]
-        STREAM_SHUTDOWN.increment();
+        metrics! {
+            STREAM_SHUTDOWN.increment();
 
-        #[cfg(feature = "metrics")]
-        if result.is_err() {
-            STREAM_SHUTDOWN_EX.increment();
+            if result.is_err() {
+                STREAM_SHUTDOWN_EX.increment();
+            }
         }
 
         result
@@ -95,8 +96,9 @@ impl Stream {
 
 impl Drop for Stream {
     fn drop(&mut self) {
-        #[cfg(feature = "metrics")]
-        STREAM_CLOSE.increment();
+        metrics! {
+            STREAM_CLOSE.increment();
+        }
     }
 }
 
