@@ -39,7 +39,7 @@ members = [
 [workspace.dependencies]
 ahash = "0.8.7"
 arrayvec = "0.7.4"
-awaken = "0.1.0"
+awaken = "0.2.0"
 backtrace = "0.3.69"
 bitvec = "1.0.1"
 blake3 = "1.5.0"
