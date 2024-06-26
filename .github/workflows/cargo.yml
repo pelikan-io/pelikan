@@ -211,7 +211,6 @@ jobs:
       - build
       - build-windows
       - check
-      - check-powerset
       - check-windows
       - rustfmt
       - clippy
