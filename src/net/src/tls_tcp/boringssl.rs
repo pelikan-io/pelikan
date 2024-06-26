@@ -50,7 +50,7 @@ impl TlsTcpStream {
             let ptr = self.inner.ssl().as_ptr();
             let ret = unsafe { boring_sys::SSL_do_handshake(ptr) };
             if ret > 0 {
-                metrics! {
+                metric! {
                     STREAM_HANDSHAKE.increment();
                 }
 
@@ -64,7 +64,7 @@ impl TlsTcpStream {
                         Err(Error::from(ErrorKind::WouldBlock))
                     }
                     _ => {
-                        metrics! {
+                        metric! {
                             STREAM_HANDSHAKE.increment();
                             STREAM_HANDSHAKE_EX.increment();
                         }
