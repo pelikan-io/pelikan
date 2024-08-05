@@ -83,10 +83,11 @@ jobs:
         with:
           shared-key: check-ubuntu-latest
           save-if: false
-      - uses: baptiste0928/cargo-install@v1
+      - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
-          args: --locked
+          version: '0.21.0-pre.0'
+          locked: true
       - run: |
           cargo audit
         
