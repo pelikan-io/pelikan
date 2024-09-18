@@ -24,31 +24,31 @@ common = { path = "../../common" }
 config = { path = "../../config" }
 entrystore = { path = "../../entrystore" }
 humantime = "2.1.0"
-h2 = "0.4.3"
+h2 = "0.4.6"
 h3 = "0.0.6"
 h3-quinn = "0.0.7"
 http = "1.1.0"
 http-body-util = "0.1.2"
-hyper = { version = "1.4.0", features = ["http1", "http2", "server"] }
+hyper = { version = "1.4.1", features = ["http1", "http2", "server"] }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
 pin-project = "1.1.5"
-prost = "0.13"
+prost = "0.13.2"
 protocol-ping = { path = "../../protocol/ping", features = ["server"] }
-quinn = "0.11.2"
-rustls = { version = "0.23.11", default-features = false, features = [
+quinn = "0.11.5"
+rustls = { version = "0.23.13", default-features = false, features = [
     "logging",
     "ring",
     "std",
 ] }
-rustls-native-certs = "0.7.1"
+rustls-native-certs = "0.8.0"
 serde = { workspace = true, features = ["derive"] }
 server = { path = "../../core/server" }
 session = { path = "../../session" }
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
 toml = { workspace = true }
-tonic = { version = "0.12" }
-warp = "0.3.6"
+tonic = { version = "0.12.2" }
+warp = "0.3.7"
 
 [build-dependencies]
-tonic-build = "0.12"
+tonic-build = "0.12.2"
