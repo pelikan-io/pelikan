@@ -1,9 +1,11 @@
 daemonize = false
 
-# Used by the tokio-pingserver only
 [general]
-engine = "tokio"
-protocol = "grpc"
+# choose between 'mio' and 'tokio'
+engine = "mio"
+# choose between 'ascii', 'grpc', 'http2', 'http3'
+# note: 'mio' engine only supports 'ascii' protocol
+protocol = "ascii"
 
 [metrics]
 interval = "1s"

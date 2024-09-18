@@ -18,7 +18,7 @@ mod metrics;
 static METRICS_SNAPSHOT: Lazy<Arc<RwLock<metrics::MetricsSnapshot>>> =
     Lazy::new(|| Arc::new(RwLock::new(Default::default())));
 
-pub fn spawn(config: Config, mut log: Box<dyn Drain>) -> Result<Pingserver, std::io::Error> {
+pub fn spawn(config: Config, mut log: Box<dyn Drain>) {
     let config = Arc::new(config);
 
     // initialize async runtime for control plane
@@ -79,8 +79,9 @@ pub fn spawn(config: Config, mut log: Box<dyn Drain>) -> Result<Pingserver, std:
         }
     }
 
-    Ok(Pingserver::Tokio {
-        control: control_runtime,
-        data: data_runtime,
-    })
+    while RUNNING.load(Ordering::Relaxed) {
+        std::thread::sleep(Duration::from_millis(250));
+    }
+    data_runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+    control_runtime.shutdown_timeout(std::time::Duration::from_millis(100));
 }
