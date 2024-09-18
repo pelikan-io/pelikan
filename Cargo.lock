@@ -1960,7 +1960,6 @@ dependencies = [
  "clap",
  "common",
  "config",
- "criterion",
  "entrystore",
  "h2 0.4.5",
  "h3",

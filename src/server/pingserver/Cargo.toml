@@ -51,5 +51,4 @@ tonic = { version = "0.12" }
 warp = "0.3.6"
 
 [build-dependencies]
-criterion = "*"
 tonic-build = "0.12"
