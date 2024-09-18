@@ -1,13 +1,14 @@
 use crate::Config;
+
+use session::REQUEST_LATENCY;
+
 use bytes::BytesMut;
 use chrono::Utc;
-use http::HeaderMap;
-use http::HeaderValue;
-use http::Version;
-use session::REQUEST_LATENCY;
+use http::{HeaderMap, HeaderValue, Version};
+use tokio::net::TcpListener;
+
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::net::TcpListener;
 
 pub async fn run(config: Arc<Config>) {
     let listener = TcpListener::bind(config.listen()).await.unwrap();

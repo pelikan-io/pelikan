@@ -1,8 +1,10 @@
 use config::*;
-use core::net::SocketAddr;
-use core::time::Duration;
+
 use serde::{Deserialize, Serialize};
+
 use std::io::Read;
+use std::net::SocketAddr;
+use std::time::Duration;
 
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct Config {

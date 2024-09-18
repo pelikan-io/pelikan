@@ -1,16 +1,15 @@
 use crate::Config;
-use bytes::Buf;
-use bytes::BytesMut;
-use chrono::Utc;
+
 use common::ssl::TlsConfig as TlsConfigTrait;
 use config::TlsConfig;
-use http::HeaderMap;
-use http::HeaderValue;
-use http::Version;
-use quinn::crypto::rustls::QuicServerConfig;
-use rustls::pki_types::CertificateDer;
-use rustls::pki_types::PrivateKeyDer;
 use session::REQUEST_LATENCY;
+
+use bytes::{Buf, BytesMut};
+use chrono::Utc;
+use http::{HeaderMap, HeaderValue, Version};
+use quinn::crypto::rustls::QuicServerConfig;
+use rustls::pki_types::{CertificateDer, PrivateKeyDer};
+
 use std::sync::Arc;
 use std::time::Instant;
 

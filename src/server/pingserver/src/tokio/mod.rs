@@ -1,11 +1,12 @@
-use core::sync::atomic::{AtomicBool, Ordering};
-use core::time::Duration;
-use logger::Drain;
+use crate::config::{Config, Protocol};
+use crate::*;
+
+use ::tokio::runtime::Builder;
+use ::tokio::sync::RwLock;
+use ::tokio::time::sleep;
 use metriken::Lazy;
+
 use std::sync::Arc;
-use tokio::runtime::Builder;
-use tokio::sync::RwLock;
-use tokio::time::sleep;
 
 mod admin;
 mod ascii;
@@ -17,11 +18,7 @@ mod metrics;
 static METRICS_SNAPSHOT: Lazy<Arc<RwLock<metrics::MetricsSnapshot>>> =
     Lazy::new(|| Arc::new(RwLock::new(Default::default())));
 
-static RUNNING: AtomicBool = AtomicBool::new(true);
-
-use crate::config::{Config, Protocol};
-
-pub fn run(config: Config, mut log: Box<dyn Drain>) {
+pub fn spawn(config: Config, mut log: Box<dyn Drain>) -> Result<Pingserver, std::io::Error> {
     let config = Arc::new(config);
 
     // initialize async runtime for control plane
@@ -82,9 +79,8 @@ pub fn run(config: Config, mut log: Box<dyn Drain>) {
         }
     }
 
-    while RUNNING.load(Ordering::Relaxed) {
-        std::thread::sleep(Duration::from_millis(250));
-    }
-
-    data_runtime.shutdown_timeout(std::time::Duration::from_millis(100));
+    Ok(Pingserver::Tokio {
+        control: control_runtime,
+        data: data_runtime,
+    })
 }

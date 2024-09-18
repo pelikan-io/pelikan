@@ -1,5 +1,7 @@
 [package]
 name = "pelikan-pingserver"
+description = "a ping/pong server with multiple protocol support"
+authors = ["Brian Martin <brian@pelikan.io>"]
 build = "build.rs"
 
 version = { workspace = true }
@@ -8,15 +10,23 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[[bin]]
+name = "pelikan_pingserver"
+path = "src/main.rs"
+doc = false
+
 [dependencies]
 backtrace = { workspace = true }
-bytes = "*"
+bytes = { workspace = true }
+chrono = "0.4.38"
 clap = { workspace = true }
 common = { path = "../../common" }
 config = { path = "../../config" }
 entrystore = { path = "../../entrystore" }
 humantime = "2.1.0"
 h2 = "0.4.3"
+h3 = "0.0.6"
+h3-quinn = "0.0.7"
 http = "1.1.0"
 http-body-util = "0.1.2"
 hyper = { version = "1.4.0", features = ["http1", "http2", "server"] }
@@ -25,14 +35,6 @@ metriken = { workspace = true }
 pin-project = "1.1.5"
 prost = "0.13"
 protocol-ping = { path = "../../protocol/ping", features = ["server"] }
-serde = { workspace = true, features = ["derive"] }
-server = { path = "../../core/server" }
-session = { path = "../../session" }
-tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
-toml = { workspace = true }
-tonic = { version = "0.12" }
-warp = "0.3.6"
-chrono = "0.4.38"
 quinn = "0.11.2"
 rustls = { version = "0.23.11", default-features = false, features = [
     "logging",
@@ -40,15 +42,14 @@ rustls = { version = "0.23.11", default-features = false, features = [
     "std",
 ] }
 rustls-native-certs = "0.7.1"
-h3 = "0.0.6"
-h3-quinn = "0.0.7"
-
-
-# mimalloc = "0.1.43"
-
-[target.'cfg(not(target_env = "msvc"))'.dependencies]
-jemallocator = "0.3.2"
+serde = { workspace = true, features = ["derive"] }
+server = { path = "../../core/server" }
+session = { path = "../../session" }
+tokio = { version = "1.0", features = ["macros", "rt-multi-thread"] }
+toml = { workspace = true }
+tonic = { version = "0.12" }
+warp = "0.3.6"
 
 [build-dependencies]
+criterion = "*"
 tonic-build = "0.12"
-

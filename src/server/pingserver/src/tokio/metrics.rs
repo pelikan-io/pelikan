@@ -1,4 +1,5 @@
 use metriken::{histogram, AtomicHistogram, RwLockHistogram, Value};
+
 use std::collections::HashMap;
 use std::time::SystemTime;
 
