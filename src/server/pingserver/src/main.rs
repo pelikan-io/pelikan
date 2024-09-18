@@ -6,7 +6,7 @@ use config::{Config, Engine};
 use entrystore::Noop;
 use logger::{configure_logging, Drain};
 use protocol_ping::{Request, RequestParser, Response};
-use server::{PERCENTILES, ProcessBuilder};
+use server::{ProcessBuilder, PERCENTILES};
 
 use backtrace::Backtrace;
 use clap::{Arg, Command};
