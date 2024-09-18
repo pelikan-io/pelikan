@@ -1,5 +1,13 @@
 daemonize = false
 
+# Used by the tokio-pingserver only
+[general]
+engine = "tokio"
+protocol = "grpc"
+
+[metrics]
+interval = "1s"
+
 [admin]
 # interfaces listening on
 host = "0.0.0.0"
