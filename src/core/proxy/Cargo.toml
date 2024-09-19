@@ -17,9 +17,13 @@ crossbeam-channel = { workspace = true }
 entrystore = { path = "../../entrystore" }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-pelikan-net = { workspace = true }
+pelikan-net = { workspace = true, features = ["metrics"] }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-common = { path = "../../protocol/common" }
 session = { path = "../../session" }
 slab = { workspace = true }
 switchboard = { workspace = true }
+
+[features]
+boringssl = ["pelikan-net/boringssl"]
+openssl = ["pelikan-net/openssl"]

@@ -1,26 +1,28 @@
-// Copyright 2021 Twitter, Inc.
-// Licensed under the Apache License, Version 2.0
-// http://www.apache.org/licenses/LICENSE-2.0
-
-//! Pingserver is an implementation of a basic backend service which responds to
-//! each `PING` with a `PONG`. This allows for testing of the core components
-//! without the overheads associated with managing any state.
-//!
-//! Running this binary is the primary way of using Pingserver.
-
 #[macro_use]
 extern crate logger;
 
+use config::{Config, Engine};
+
+use entrystore::Noop;
+use logger::{configure_logging, Drain};
+use protocol_ping::{Request, RequestParser, Response};
+use server::{ProcessBuilder, PERCENTILES};
+
 use backtrace::Backtrace;
 use clap::{Arg, Command};
-use config::PingserverConfig;
 use metriken::*;
-use pelikan_pingserver_rs::Pingserver;
-use server::PERCENTILES;
 
-/// The entry point into the running Pingserver instance. This function parses
-/// parses the command line options, loads the configuration, and launches the
-/// core threads.
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
+
+type Parser = RequestParser;
+type Storage = Noop;
+
+mod config;
+mod tokio;
+
+static RUNNING: AtomicBool = AtomicBool::new(true);
+
 fn main() {
     // custom panic hook to terminate whole process after unwinding
     std::panic::set_hook(Box::new(|s| {
@@ -42,17 +44,17 @@ fn main() {
             environment.",
         )
         .arg(
+            Arg::new("CONFIG")
+                .help("Server configuration file")
+                .action(clap::ArgAction::Set)
+                .index(1),
+        )
+        .arg(
             Arg::new("stats")
                 .short('s')
                 .long("stats")
                 .help("List all metrics in stats")
                 .action(clap::ArgAction::SetTrue),
-        )
-        .arg(
-            Arg::new("CONFIG")
-                .help("Server configuration file")
-                .action(clap::ArgAction::Set)
-                .index(1),
         )
         .get_matches();
 
@@ -95,7 +97,7 @@ fn main() {
     // load config from file
     let config = if let Some(file) = matches.get_one::<String>("CONFIG") {
         debug!("loading config: {}", file);
-        match PingserverConfig::load(file) {
+        match Config::load(file) {
             Ok(c) => c,
             Err(error) => {
                 eprintln!("error loading config file: {file}\n{error}");
@@ -106,12 +108,31 @@ fn main() {
         Default::default()
     };
 
-    // launch
-    match Pingserver::new(config) {
-        Ok(s) => s.wait(),
-        Err(e) => {
-            eprintln!("error launching pingserver: {e}");
-            std::process::exit(1);
+    // initialize logging
+    let log = configure_logging(&config);
+
+    // initialize metrics
+    common::metrics::init();
+
+    // launch the server
+    match config.general.engine {
+        Engine::Mio => {
+            // initialize storage
+            let storage = Storage::new();
+
+            // initialize parser
+            let parser = Parser::new();
+
+            // initialize process
+            let process_builder = ProcessBuilder::<Parser, Request, Response, Storage>::new(
+                &config, log, parser, storage,
+            )
+            .expect("failed to initialize process");
+
+            // spawn threads
+            let process = process_builder.spawn();
+            process.wait();
         }
+        Engine::Tokio => tokio::spawn(config, log),
     }
 }

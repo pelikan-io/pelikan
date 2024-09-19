@@ -1,5 +1,20 @@
 daemonize = false
 
+[general]
+# choose between 'mio' and 'tokio'
+engine = "mio"
+# choose between:
+# * 'ascii' - a text based protocol with optional TLS
+# * 'grpc' - a simple gRPC implementation using `tonic`
+# * 'http2' - a gRPC implementation that is manually implemented on HTTP2
+# * 'http3' - a gRPC implementation that is manually implemented on HTTP3 (QUIC)
+#
+# Please note: 'mio' engine currently only supports 'ascii' protocol
+protocol = "ascii"
+
+[metrics]
+interval = "1s"
+
 [admin]
 # interfaces listening on
 host = "0.0.0.0"

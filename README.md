@@ -51,8 +51,10 @@ Pelikan contains the following products:
   storage, a TTL-centric design offering extremely high memory efficiency and
   excellent core scalability. See our [NSDI'21 paper] for design
   and evaluation details.
-- `pelikan_pingserver_rs`: an over-engineered, production-ready ping server
-  useful as a tutorial and for measuring baseline RPC performance
+- `pelikan_pingserver`: an over-engineered, production-ready ping server which
+  is useful as a tutorial and for measuring baseline RPC performance. It
+  supports multiple protocols and application transports to allow comparing the
+  performance of different protocols, transports, and implementations.
 - [`momento_proxy`][momento_proxy-url]: a proxy which allows existing
   applications to use Momento instead of a Memcache-compatible cache backend.
 
