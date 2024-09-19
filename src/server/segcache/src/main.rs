@@ -15,17 +15,17 @@
 #[macro_use]
 extern crate logger;
 
-use std::sync::atomic::AtomicBool;
-use protocol_memcache::Response;
-use server::ProcessBuilder;
+use entrystore::Seg;
 use protocol_memcache::Request;
 use protocol_memcache::RequestParser;
-use entrystore::Seg;
+use protocol_memcache::Response;
+use server::ProcessBuilder;
+use std::sync::atomic::AtomicBool;
 // use protocol_memcache::Storage;
 use crate::config::Engine;
-use logger::configure_logging;
 use backtrace::Backtrace;
 use clap::{Arg, Command};
+use logger::configure_logging;
 // use config::SegcacheConfig;
 use metriken::*;
 // use pelikan_segcache_rs::Segcache;

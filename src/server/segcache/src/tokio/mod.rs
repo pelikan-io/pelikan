@@ -1,8 +1,8 @@
+use crate::config::Config;
+use crate::*;
+use logger::Drain;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
-use logger::Drain;
-use crate::config::{Config};
-use crate::*;
 
 use ::tokio::runtime::Builder;
 use ::tokio::sync::RwLock;
@@ -64,7 +64,6 @@ pub fn spawn(config: Config, mut log: Box<dyn Drain>) {
     let parser = Parser::new()
         .max_value_size(config.seg.segment_size() as usize)
         .time_type(config.time.time_type());
-
 
     // initialize async runtime for the data plane
     let data_runtime = Builder::new_multi_thread()

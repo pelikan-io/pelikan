@@ -1,6 +1,6 @@
+use crate::Config;
 use crate::Parser;
 use crate::Storage;
-use crate::Config;
 
 use ::config::BufConfig;
 use protocol_common::Execute;
