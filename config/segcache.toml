@@ -1,4 +1,6 @@
-daemonize = false
+[general]
+# choose between 'mio' and 'tokio'
+engine = "mio"
 
 [admin]
 # interfaces listening on

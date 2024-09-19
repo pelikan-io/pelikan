@@ -14,5 +14,5 @@ clocksource = { workspace = true }
 common = { path = "../common", default-features = false }
 log = { workspace = true }
 metriken = { workspace = true }
-pelikan-net = { workspace = true, default-features = false }
+pelikan-net = { workspace = true }
 protocol-common = { path = "../protocol/common", default-features = false }
