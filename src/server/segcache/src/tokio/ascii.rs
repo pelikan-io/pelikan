@@ -7,7 +7,8 @@ use protocol_common::Execute;
 use protocol_memcache::{Compose, Parse};
 use session::{Buf, BufMut, Buffer};
 
-use parking_lot::Mutex;
+// use parking_lot::Mutex;
+use tokio::sync::Mutex;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpListener;
 
@@ -83,7 +84,7 @@ pub async fn run(config: Arc<Config>, storage: Storage, parser: Parser) {
 
                     // execute the request
                     let response = {
-                        let mut storage = storage.lock();
+                        let mut storage = storage.lock().await;
                         (*storage).execute(&request.into_inner())
                     };
 
