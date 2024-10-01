@@ -47,7 +47,7 @@ server = { path = "../../core/server" }
 session = { path = "../../session" }
 tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
 toml = { workspace = true }
-tonic = { version = "0.12.2" }
+tonic = { version = "0.12.3" }
 warp = "0.3.7"
 
 [build-dependencies]
