@@ -30,7 +30,7 @@ pub async fn set(
     let ttl = request
         .ttl()
         .get()
-        .map(|ttl| Duration::from_millis(ttl.max(1) as u64));
+        .map(|ttl| Duration::from_secs(ttl.max(1) as u64));
 
     match timeout(
         Duration::from_millis(200),
