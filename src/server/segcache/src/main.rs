@@ -15,12 +15,31 @@
 #[macro_use]
 extern crate logger;
 
+use entrystore::Seg;
+use protocol_memcache::Request;
+use protocol_memcache::RequestParser;
+use protocol_memcache::Response;
+use server::ProcessBuilder;
+use std::sync::atomic::AtomicBool;
+// use protocol_memcache::Storage;
+use crate::config::Engine;
 use backtrace::Backtrace;
 use clap::{Arg, Command};
-use config::SegcacheConfig;
+use logger::configure_logging;
+// use config::SegcacheConfig;
 use metriken::*;
-use pelikan_segcache_rs::Segcache;
+// use pelikan_segcache_rs::Segcache;
 use server::PERCENTILES;
+
+type Parser = RequestParser;
+type Storage = Seg;
+
+mod config;
+mod tokio;
+
+use crate::config::*;
+
+static RUNNING: AtomicBool = AtomicBool::new(true);
 
 /// The entry point into the running Segcache instance. This function parses the
 /// command line options, loads the configuration, and launches the core
@@ -104,7 +123,7 @@ fn main() {
     // load config from file
     let config = if let Some(file) = matches.get_one::<String>("CONFIG") {
         debug!("loading config: {}", file);
-        match SegcacheConfig::load(file) {
+        match Config::load(file) {
             Ok(c) => c,
             Err(error) => {
                 eprintln!("error loading config file: {file}\n{error}");
@@ -116,16 +135,38 @@ fn main() {
     };
 
     if matches.get_flag("print-config") {
-        config.print();
-        std::process::exit(0);
+        todo!("not implemented");
+        // config.print();
+        // std::process::exit(0);
     }
 
-    // launch segcache
-    match Segcache::new(config) {
-        Ok(segcache) => segcache.wait(),
-        Err(e) => {
-            eprintln!("error launching segcache: {e}");
-            std::process::exit(1);
+    // initialize logging
+    let log = configure_logging(&config);
+
+    // initialize metrics
+    common::metrics::init();
+
+    // launch the server
+    match config.general.engine {
+        Engine::Mio => {
+            // initialize storage
+            let storage = Storage::new(&config).expect("failed to initialize storage");
+
+            // initialize parser
+            let parser = Parser::new()
+                .max_value_size(config.seg.segment_size() as usize)
+                .time_type(config.time.time_type());
+
+            // initialize process
+            let process_builder = ProcessBuilder::<Parser, Request, Response, Storage>::new(
+                &config, log, parser, storage,
+            )
+            .expect("failed to initialize process");
+
+            // spawn threads
+            let process = process_builder.spawn();
+            process.wait();
         }
+        Engine::Tokio => tokio::spawn(config, log),
     }
 }

@@ -9,30 +9,10 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-[lib]
-name = "pelikan_segcache_rs"
-path = "src/lib.rs"
-doc = true
-
 [[bin]]
 name = "pelikan_segcache_rs"
 path = "src/main.rs"
 doc = false
-
-[[test]]
-name = "integration"
-path = "tests/integration.rs"
-harness = false
-
-[[test]]
-name = "integration_multi"
-path = "tests/integration_multi.rs"
-harness = false
-
-[[bench]]
-name = "benchmark"
-path = "benches/benchmark.rs"
-harness = false
 
 [features]
 debug = ["entrystore/debug"]
@@ -43,10 +23,18 @@ clap = { workspace = true }
 common = { path = "../../common" }
 config = { path = "../../config" }
 entrystore = { path = "../../entrystore" }
+humantime = "2.1.0"
 logger = { path = "../../logger" }
 metriken = { workspace = true }
+parking_lot = "0.12.3"
+protocol-common = { path = "../../protocol/common" }
 protocol-memcache = { path = "../../protocol/memcache" }
+serde = { workspace = true, features = ["derive"] }
 server = { path = "../../core/server", features = ["boringssl"] }
+session = { path = "../../session" }
+tokio = { workspace = true, features = ["full"] }
+toml = { workspace = true }
+warp = "0.3.7"
 
 [dev-dependencies]
 criterion = "0.5.1"
