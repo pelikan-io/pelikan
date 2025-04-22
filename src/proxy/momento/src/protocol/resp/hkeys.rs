@@ -2,10 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::time::Duration;
 use momento::cache::DictionaryFetchResponse;
 use momento::CacheClient;
 use protocol_resp::{HashKeys, HKEYS, HKEYS_EX, HKEYS_HIT, HKEYS_MISS};
+use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
@@ -40,7 +41,7 @@ pub async fn hkeys(
         match response {
             DictionaryFetchResponse::Hit { value } => {
                 HKEYS_HIT.increment();
-                let map: Vec<(Vec<u8>, Vec<u8>)> = value.collect_into();
+                let map: HashMap<Vec<u8>, Vec<u8>> = value.into();
 
                 response_buf.extend_from_slice(format!("*{}\r\n", map.len()).as_bytes());
 
