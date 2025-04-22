@@ -9,7 +9,6 @@ use momento::CacheClient;
 use protocol_resp::{SetAdd, SADD, SADD_EX};
 
 use crate::error::ProxyResult;
-use crate::COLLECTION_TTL;
 
 use super::update_method_metrics;
 
@@ -20,7 +19,7 @@ pub async fn sadd(
     req: &SetAdd,
 ) -> ProxyResult {
     update_method_metrics(&SADD, &SADD_EX, async move {
-        let elements = req.members().iter().map(|e| &**e).collect();
+        let elements: Vec<&[u8]> = req.members().iter().map(|e| &**e).collect();
 
         tokio::time::timeout(
             Duration::from_millis(200),
