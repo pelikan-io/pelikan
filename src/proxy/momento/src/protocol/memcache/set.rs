@@ -4,6 +4,7 @@
 
 use crate::klog::{klog_set, Status};
 use crate::{Error, *};
+use momento::cache::SetRequest;
 use pelikan_net::*;
 use protocol_memcache::*;
 
@@ -34,7 +35,7 @@ pub async fn set(
 
     match timeout(
         Duration::from_millis(200),
-        client.set(cache_name, key, value, ttl),
+        client.send_request(SetRequest::new(cache_name, key, value).ttl(ttl)),
     )
     .await
     {
