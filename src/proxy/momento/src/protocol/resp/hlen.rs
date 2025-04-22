@@ -2,10 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::time::Duration;
-use momento::cache::DictionaryFetchResponse;
+use momento::cache::{DictionaryFetchResponse, DictionaryLengthResponse};
 use momento::CacheClient;
 use protocol_resp::{HashLength, HLEN, HLEN_EX, HLEN_HIT, HLEN_MISS};
+use std::time::Duration;
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
@@ -22,7 +22,7 @@ pub async fn hlen(
     update_method_metrics(&HLEN, &HLEN_EX, async move {
         let response = match tokio::time::timeout(
             Duration::from_millis(200),
-            client.dictionary_fetch(cache_name, req.key()),
+            client.dictionary_length(cache_name, req.key()),
         )
         .await
         {
@@ -38,17 +38,16 @@ pub async fn hlen(
         };
 
         match response {
-            DictionaryFetchResponse::Hit { value } => {
+            DictionaryLengthResponse::Hit { length } => {
                 HLEN_HIT.increment();
 
-                let map: Vec<(Vec<u8>, Vec<u8>)> = value.collect_into();
-                let response = format!(":{}\r\n", map.len()).into_bytes();
+                let response = format!(":{}\r\n", length).into_bytes();
 
                 response_buf.extend_from_slice(&response);
 
                 klog_1(&"hlen", &req.key(), Status::Hit, response_buf.len());
             }
-            DictionaryFetchResponse::Miss => {
+            DictionaryLengthResponse::Miss => {
                 HLEN_MISS.increment();
                 response_buf.extend_from_slice(b":0\r\n");
                 klog_1(&"hlen", &req.key(), Status::Miss, response_buf.len());
