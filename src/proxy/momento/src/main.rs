@@ -5,9 +5,9 @@
 #[macro_use]
 extern crate logger;
 
+use ::config::{AdminConfig, MomentoProxyConfig, TimeType};
 use backtrace::Backtrace;
 use clap::{Arg, Command};
-use config::*;
 use core::num::NonZeroUsize;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::time::Duration;
@@ -342,7 +342,6 @@ async fn spawn(
                 std::process::exit(1);
             }
         };
-        let ttl = cache.default_ttl();
 
         let tcp_listener = match std::net::TcpListener::bind(addr) {
             Ok(v) => {
