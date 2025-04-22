@@ -5,6 +5,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use momento::cache::{DictionarySetFieldsRequest, IntoDictionaryFieldValuePairs};
 use momento::CacheClient;
 use protocol_resp::{HashSet, HSET, HSET_EX, HSET_STORED};
 
@@ -29,7 +30,14 @@ pub async fn hset(
 
         let _response = match tokio::time::timeout(
             Duration::from_millis(200),
-            client.dictionary_set(cache_name, req.key(), map.clone(), COLLECTION_TTL),
+            client.send_request(
+                DictionarySetFieldsRequest::new(
+                    cache_name,
+                    req.key(),
+                    map.clone().into_dictionary_field_value_pairs(),
+                )
+                .ttl(COLLECTION_TTL),
+            ),
         )
         .await
         {
