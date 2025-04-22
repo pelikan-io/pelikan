@@ -5,6 +5,7 @@
 use std::io::Write;
 use std::time::Duration;
 
+use momento::cache::ListLengthResponse;
 use momento::CacheClient;
 use protocol_resp::{ListLen, LLEN, LLEN_EX};
 
@@ -21,7 +22,7 @@ pub async fn llen(
     req: &ListLen,
 ) -> ProxyResult {
     update_method_metrics(&LLEN, &LLEN_EX, async move {
-        let len = match tokio::time::timeout(
+        let length_response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.list_length(cache_name, req.key()),
         )
@@ -38,8 +39,16 @@ pub async fn llen(
             }
         };
 
-        write!(response_buf, ":{}\r\n", len.unwrap_or(0))?;
-        klog_1(&"llen", &req.key(), Status::Hit, response_buf.len());
+        match length_response {
+            ListLengthResponse::Hit { length } => {
+                write!(response_buf, ":{}\r\n", length)?;
+                klog_1(&"llen", &req.key(), Status::Hit, response_buf.len());
+            }
+            ListLengthResponse::Miss => {
+                write!(response_buf, ":0\r\n")?;
+                klog_1(&"llen", &req.key(), Status::Miss, response_buf.len());
+            }
+        }
 
         Ok(())
     })
