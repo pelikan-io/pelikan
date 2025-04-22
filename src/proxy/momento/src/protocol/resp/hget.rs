@@ -2,11 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::collections::HashMap;
-use std::time::Duration;
 use momento::cache::DictionaryGetFieldResponse;
 use momento::CacheClient;
 use protocol_resp::{HashGet, HGET, HGET_EX, HGET_HIT, HGET_MISS};
+use std::time::Duration;
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_2, Status};
@@ -23,7 +22,7 @@ pub async fn hget(
     update_method_metrics(&HGET, &HGET_EX, async move {
         let response = match tokio::time::timeout(
             Duration::from_millis(200),
-            client.dictionary_get(cache_name, req.key(), vec![req.field()]),
+            client.dictionary_get_field(cache_name, req.key(), req.field()),
         )
         .await
         {
@@ -40,23 +39,22 @@ pub async fn hget(
 
         match response {
             DictionaryGetFieldResponse::Hit { value } => {
-                let map: HashMap<Vec<u8>, Vec<u8>> = value.collect_into();
+                HGET_HIT.increment();
 
-                if let Some(value) = map.get(req.field()) {
-                    HGET_HIT.increment();
+                let value_bytes: Vec<u8> = value.into();
+                let item_header = format!("${}\r\n", value_bytes.len());
 
-                    let item_header = format!("${}\r\n", value.len());
+                response_buf.extend_from_slice(item_header.as_bytes());
+                response_buf.extend_from_slice(value_bytes.as_slice());
+                response_buf.extend_from_slice(b"\r\n");
 
-                    response_buf.extend_from_slice(item_header.as_bytes());
-                    response_buf.extend_from_slice(value);
-                    response_buf.extend_from_slice(b"\r\n");
-
-                    klog_2(&"hget", &req.key(), &req.field(), Status::Hit, value.len());
-                } else {
-                    HGET_MISS.increment();
-                    response_buf.extend_from_slice(b"$-1\r\n");
-                    klog_2(&"hget", &req.key(), &req.field(), Status::Miss, 0);
-                }
+                klog_2(
+                    &"hget",
+                    &req.key(),
+                    &req.field(),
+                    Status::Hit,
+                    value_bytes.len(),
+                );
             }
             DictionaryGetFieldResponse::Miss => {
                 HGET_MISS.increment();
