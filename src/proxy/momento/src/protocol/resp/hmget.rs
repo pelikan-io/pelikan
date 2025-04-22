@@ -2,14 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use momento::cache::{
-    DictionaryFetchResponse, DictionaryGetFieldResponse, DictionaryGetFieldsResponse,
-};
+use momento::cache::{DictionaryGetFieldResponse, DictionaryGetFieldsResponse};
 use momento::CacheClient;
 use protocol_resp::{
     HashMultiGet, HMGET, HMGET_EX, HMGET_FIELD, HMGET_FIELD_HIT, HMGET_FIELD_MISS,
 };
-use std::collections::HashMap;
 use std::time::Duration;
 
 use crate::error::ProxyResult;
