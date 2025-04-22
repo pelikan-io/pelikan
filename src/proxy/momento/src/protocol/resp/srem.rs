@@ -4,9 +4,8 @@
 
 use std::io::Write;
 use std::time::Duration;
-
-use momento::response::MomentoSetDifferenceResponse;
-use momento::SimpleCacheClient;
+use momento::cache::SetRemoveElementsResponse;
+use momento::CacheClient;
 use protocol_resp::{SetRem, SREM, SREM_EX};
 
 use crate::error::ProxyResult;
@@ -14,7 +13,7 @@ use crate::error::ProxyResult;
 use super::update_method_metrics;
 
 pub async fn srem(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &SetRem,
@@ -24,7 +23,7 @@ pub async fn srem(
 
         let resp = tokio::time::timeout(
             Duration::from_millis(200),
-            client.set_difference(cache_name, req.key(), elements),
+            client.set_remove_elements(cache_name, req.key(), elements),
         )
         .await??;
 
@@ -33,10 +32,7 @@ pub async fn srem(
         write!(
             response_buf,
             ":{}\r\n",
-            match resp {
-                MomentoSetDifferenceResponse::Found => req.members().len(),
-                MomentoSetDifferenceResponse::Missing => 0,
-            }
+            req.members().len()
         )?;
 
         Ok(())

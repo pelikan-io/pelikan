@@ -3,8 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use std::future::Future;
-
-use momento::response::MomentoError;
+use momento::MomentoError;
 pub use protocol_resp::{Request, RequestParser};
 
 mod del;

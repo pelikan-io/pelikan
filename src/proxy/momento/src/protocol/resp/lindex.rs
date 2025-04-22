@@ -5,7 +5,7 @@
 use std::io::Write;
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::CacheClient;
 use protocol_resp::{ListIndex, LINDEX, LINDEX_EX, LINDEX_HIT, LINDEX_MISS};
 
 use crate::error::ProxyResult;
@@ -15,7 +15,7 @@ use crate::ProxyError;
 use super::update_method_metrics;
 
 pub async fn lindex(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &ListIndex,

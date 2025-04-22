@@ -5,7 +5,7 @@
 use std::io::Write;
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::CacheClient;
 use protocol_resp::{ListRange, LRANGE, LRANGE_EX};
 use tokio::time::timeout;
 
@@ -14,7 +14,7 @@ use crate::error::ProxyResult;
 use super::update_method_metrics;
 
 pub async fn lrange(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &ListRange,

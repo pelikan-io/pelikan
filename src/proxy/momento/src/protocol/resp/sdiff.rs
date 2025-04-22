@@ -5,7 +5,7 @@
 use std::io::Write;
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::CacheClient;
 use protocol_resp::{SetDiff, SDIFF, SDIFF_EX};
 use tokio::time;
 
@@ -14,7 +14,7 @@ use crate::ProxyResult;
 use super::update_method_metrics;
 
 pub async fn sdiff(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &SetDiff,

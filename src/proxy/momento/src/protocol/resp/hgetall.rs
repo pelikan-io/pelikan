@@ -3,9 +3,8 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use std::time::Duration;
-
-use momento::response::DictionaryFetch;
-use momento::SimpleCacheClient;
+use momento::cache::DictionaryFetchResponse;
+use momento::CacheClient;
 use protocol_resp::{HashGetAll, HGETALL, HGETALL_EX, HGETALL_HIT, HGETALL_MISS};
 
 use crate::error::ProxyResult;
@@ -15,7 +14,7 @@ use crate::ProxyError;
 use super::update_method_metrics;
 
 pub async fn hgetall(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &HashGetAll,
@@ -39,7 +38,7 @@ pub async fn hgetall(
         };
 
         match response {
-            DictionaryFetch::Hit { value } => {
+            DictionaryFetchResponse::Hit { value } => {
                 HGETALL_HIT.increment();
                 let map: Vec<(Vec<u8>, Vec<u8>)> = value.collect_into();
 
@@ -59,7 +58,7 @@ pub async fn hgetall(
 
                 klog_1(&"hgetall", &req.key(), Status::Hit, response_buf.len());
             }
-            DictionaryFetch::Miss => {
+            DictionaryFetchResponse::Miss => {
                 HGETALL_MISS.increment();
                 response_buf.extend_from_slice(b"*0\r\n");
                 klog_1(&"hgetall", &req.key(), Status::Miss, response_buf.len());

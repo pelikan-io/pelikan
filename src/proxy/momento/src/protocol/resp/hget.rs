@@ -4,9 +4,8 @@
 
 use std::collections::HashMap;
 use std::time::Duration;
-
-use momento::response::DictionaryGet;
-use momento::SimpleCacheClient;
+use momento::cache::DictionaryGetFieldResponse;
+use momento::CacheClient;
 use protocol_resp::{HashGet, HGET, HGET_EX, HGET_HIT, HGET_MISS};
 
 use crate::error::ProxyResult;
@@ -16,7 +15,7 @@ use crate::ProxyError;
 use super::update_method_metrics;
 
 pub async fn hget(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &HashGet,
@@ -40,7 +39,7 @@ pub async fn hget(
         };
 
         match response {
-            DictionaryGet::Hit { value } => {
+            DictionaryGetFieldResponse::Hit { value } => {
                 let map: HashMap<Vec<u8>, Vec<u8>> = value.collect_into();
 
                 if let Some(value) = map.get(req.field()) {
@@ -59,7 +58,7 @@ pub async fn hget(
                     klog_2(&"hget", &req.key(), &req.field(), Status::Miss, 0);
                 }
             }
-            DictionaryGet::Miss => {
+            DictionaryGetFieldResponse::Miss => {
                 HGET_MISS.increment();
                 response_buf.extend_from_slice(b"$-1\r\n");
                 klog_2(&"hget", &req.key(), &req.field(), Status::Miss, 0);

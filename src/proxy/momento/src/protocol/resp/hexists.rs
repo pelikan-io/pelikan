@@ -4,9 +4,8 @@
 
 use std::collections::HashMap;
 use std::time::Duration;
-
-use momento::response::DictionaryGet;
-use momento::SimpleCacheClient;
+use momento::cache::DictionaryGetFieldResponse;
+use momento::CacheClient;
 use protocol_resp::{HashExists, HEXISTS, HEXISTS_EX, HEXISTS_HIT, HEXISTS_MISS};
 use tokio::time::timeout;
 
@@ -17,7 +16,7 @@ use crate::ProxyError;
 use super::update_method_metrics;
 
 pub async fn hexists(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &HashExists,
@@ -41,7 +40,7 @@ pub async fn hexists(
         };
 
         match response {
-            DictionaryGet::Hit { value } => {
+            DictionaryGetFieldResponse::Hit { value } => {
                 let map: HashMap<Vec<u8>, Vec<u8>> = value.collect_into();
 
                 if let Some(_value) = map.get(req.field()) {
@@ -54,7 +53,7 @@ pub async fn hexists(
                     klog_2(&"hexists", &req.key(), &req.field(), Status::Miss, 0);
                 }
             }
-            DictionaryGet::Miss => {
+            DictionaryGetFieldResponse::Miss => {
                 HEXISTS_MISS.increment();
                 response_buf.extend_from_slice(b":0\r\n");
                 klog_2(&"hexists", &req.key(), &req.field(), Status::Miss, 0);

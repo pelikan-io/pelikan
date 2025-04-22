@@ -4,7 +4,7 @@
 
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::CacheClient;
 use protocol_resp::{SetIsMember, SISMEMBER, SISMEMBER_EX, SISMEMBER_HIT, SISMEMBER_MISS};
 use tokio::time;
 
@@ -15,7 +15,7 @@ use crate::ProxyError;
 use super::update_method_metrics;
 
 pub async fn sismember(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &SetIsMember,

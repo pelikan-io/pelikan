@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::CacheClient;
 use protocol_resp::{HashSet, HSET, HSET_EX, HSET_STORED};
 
 use crate::error::ProxyResult;
@@ -16,7 +16,7 @@ use crate::COLLECTION_TTL;
 use super::update_method_metrics;
 
 pub async fn hset(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &HashSet,

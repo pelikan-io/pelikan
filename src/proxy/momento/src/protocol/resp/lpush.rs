@@ -18,18 +18,13 @@ pub async fn lpush(
     update_method_metrics(&LPUSH, &LPUSH_EX, async move {
         let count = timeout(
             Duration::from_millis(200),
-            client.list_concat_front(
+            client.list_concatenate_front(
                 cache_name,
                 req.key(),
                 req.elements().iter().map(|e| &e[..]),
-                None,
-                COLLECTION_TTL,
             ),
         )
         .await??;
-
-        write!(response_buf, ":{count}\r\n")?;
-
         Ok(())
     })
     .await

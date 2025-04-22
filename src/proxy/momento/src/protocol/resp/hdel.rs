@@ -19,7 +19,7 @@ pub async fn hdel(
         let fields: Vec<&[u8]> = req.fields().iter().map(|f| &**f).collect();
         match timeout(
             Duration::from_millis(200),
-            client.dictionary_delete(cache_name, req.key(), Fields::Some(fields)),
+            client.dictionary_remove_fields(cache_name, req.key(), fields),
         )
         .await
         {
