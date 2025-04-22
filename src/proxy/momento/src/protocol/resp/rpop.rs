@@ -4,6 +4,7 @@
 
 use std::io::Write;
 
+use momento::cache::{ListLengthResponse, ListPopBackResponse};
 use protocol_resp::{ListPopBack, RPOP, RPOP_EX};
 
 use crate::*;
@@ -21,18 +22,19 @@ pub async fn rpop(
 
         match req.count() {
             None => match timeout(tout, client.list_pop_back(cache_name, req.key())).await?? {
-                Some(item) => {
-                    write!(response_buf, "${}\r\n", item.len())?;
-                    response_buf.extend_from_slice(&item);
+                ListPopBackResponse::Hit { value } => {
+                    let value: Vec<u8> = value.try_into()?;
+                    write!(response_buf, "${}\r\n", value.len())?;
+                    response_buf.extend_from_slice(&value);
                     response_buf.extend_from_slice(b"\r\n");
                 }
-                None => {
+                ListPopBackResponse::Miss => {
                     response_buf.extend_from_slice(b"$-1\r\n");
                 }
             },
             Some(0) => match timeout(tout, client.list_length(cache_name, req.key())).await?? {
-                Some(_) => response_buf.extend_from_slice(b"*0\r\n"),
-                None => response_buf.extend_from_slice(b"*-1\r\n"),
+                ListLengthResponse::Hit { length: _ } => response_buf.extend_from_slice(b"*0\r\n"),
+                ListLengthResponse::Miss => response_buf.extend_from_slice(b"*-1\r\n"),
             },
             Some(count) => {
                 let mut items = Vec::with_capacity(count.min(64) as usize);
@@ -50,8 +52,11 @@ pub async fn rpop(
                 // potentialy losing or duplicating elements.
                 for _ in 0..count {
                     match timeout(tout, client.list_pop_back(cache_name, req.key())).await?? {
-                        Some(item) => items.push(item),
-                        None => break,
+                        ListPopBackResponse::Hit { value } => {
+                            let value: Vec<u8> = value.try_into()?;
+                            items.push(value);
+                        }
+                        ListPopBackResponse::Miss => break,
                     }
                 }
 
