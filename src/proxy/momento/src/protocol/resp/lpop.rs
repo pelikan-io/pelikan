@@ -10,7 +10,7 @@ use protocol_resp::{ListPop, LPOP, LPOP_EX};
 use super::update_method_metrics;
 
 pub async fn lpop(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &ListPop,

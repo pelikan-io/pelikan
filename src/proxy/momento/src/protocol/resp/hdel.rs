@@ -10,7 +10,7 @@ use std::io::Write;
 use super::update_method_metrics;
 
 pub async fn hdel(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &HashDelete,

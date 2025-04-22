@@ -2,15 +2,15 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use momento::cache::GetResponse;
 use crate::klog::{klog_1, Status};
 use crate::*;
-use momento::response::Get as GetResponse;
 use protocol_memcache::*;
 
 use super::update_method_metrics;
 
 pub async fn get(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     key: &[u8],

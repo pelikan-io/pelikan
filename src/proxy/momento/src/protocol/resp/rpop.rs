@@ -11,7 +11,7 @@ use crate::*;
 use super::update_method_metrics;
 
 pub async fn rpop(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &ListPopBack,

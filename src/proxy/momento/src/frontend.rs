@@ -9,7 +9,7 @@ use session::Buf;
 
 pub(crate) async fn handle_memcache_client(
     mut socket: tokio::net::TcpStream,
-    mut client: SimpleCacheClient,
+    mut client: CacheClient,
     cache_name: String,
 ) {
     // initialize a buffer for incoming bytes from the client
@@ -79,7 +79,7 @@ pub(crate) async fn handle_memcache_client(
 
 pub(crate) async fn handle_resp_client(
     mut socket: tokio::net::TcpStream,
-    mut client: SimpleCacheClient,
+    mut client: CacheClient,
     cache_name: String,
 ) {
     // initialize a buffer for incoming bytes from the client

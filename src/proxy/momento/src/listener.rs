@@ -2,12 +2,13 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use momento_proxy::Protocol;
 use crate::*;
 use pelikan_net::{TCP_ACCEPT, TCP_CLOSE, TCP_CONN_CURR};
 
 pub(crate) async fn listener(
     listener: TcpListener,
-    client_builder: SimpleCacheClientBuilder,
+    client: CacheClient,
     cache_name: String,
     protocol: Protocol,
 ) {
@@ -17,7 +18,7 @@ pub(crate) async fn listener(
         if let Ok((socket, _)) = listener.accept().await {
             TCP_ACCEPT.increment();
 
-            let client = client_builder.clone().build();
+            let client = client.clone();
             let cache_name = cache_name.clone();
 
             // spawn a task for managing requests for the client

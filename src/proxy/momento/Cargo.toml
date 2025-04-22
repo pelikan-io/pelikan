@@ -18,7 +18,7 @@ config = { path = "../../config" }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-momento = "0.32.0"
+momento = "0.49.0"
 pelikan-net = { workspace = true, features = ["metrics"] }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-memcache = { path = "../../protocol/memcache" }

@@ -10,7 +10,7 @@ use protocol_resp::{ListPush, LPUSH, LPUSH_EX};
 use super::update_method_metrics;
 
 pub async fn lpush(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &ListPush,

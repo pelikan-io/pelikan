@@ -4,7 +4,7 @@ use pelikan_net::*;
 use protocol_memcache::*;
 
 pub async fn delete(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     socket: &mut tokio::net::TcpStream,
     request: &protocol_memcache::Delete,
