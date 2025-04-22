@@ -310,6 +310,7 @@ async fn spawn(
         .default_ttl(DEFAULT_TTL)
         .configuration(configurations::Laptop::latest())
         .credential_provider(credential_provider)
+        .build()
     {
         Ok(c) => c,
         Err(e) => {
@@ -317,7 +318,6 @@ async fn spawn(
             std::process::exit(1);
         }
     };
-
 
     if config.caches().is_empty() {
         error!("no caches specified in the config");
@@ -371,8 +371,6 @@ async fn spawn(
         };
 
         tokio::spawn(async move {
-            let client_builder = client_builder.default_ttl(ttl).expect("bad default ttl");
-
             info!(
                 "starting proxy frontend listener for cache `{}` on: {}",
                 cache.cache_name(),
@@ -382,7 +380,7 @@ async fn spawn(
                 TcpListener::from_std(tcp_listener).expect("could not convert to tokio listener");
             listener::listener(
                 tcp_listener,
-                client_builder.build(),
+                client_builder,
                 cache.cache_name(),
                 cache.protocol(),
             )
