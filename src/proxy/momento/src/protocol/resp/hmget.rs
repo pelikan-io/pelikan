@@ -2,13 +2,15 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::collections::HashMap;
-use std::time::Duration;
-use momento::cache::DictionaryFetchResponse;
+use momento::cache::{
+    DictionaryFetchResponse, DictionaryGetFieldResponse, DictionaryGetFieldsResponse,
+};
 use momento::CacheClient;
 use protocol_resp::{
     HashMultiGet, HMGET, HMGET_EX, HMGET_FIELD, HMGET_FIELD_HIT, HMGET_FIELD_MISS,
 };
+use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_2, Status};
@@ -26,7 +28,7 @@ pub async fn hmget(
         let fields: Vec<_> = req.fields().iter().map(|x| &**x).collect();
         let response = match tokio::time::timeout(
             Duration::from_millis(200),
-            client.dictionary_get(cache_name, req.key(), fields),
+            client.dictionary_get_fields(cache_name, req.key(), fields),
         )
         .await
         {
@@ -46,28 +48,30 @@ pub async fn hmget(
         };
 
         match response {
-            DictionaryFetchResponse::Hit { value } => {
-                let map: HashMap<Vec<u8>, Vec<u8>> = value.collect_into();
-
+            DictionaryGetFieldsResponse::Hit { fields, responses } => {
                 response_buf.extend_from_slice(format!("*{}\r\n", req.fields().len()).as_bytes());
 
                 let mut hit = 0;
                 let mut miss = 0;
 
-                for field in req.fields() {
-                    if let Some(value) = map.get(&**field) {
-                        hit += 1;
-                        klog_2(&"hmget", &req.key(), field, Status::Hit, value.len());
+                for (field, response) in fields.iter().zip(responses) {
+                    match response {
+                        DictionaryGetFieldResponse::Hit { value } => {
+                            hit += 1;
+                            let value: Vec<u8> = value.into();
+                            klog_2(&"hmget", &req.key(), field, Status::Hit, value.len());
 
-                        let item_header = format!("${}\r\n", value.len());
+                            let item_header = format!("${}\r\n", value.len());
 
-                        response_buf.extend_from_slice(item_header.as_bytes());
-                        response_buf.extend_from_slice(value);
-                        response_buf.extend_from_slice(b"\r\n");
-                    } else {
-                        miss += 1;
-                        klog_2(&"hmget", &req.key(), field, Status::Miss, 0);
-                        response_buf.extend_from_slice(b"$-1\r\n");
+                            response_buf.extend_from_slice(item_header.as_bytes());
+                            response_buf.extend_from_slice(value.as_slice());
+                            response_buf.extend_from_slice(b"\r\n");
+                        }
+                        DictionaryGetFieldResponse::Miss => {
+                            miss += 1;
+                            klog_2(&"hmget", &req.key(), field, Status::Miss, 0);
+                            response_buf.extend_from_slice(b"$-1\r\n");
+                        }
                     }
                 }
 
@@ -75,7 +79,7 @@ pub async fn hmget(
                 HMGET_FIELD_HIT.add(hit);
                 HMGET_FIELD_MISS.add(miss);
             }
-            DictionaryFetchResponse::Miss => {
+            DictionaryGetFieldsResponse::Miss => {
                 // treat every requested field as a miss
                 response_buf.extend_from_slice(format!("*{}\r\n", req.fields().len()).as_bytes());
 
