@@ -5,7 +5,6 @@
 use momento::cache::DictionaryGetFieldResponse;
 use momento::CacheClient;
 use protocol_resp::{HashExists, HEXISTS, HEXISTS_EX, HEXISTS_HIT, HEXISTS_MISS};
-use std::collections::HashMap;
 use std::time::Duration;
 use tokio::time::timeout;
 
