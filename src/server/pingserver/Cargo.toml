@@ -36,7 +36,7 @@ pin-project = "1.1.5"
 prost = "0.13.2"
 protocol-ping = { path = "../../protocol/ping", features = ["server"] }
 quinn = "0.11.5"
-rustls = { version = "0.23.13", default-features = false, features = [
+rustls = { version = "0.23.18", default-features = false, features = [
     "logging",
     "ring",
     "std",
