@@ -3,12 +3,11 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use std::collections::HashSet;
-use std::fmt::Debug;
 use std::io::Write;
 use std::time::Duration;
 
 use momento::cache::SetFetchResponse;
-use momento::{CacheClient, MomentoError};
+use momento::CacheClient;
 use protocol_resp::{SetUnion, SUNION, SUNION_EX};
 use tokio::time;
 
@@ -24,26 +23,22 @@ pub async fn sunion(
 ) -> ProxyResult {
     update_method_metrics(&SUNION, &SUNION_EX, async move {
         let timeout = Duration::from_millis(200);
-        let mut set = HashSet::new();
+        let mut set: HashSet<Vec<u8>> = HashSet::new();
 
         for key in req.keys() {
             let key = &**key;
 
-            let response: Result<SetFetchResponse, MomentoError> =
-                time::timeout(timeout, client.set_fetch(cache_name, key)).await?;
+            let response: SetFetchResponse =
+                time::timeout(timeout, client.set_fetch(cache_name, key)).await??;
 
             match response {
-                Ok(response) => {
-                    match response {
-                        SetFetchResponse::Hit { values } => {
-                            for entry in values.into() {
-                                set.insert(entry);
-                            }
-                        }
-                        SetFetchResponse::Miss {} => {}
+                SetFetchResponse::Hit { values } => {
+                    let values: Vec<Vec<u8>> = values.into();
+                    for entry in values {
+                        set.insert(entry);
                     }
                 }
-                Err(e) => {}
+                SetFetchResponse::Miss => {}
             }
         }
 
@@ -51,7 +46,7 @@ pub async fn sunion(
 
         for entry in &set {
             write!(response_buf, "${}\r\n", entry.len())?;
-            response_buf.extend_from_slice(entry.concat().as_bytes());
+            response_buf.extend_from_slice(entry);
         }
 
         Ok(())
