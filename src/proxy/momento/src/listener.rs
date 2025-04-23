@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use crate::*;
-use momento_proxy::Protocol;
+use ::config::momento_proxy::Protocol;
 use pelikan_net::{TCP_ACCEPT, TCP_CLOSE, TCP_CONN_CURR};
 
 pub(crate) async fn listener(
