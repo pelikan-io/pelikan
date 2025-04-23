@@ -170,9 +170,6 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::ListPushBack(r) => {
                     resp::rpush(&mut client, &cache_name, &mut response_buf, r).await?
                 }
-                resp::Request::ListTrim(r) => {
-                    resp::ltrim(&mut client, &cache_name, &mut response_buf, r).await?
-                }
                 resp::Request::ListPopBack(r) => {
                     resp::rpop(&mut client, &cache_name, &mut response_buf, r).await?
                 }
