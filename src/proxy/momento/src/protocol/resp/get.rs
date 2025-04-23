@@ -2,9 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use momento::cache::GetResponse;
 use crate::klog::{klog_1, Status};
 use crate::*;
+use momento::cache::GetResponse;
 use protocol_memcache::*;
 
 use super::update_method_metrics;
