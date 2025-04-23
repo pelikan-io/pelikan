@@ -6,6 +6,7 @@ use std::collections::HashSet;
 use std::io::Write;
 use std::time::Duration;
 
+use momento::cache::SetFetchResponse;
 use momento::CacheClient;
 use protocol_resp::{SetMembers, SMEMBERS, SMEMBERS_EX};
 use tokio::time;
@@ -40,10 +41,16 @@ pub async fn smembers(
             }
         };
 
-
-        let (set, status) = match response.value {
-            Some(set) => (set, Status::Hit),
-            None => (HashSet::default(), Status::Miss),
+        let (set, status) = match response {
+            SetFetchResponse::Hit { values } => {
+                let values: Vec<Vec<u8>> = values.into();
+                let set: HashSet<Vec<u8>> = values.into_iter().collect();
+                (set, Status::Hit)
+            }
+            SetFetchResponse::Miss => {
+                let set: HashSet<Vec<u8>> = HashSet::default();
+                (set, Status::Miss)
+            }
         };
 
         write!(response_buf, "*{}\r\n", set.len())?;
