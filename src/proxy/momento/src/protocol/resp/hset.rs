@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use momento::cache::{DictionarySetFieldsRequest, IntoDictionaryFieldValuePairs};
+use momento::cache::DictionarySetFieldsRequest;
 use momento::CacheClient;
 use protocol_resp::{HashSet, HSET, HSET_EX, HSET_STORED};
 
@@ -20,23 +20,19 @@ pub async fn hset(
     client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
-    req: HashSet,
+    req: &HashSet,
 ) -> ProxyResult {
     update_method_metrics(&HSET, &HSET_EX, async move {
-        let mut map: HashMap<&[u8], &[u8]> = std::collections::HashMap::new();
+        let mut map: HashMap<Vec<u8>, Vec<u8>> = std::collections::HashMap::new();
         for (field, value) in req.data() {
-            map.insert(&**field, &**value);
+            map.insert(field.as_ref().to_vec(), value.as_ref().to_vec());
         }
 
         let _response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.send_request(
-                DictionarySetFieldsRequest::new(
-                    cache_name,
-                    req.key(),
-                    map.clone().into_dictionary_field_value_pairs(),
-                )
-                .ttl(COLLECTION_TTL),
+                DictionarySetFieldsRequest::new(cache_name, req.key(), map.clone())
+                    .ttl(COLLECTION_TTL),
             ),
         )
         .await
