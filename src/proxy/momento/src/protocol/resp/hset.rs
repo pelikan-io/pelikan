@@ -20,7 +20,7 @@ pub async fn hset(
     client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
-    req: &HashSet,
+    req: HashSet,
 ) -> ProxyResult {
     update_method_metrics(&HSET, &HSET_EX, async move {
         let mut map: HashMap<&[u8], &[u8]> = std::collections::HashMap::new();
