@@ -36,7 +36,7 @@ pin-project = "1.1.5"
 prost = "0.13.2"
 protocol-ping = { path = "../../protocol/ping", features = ["server"] }
 quinn = "0.11.5"
-rustls = { version = "0.23.13", default-features = false, features = [
+rustls = { version = "0.23.18", default-features = false, features = [
     "logging",
     "ring",
     "std",
@@ -45,7 +45,7 @@ rustls-native-certs = "0.8.0"
 serde = { workspace = true, features = ["derive"] }
 server = { path = "../../core/server" }
 session = { path = "../../session" }
-tokio = { version = "1.40.0", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.43.1", features = ["macros", "rt-multi-thread"] }
 toml = { workspace = true }
 tonic = { version = "0.12.3" }
 warp = "0.3.7"
