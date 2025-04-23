@@ -46,7 +46,7 @@ pub async fn lindex(
         match entry {
             ListFetchResponse::Hit { values } => {
                 // TODO need to impl from here
-                let list: Vec<Vec<u8>> = values.try_into()?;
+                let list: Vec<Vec<u8>> = values.into();
                 let index: Option<usize> = match req.index() {
                     index @ 0.. => index.try_into().ok(),
                     index => (-index)

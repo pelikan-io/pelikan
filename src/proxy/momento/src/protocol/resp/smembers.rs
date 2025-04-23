@@ -42,15 +42,8 @@ pub async fn smembers(
         };
 
         let (set, status) = match response {
-            SetFetchResponse::Hit { values } => {
-                let values: Vec<Vec<u8>> = values.into();
-                let set: HashSet<Vec<u8>> = values.into_iter().collect();
-                (set, Status::Hit)
-            }
-            SetFetchResponse::Miss => {
-                let set: HashSet<Vec<u8>> = HashSet::default();
-                (set, Status::Miss)
-            }
+            SetFetchResponse::Hit { values } => (values.into(), Status::Hit),
+            SetFetchResponse::Miss => (HashSet::default(), Status::Miss),
         };
 
         write!(response_buf, "*{}\r\n", set.len())?;

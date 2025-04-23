@@ -33,8 +33,7 @@ pub async fn sinter(
         let response = time::timeout(timeout, client.set_fetch(cache_name, head)).await??;
         match response {
             SetFetchResponse::Hit { values } => {
-                let values: Vec<Vec<u8>> = values.into();
-                let mut set: HashSet<Vec<u8>> = values.into_iter().collect();
+                let mut set: HashSet<Vec<u8>> = values.into();
 
                 for key in rest {
                     let key = &**key;
@@ -48,7 +47,6 @@ pub async fn sinter(
                     match response {
                         SetFetchResponse::Hit { values } => {
                             let other_set: Vec<Vec<u8>> = values.into();
-                            let other_set: HashSet<Vec<u8>> = other_set.into_iter().collect();
                             for entry in other_set {
                                 set.retain(|e| e == &entry);
                             }

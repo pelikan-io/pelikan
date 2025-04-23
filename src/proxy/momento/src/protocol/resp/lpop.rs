@@ -22,7 +22,7 @@ pub async fn lpop(
         match req.count() {
             None => match timeout(tout, client.list_pop_front(cache_name, req.key())).await?? {
                 ListPopFrontResponse::Hit { value } => {
-                    let value: Vec<u8> = value.try_into()?;
+                    let value: Vec<u8> = value.into();
                     write!(response_buf, "${}\r\n", value.len())?;
                     response_buf.extend_from_slice(&value);
                     response_buf.extend_from_slice(b"\r\n");
@@ -36,7 +36,7 @@ pub async fn lpop(
                 ListLengthResponse::Miss => response_buf.extend_from_slice(b"*-1\r\n"),
             },
             Some(count) => {
-                let mut items = Vec::with_capacity(count.min(64) as usize);
+                let mut items: Vec<Vec<u8>> = Vec::with_capacity(count.min(64) as usize);
 
                 // Momento doesn't provide a single operation to do what we want here. To make it
                 // work there are two options for emulating things here:
@@ -51,10 +51,7 @@ pub async fn lpop(
                 // potentialy losing or duplicating elements.
                 for _ in 0..count {
                     match timeout(tout, client.list_pop_front(cache_name, req.key())).await?? {
-                        ListPopFrontResponse::Hit { value } => {
-                            let value: Vec<u8> = value.try_into()?;
-                            items.push(value);
-                        }
+                        ListPopFrontResponse::Hit { value } => items.push(value.into()),
                         ListPopFrontResponse::Miss => break,
                     }
                 }

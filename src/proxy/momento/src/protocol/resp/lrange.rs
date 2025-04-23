@@ -28,7 +28,7 @@ pub async fn lrange(
 
         match list_fetch_response {
             ListFetchResponse::Hit { values } => {
-                let list: Vec<Vec<u8>> = values.try_into()?;
+                let list: Vec<Vec<u8>> = values.into();
 
                 let start: usize = match req.start() {
                     start @ 0.. => start.try_into().unwrap_or(usize::MAX),

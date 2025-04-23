@@ -54,8 +54,7 @@ pub async fn sismember(
 
         let status = match response {
             SetFetchResponse::Hit { values } => {
-                let values: Vec<Vec<u8>> = values.into();
-                let values: HashSet<Vec<u8>> = values.into_iter().collect();
+                let values: HashSet<Vec<u8>> = values.into();
                 if values.contains(req.field()) {
                     SISMEMBER_HIT.increment();
                     response_buf.extend_from_slice(b":1\r\n");
