@@ -2,10 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::io::Write;
 use std::time::Duration;
+use std::{collections::HashSet, io::Write};
 
-use momento::CacheClient;
+use momento::{cache::SetFetchResponse, CacheClient};
 use protocol_resp::{SetDiff, SDIFF, SDIFF_EX};
 use tokio::time;
 
@@ -30,31 +30,42 @@ pub async fn sdiff(
         let head = &**head;
 
         let response = time::timeout(timeout, client.set_fetch(cache_name, head)).await??;
-        let Some(mut set) = response.value else {
-            response_buf.extend_from_slice(b"*0\r\n");
-            return Ok(());
-        };
+        match response {
+            SetFetchResponse::Hit { values } => {
+                let set: Vec<Vec<u8>> = values.into();
+                let mut set: HashSet<Vec<u8>> = set.into_iter().collect();
+                for key in rest {
+                    let key = &**key;
 
-        for key in rest {
-            let key = &**key;
+                    if set.is_empty() {
+                        break;
+                    }
 
-            if set.is_empty() {
-                break;
-            }
+                    let response =
+                        time::timeout(timeout, client.set_fetch(cache_name, key)).await??;
+                    match response {
+                        SetFetchResponse::Hit { values } => {
+                            let other_set: Vec<Vec<u8>> = values.into();
+                            let other_set: HashSet<Vec<u8>> = other_set.into_iter().collect();
+                            for entry in other_set {
+                                set.remove(&entry);
+                            }
+                        }
+                        SetFetchResponse::Miss => {}
+                    }
+                }
 
-            let response = time::timeout(timeout, client.set_fetch(cache_name, key)).await??;
-            if let Some(value) = response.value {
-                for entry in value {
-                    set.remove(&entry);
+                write!(response_buf, "*{}\r\n", set.len())?;
+
+                for entry in &set {
+                    write!(response_buf, "${}\r\n", entry.len())?;
+                    response_buf.extend_from_slice(entry);
                 }
             }
-        }
-
-        write!(response_buf, "*{}\r\n", set.len())?;
-
-        for entry in &set {
-            write!(response_buf, "${}\r\n", entry.len())?;
-            response_buf.extend_from_slice(entry);
+            SetFetchResponse::Miss => {
+                response_buf.extend_from_slice(b"*0\r\n");
+                return Ok(());
+            }
         }
 
         Ok(())
