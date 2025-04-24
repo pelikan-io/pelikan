@@ -2,7 +2,6 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::collections::HashMap;
 use std::time::Duration;
 
 use momento::cache::DictionarySetFieldsRequest;
@@ -23,15 +22,15 @@ pub async fn hset(
     req: &HashSet,
 ) -> ProxyResult {
     update_method_metrics(&HSET, &HSET_EX, async move {
-        let mut map: HashMap<Vec<u8>, Vec<u8>> = std::collections::HashMap::new();
-        for (field, value) in req.data() {
-            map.insert(field.as_ref().to_vec(), value.as_ref().to_vec());
-        }
-
+        let elements: Vec<(Vec<u8>, Vec<u8>)> = req
+            .data()
+            .iter()
+            .map(|(field, value)| (field.as_ref().to_vec(), value.as_ref().to_vec()))
+            .collect();
         let _response = match tokio::time::timeout(
             Duration::from_millis(200),
             client.send_request(
-                DictionarySetFieldsRequest::new(cache_name, req.key(), map.clone())
+                DictionarySetFieldsRequest::new(cache_name, req.key(), elements.clone())
                     .ttl(COLLECTION_TTL),
             ),
         )
@@ -39,7 +38,7 @@ pub async fn hset(
         {
             Ok(Ok(r)) => r,
             Ok(Err(e)) => {
-                for (field, value) in map.iter() {
+                for (field, value) in elements.iter() {
                     klog_7(
                         &"hset",
                         &req.key(),
@@ -53,7 +52,7 @@ pub async fn hset(
                 return Err(ProxyError::from(e));
             }
             Err(e) => {
-                for (field, value) in map.iter() {
+                for (field, value) in elements.iter() {
                     klog_7(
                         &"hset",
                         &req.key(),
@@ -69,7 +68,7 @@ pub async fn hset(
         };
 
         HSET_STORED.increment();
-        for (field, value) in map.iter() {
+        for (field, value) in elements.iter() {
             klog_7(
                 &"hset",
                 &req.key(),
