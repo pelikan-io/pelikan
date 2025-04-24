@@ -306,18 +306,16 @@ async fn spawn(
         eprintln!("failed to initialize credential provider. error: {e}");
         std::process::exit(1);
     });
-    let client_builder = match CacheClient::builder()
+    let client_builder = CacheClient::builder()
         .default_ttl(DEFAULT_TTL)
         .configuration(configurations::Laptop::latest())
-        .credential_provider(credential_provider)
-        .build()
-    {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("could not create cache client: {}", e);
-            std::process::exit(1);
-        }
-    };
+        .credential_provider(credential_provider);
+
+    // Validate client can build early
+    client_builder.clone().build().unwrap_or_else(|e| {
+        eprintln!("could not create cache client: {}", e);
+        std::process::exit(1);
+    });
 
     if config.caches().is_empty() {
         error!("no caches specified in the config");
