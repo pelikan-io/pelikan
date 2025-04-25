@@ -4,12 +4,12 @@
 
 use crate::klog::{klog_1, Status};
 use crate::{Error, *};
-use momento::response::Get as GetResponse;
+use momento::cache::GetResponse;
 use pelikan_net::*;
 use protocol_memcache::*;
 
 pub async fn get(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     socket: &mut tokio::net::TcpStream,
     keys: &[Box<[u8]>],

@@ -6,7 +6,8 @@ use std::collections::HashSet;
 use std::io::Write;
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::cache::SetFetchResponse;
+use momento::CacheClient;
 use protocol_resp::{SetUnion, SUNION, SUNION_EX};
 use tokio::time;
 
@@ -15,23 +16,29 @@ use crate::ProxyResult;
 use super::update_method_metrics;
 
 pub async fn sunion(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &SetUnion,
 ) -> ProxyResult {
     update_method_metrics(&SUNION, &SUNION_EX, async move {
         let timeout = Duration::from_millis(200);
-        let mut set = HashSet::new();
+        let mut set: HashSet<Vec<u8>> = HashSet::new();
 
         for key in req.keys() {
             let key = &**key;
 
-            let response = time::timeout(timeout, client.set_fetch(cache_name, key)).await??;
-            if let Some(value) = response.value {
-                for entry in value {
-                    set.insert(entry);
+            let response: SetFetchResponse =
+                time::timeout(timeout, client.set_fetch(cache_name, key)).await??;
+
+            match response {
+                SetFetchResponse::Hit { values } => {
+                    let values: Vec<Vec<u8>> = values.into();
+                    for entry in values {
+                        set.insert(entry);
+                    }
                 }
+                SetFetchResponse::Miss => {}
             }
         }
 

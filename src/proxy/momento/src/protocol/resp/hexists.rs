@@ -2,12 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::collections::HashMap;
-use std::time::Duration;
-
-use momento::response::DictionaryGet;
-use momento::SimpleCacheClient;
+use momento::cache::DictionaryGetFieldResponse;
+use momento::CacheClient;
 use protocol_resp::{HashExists, HEXISTS, HEXISTS_EX, HEXISTS_HIT, HEXISTS_MISS};
+use std::time::Duration;
 use tokio::time::timeout;
 
 use crate::error::ProxyResult;
@@ -17,7 +15,7 @@ use crate::ProxyError;
 use super::update_method_metrics;
 
 pub async fn hexists(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &HashExists,
@@ -25,7 +23,7 @@ pub async fn hexists(
     update_method_metrics(&HEXISTS, &HEXISTS_EX, async move {
         let response = match timeout(
             Duration::from_millis(200),
-            client.dictionary_get(cache_name, req.key(), vec![req.field()]),
+            client.dictionary_get_field(cache_name, req.key(), req.field()),
         )
         .await
         {
@@ -41,20 +39,12 @@ pub async fn hexists(
         };
 
         match response {
-            DictionaryGet::Hit { value } => {
-                let map: HashMap<Vec<u8>, Vec<u8>> = value.collect_into();
-
-                if let Some(_value) = map.get(req.field()) {
-                    HEXISTS_HIT.increment();
-                    response_buf.extend_from_slice(b":1\r\n");
-                    klog_2(&"hexists", &req.key(), &req.field(), Status::Hit, 1);
-                } else {
-                    HEXISTS_MISS.increment();
-                    response_buf.extend_from_slice(b":0\r\n");
-                    klog_2(&"hexists", &req.key(), &req.field(), Status::Miss, 0);
-                }
+            DictionaryGetFieldResponse::Hit { value: _ } => {
+                HEXISTS_HIT.increment();
+                response_buf.extend_from_slice(b":1\r\n");
+                klog_2(&"hexists", &req.key(), &req.field(), Status::Hit, 1);
             }
-            DictionaryGet::Miss => {
+            DictionaryGetFieldResponse::Miss => {
                 HEXISTS_MISS.increment();
                 response_buf.extend_from_slice(b":0\r\n");
                 klog_2(&"hexists", &req.key(), &req.field(), Status::Miss, 0);

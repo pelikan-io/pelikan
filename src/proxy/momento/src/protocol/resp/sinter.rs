@@ -5,8 +5,9 @@
 use std::io::Write;
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::{cache::SetFetchResponse, CacheClient};
 use protocol_resp::{SetIntersect, SINTER, SINTER_EX};
+use std::collections::HashSet;
 use tokio::time;
 
 use crate::ProxyResult;
@@ -14,7 +15,7 @@ use crate::ProxyResult;
 use super::update_method_metrics;
 
 pub async fn sinter(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &SetIntersect,
@@ -30,26 +31,40 @@ pub async fn sinter(
         let head = &**head;
 
         let response = time::timeout(timeout, client.set_fetch(cache_name, head)).await??;
-        let mut set = response.value.unwrap_or_default();
+        match response {
+            SetFetchResponse::Hit { values } => {
+                let mut set: HashSet<Vec<u8>> = values.into();
 
-        for key in rest {
-            let key = &**key;
+                for key in rest {
+                    let key = &**key;
 
-            if set.is_empty() {
-                break;
+                    if set.is_empty() {
+                        break;
+                    }
+
+                    let response =
+                        time::timeout(timeout, client.set_fetch(cache_name, key)).await??;
+                    match response {
+                        SetFetchResponse::Hit { values } => {
+                            let other_set: Vec<Vec<u8>> = values.into();
+                            for entry in other_set {
+                                set.retain(|e| e == &entry);
+                            }
+                        }
+                        SetFetchResponse::Miss => {
+                            set.clear();
+                        }
+                    }
+                }
+
+                write!(response_buf, "*{}\r\n", set.len())?;
+
+                for entry in &set {
+                    write!(response_buf, "${}\r\n", entry.len())?;
+                    response_buf.extend_from_slice(entry);
+                }
             }
-
-            let response = time::timeout(timeout, client.set_fetch(cache_name, key)).await??;
-            if let Some(value) = response.value {
-                set.retain(|entry| value.contains(entry));
-            }
-        }
-
-        write!(response_buf, "*{}\r\n", set.len())?;
-
-        for entry in &set {
-            write!(response_buf, "${}\r\n", entry.len())?;
-            response_buf.extend_from_slice(entry);
+            SetFetchResponse::Miss => {}
         }
 
         Ok(())

@@ -10,7 +10,7 @@ use std::io::Write;
 use super::update_method_metrics;
 
 pub async fn hdel(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &HashDelete,
@@ -19,7 +19,7 @@ pub async fn hdel(
         let fields: Vec<&[u8]> = req.fields().iter().map(|f| &**f).collect();
         match timeout(
             Duration::from_millis(200),
-            client.dictionary_delete(cache_name, req.key(), Fields::Some(fields)),
+            client.dictionary_remove_fields(cache_name, req.key(), fields),
         )
         .await
         {
