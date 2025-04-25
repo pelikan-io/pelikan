@@ -45,6 +45,7 @@ mod sunion;
 mod zcard;
 mod zincrby;
 mod zmscore;
+mod zrank;
 mod zrem;
 mod zscore;
 
@@ -80,6 +81,7 @@ pub use set::*;
 pub use zcard::*;
 pub use zincrby::*;
 pub use zmscore::*;
+pub use zrank::*;
 pub use zrem::*;
 pub use zscore::*;
 
@@ -211,6 +213,7 @@ decl_request! {
         SortedSetScore(SortedSetScore) => "zscore",
         SortedSetMultiScore(SortedSetMultiScore) => "zmscore",
         SortedSetRemove(SortedSetRemove) => "zrem",
+        SortedSetRank(SortedSetRank) => "zrank",
     }
 }
 
@@ -312,6 +315,10 @@ impl Request {
 
     pub fn sorted_set_remove(key: &[u8], members: &[&[u8]]) -> Self {
         Self::SortedSetRemove(SortedSetRemove::new(key, members))
+    }
+
+    pub fn sorted_set_rank(key: &[u8], member: &[u8], with_score: bool) -> Self {
+        Self::SortedSetRank(SortedSetRank::new(key, member, with_score))
     }
 
     // TODO: add remaining sorted set commands
