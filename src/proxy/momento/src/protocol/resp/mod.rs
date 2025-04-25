@@ -34,7 +34,7 @@ mod smembers;
 mod srem;
 mod sunion;
 mod zcard;
-
+mod zincrby;
 pub use self::lindex::*;
 pub use self::llen::*;
 pub use self::lpop::*;
@@ -63,6 +63,7 @@ pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
 pub use zcard::*;
+pub use zincrby::*;
 
 pub(crate) fn momento_error_to_resp_error(buf: &mut Vec<u8>, command: &str, error: MomentoError) {
     use crate::BACKEND_EX;

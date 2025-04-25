@@ -43,6 +43,7 @@ mod smembers;
 mod srem;
 mod sunion;
 mod zcard;
+mod zincrby;
 
 pub use self::lindex::*;
 pub use self::llen::*;
@@ -74,7 +75,7 @@ pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
 pub use zcard::*;
-
+pub use zincrby::*;
 /// response codes for klog
 /// matches Memcache protocol response codes for compatibility with existing tools
 /// [crate::memcache::MISS]
@@ -199,6 +200,7 @@ decl_request! {
         SetMembers(SetMembers) => "smembers",
         SetIsMember(SetIsMember) => "sismember",
         SortedSetCardinality(SortedSetCardinality) => "zcard",
+        SortedSetIncrement(SortedSetIncrement) => "zincrby",
     }
 }
 

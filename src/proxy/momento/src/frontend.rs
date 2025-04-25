@@ -396,6 +396,9 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::SortedSetCardinality(r) => {
                     resp::zcard(&mut client, &cache_name, &mut response_buf, r).await?
                 }
+                resp::Request::SortedSetIncrement(r) => {
+                    resp::zincrby(&mut client, &cache_name, &mut response_buf, r).await?
+                }
                 // TODO: add remaining sorted set commands
                 _ => return Err(ProxyError::UnsupportedCommand(request.command())),
             }
