@@ -42,6 +42,7 @@ mod sismember;
 mod smembers;
 mod srem;
 mod sunion;
+mod zcard;
 
 pub use self::lindex::*;
 pub use self::llen::*;
@@ -72,6 +73,7 @@ pub use hset::*;
 pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
+pub use zcard::*;
 
 /// response codes for klog
 /// matches Memcache protocol response codes for compatibility with existing tools
@@ -88,6 +90,7 @@ enum ResponseCode {
 }
 
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
+pub type ValueScorePair = (Arc<[u8]>, f64);
 
 /// Macro to deal with the boilerplate around the Request enum.
 macro_rules! decl_request {
@@ -195,6 +198,7 @@ decl_request! {
         SetIntersect(SetIntersect) => "sinter",
         SetMembers(SetMembers) => "smembers",
         SetIsMember(SetIsMember) => "sismember",
+        SortedSetCardinality(SortedSetCardinality) => "zcard",
     }
 }
 
@@ -277,6 +281,12 @@ impl Request {
     ) -> Self {
         Self::Set(Set::new(key, value, expire_time, mode, get_old))
     }
+
+    pub fn sorted_set_cardinality(key: &[u8]) -> Self {
+        Self::SortedSetCardinality(SortedSetCardinality::new(key))
+    }
+
+    // TODO: add remaining sorted set commands
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
