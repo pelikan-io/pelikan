@@ -44,6 +44,7 @@ mod srem;
 mod sunion;
 mod zcard;
 mod zincrby;
+mod zmscore;
 mod zscore;
 
 pub use self::lindex::*;
@@ -77,6 +78,7 @@ pub use sadd::*;
 pub use set::*;
 pub use zcard::*;
 pub use zincrby::*;
+pub use zmscore::*;
 pub use zscore::*;
 /// response codes for klog
 /// matches Memcache protocol response codes for compatibility with existing tools
@@ -204,6 +206,7 @@ decl_request! {
         SortedSetCardinality(SortedSetCardinality) => "zcard",
         SortedSetIncrement(SortedSetIncrement) => "zincrby",
         SortedSetScore(SortedSetScore) => "zscore",
+        SortedSetMultiScore(SortedSetMultiScore) => "zmscore",
     }
 }
 
@@ -297,6 +300,10 @@ impl Request {
 
     pub fn sorted_set_score(key: &[u8], member: &[u8]) -> Self {
         Self::SortedSetScore(SortedSetScore::new(key, member))
+    }
+
+    pub fn sorted_set_multi_score(key: &[u8], members: &[&[u8]]) -> Self {
+        Self::SortedSetMultiScore(SortedSetMultiScore::new(key, members))
     }
 
     // TODO: add remaining sorted set commands
