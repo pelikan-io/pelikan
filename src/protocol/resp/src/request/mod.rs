@@ -44,6 +44,7 @@ mod srem;
 mod sunion;
 mod zcard;
 mod zincrby;
+mod zscore;
 
 pub use self::lindex::*;
 pub use self::llen::*;
@@ -76,6 +77,7 @@ pub use sadd::*;
 pub use set::*;
 pub use zcard::*;
 pub use zincrby::*;
+pub use zscore::*;
 /// response codes for klog
 /// matches Memcache protocol response codes for compatibility with existing tools
 /// [crate::memcache::MISS]
@@ -201,6 +203,7 @@ decl_request! {
         SetIsMember(SetIsMember) => "sismember",
         SortedSetCardinality(SortedSetCardinality) => "zcard",
         SortedSetIncrement(SortedSetIncrement) => "zincrby",
+        SortedSetScore(SortedSetScore) => "zscore",
     }
 }
 
@@ -290,6 +293,10 @@ impl Request {
 
     pub fn sorted_set_increment(key: &[u8], increment: i64, member: &[u8]) -> Self {
         Self::SortedSetIncrement(SortedSetIncrement::new(key, increment, member))
+    }
+
+    pub fn sorted_set_score(key: &[u8], member: &[u8]) -> Self {
+        Self::SortedSetScore(SortedSetScore::new(key, member))
     }
 
     // TODO: add remaining sorted set commands
