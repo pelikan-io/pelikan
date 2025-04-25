@@ -25,3 +25,9 @@ name = "memcache"
 path = "fuzz_targets/memcache.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "memcache_binary"
+path = "fuzz_targets/memcache_binary.rs"
+test = false
+doc = false

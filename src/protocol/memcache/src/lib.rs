@@ -5,6 +5,7 @@
 #[macro_use]
 extern crate logger;
 
+pub mod binary;
 mod request;
 mod response;
 mod storage;
