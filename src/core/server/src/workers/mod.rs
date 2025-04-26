@@ -3,6 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use crate::*;
+use protocol_common::Protocol;
 use std::thread::JoinHandle;
 
 mod multi;
@@ -76,9 +77,9 @@ pub enum Workers<Parser, Request, Response, Storage> {
     },
 }
 
-impl<Parser, Request, Response, Storage> Workers<Parser, Request, Response, Storage>
+impl<P, Request, Response, Storage> Workers<P, Request, Response, Storage>
 where
-    Parser: 'static + Parse<Request> + Clone + Send,
+    P: 'static + Protocol<Request, Response> + Clone + Send,
     Request: 'static + Klog + Klog<Response = Response> + Send,
     Response: 'static + Compose + Send,
     Storage: 'static + EntryStore + Execute<Request, Response> + Send,
@@ -115,29 +116,29 @@ where
     }
 }
 
-pub enum WorkersBuilder<Parser, Request, Response, Storage> {
+pub enum WorkersBuilder<P, Request, Response, Storage> {
     Single {
-        worker: SingleWorkerBuilder<Parser, Request, Response, Storage>,
+        worker: SingleWorkerBuilder<P, Request, Response, Storage>,
     },
     Multi {
-        workers: Vec<MultiWorkerBuilder<Parser, Request, Response>>,
+        workers: Vec<MultiWorkerBuilder<P, Request, Response>>,
         storage: StorageWorkerBuilder<Request, Response, Storage>,
     },
 }
 
-impl<Parser, Request, Response, Storage> WorkersBuilder<Parser, Request, Response, Storage>
+impl<P, Request, Response, Storage> WorkersBuilder<P, Request, Response, Storage>
 where
-    Parser: Parse<Request> + Clone,
+    P: Protocol<Request, Response> + Clone,
     Response: Compose,
     Storage: Execute<Request, Response> + EntryStore,
 {
-    pub fn new<T: WorkerConfig>(config: &T, parser: Parser, storage: Storage) -> Result<Self> {
+    pub fn new<T: WorkerConfig>(config: &T, protocol: P, storage: Storage) -> Result<Self> {
         let threads = config.worker().threads();
 
         if threads > 1 {
             let mut workers = vec![];
             for _ in 0..threads {
-                workers.push(MultiWorkerBuilder::new(config, parser.clone())?)
+                workers.push(MultiWorkerBuilder::new(config, protocol.clone())?)
             }
 
             Ok(Self::Multi {
@@ -146,7 +147,7 @@ where
             })
         } else {
             Ok(Self::Single {
-                worker: SingleWorkerBuilder::new(config, parser, storage)?,
+                worker: SingleWorkerBuilder::new(config, protocol, storage)?,
             })
         }
     }
@@ -182,7 +183,7 @@ where
         self,
         session_queues: Vec<Queues<Session, Session>>,
         signal_queues: Vec<Queues<(), Signal>>,
-    ) -> Workers<Parser, Request, Response, Storage> {
+    ) -> Workers<P, Request, Response, Storage> {
         let mut signal_queues = signal_queues;
         let mut session_queues = session_queues;
         match self {

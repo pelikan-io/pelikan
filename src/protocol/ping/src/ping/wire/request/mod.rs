@@ -6,7 +6,7 @@
 
 mod compose;
 mod keyword;
-mod parse;
+pub(crate) mod parse;
 
 #[cfg(test)]
 mod test;
@@ -14,8 +14,6 @@ mod test;
 use crate::Response;
 pub use keyword::Keyword;
 use logger::Klog;
-
-pub use parse::Parser as RequestParser;
 
 #[derive(Debug)]
 /// A collection of all possible `Ping` request types.

@@ -65,22 +65,22 @@ impl<Parser, Request, Response, Storage> SingleWorkerBuilder<Parser, Request, Re
     }
 }
 
-pub struct SingleWorker<Parser, Request, Response, Storage> {
+pub struct SingleWorker<P, Request, Response, Storage> {
     nevent: usize,
-    parser: Parser,
+    parser: P,
     pending: VecDeque<Token>,
     poll: Poll,
     session_queue: Queues<Session, Session>,
-    sessions: Slab<ServerSession<Parser, Response, Request>>,
+    sessions: Slab<ServerSession<P, Response, Request>>,
     signal_queue: Queues<(), Signal>,
     storage: Storage,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Parser, Request, Response, Storage> SingleWorker<Parser, Request, Response, Storage>
+impl<P, Request, Response, Storage> SingleWorker<P, Request, Response, Storage>
 where
-    Parser: Parse<Request> + Clone,
+    P: Protocol<Request, Response> + Clone,
     Request: Klog + Klog<Response = Response>,
     Response: Compose,
     Storage: EntryStore + Execute<Request, Response>,

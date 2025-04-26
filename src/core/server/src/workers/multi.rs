@@ -60,21 +60,21 @@ impl<Parser, Request, Response> MultiWorkerBuilder<Parser, Request, Response> {
     }
 }
 
-pub struct MultiWorker<Parser, Request, Response> {
+pub struct MultiWorker<P, Request, Response> {
     data_queue: Queues<(Request, Token), (Request, Response, Token)>,
     nevent: usize,
-    parser: Parser,
+    parser: P,
     poll: Poll,
     session_queue: Queues<Session, Session>,
-    sessions: Slab<ServerSession<Parser, Response, Request>>,
+    sessions: Slab<ServerSession<P, Response, Request>>,
     signal_queue: Queues<(), Signal>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Parser, Request, Response> MultiWorker<Parser, Request, Response>
+impl<P, Request, Response> MultiWorker<P, Request, Response>
 where
-    Parser: Parse<Request> + Clone,
+    P: Protocol<Request, Response> + Clone,
     Request: Klog + Klog<Response = Response>,
     Response: Compose,
 {

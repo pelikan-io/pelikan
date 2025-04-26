@@ -3,43 +3,13 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use protocol_common::BufMut;
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Add {
-    pub(crate) key: Box<[u8]>,
-    pub(crate) value: Box<[u8]>,
-    pub(crate) flags: u32,
-    pub(crate) ttl: Ttl,
-    pub(crate) noreply: bool,
-}
-
-impl Add {
-    pub fn key(&self) -> &[u8] {
-        &self.key
-    }
-
-    pub fn value(&self) -> &[u8] {
-        &self.value
-    }
-
-    pub fn ttl(&self) -> Ttl {
-        self.ttl
-    }
-
-    pub fn flags(&self) -> u32 {
-        self.flags
-    }
-
-    pub fn noreply(&self) -> bool {
-        self.noreply
-    }
-}
-
-impl RequestParser {
+impl TextProtocol {
     // this is to be called after parsing the command, so we do not match the verb
-    pub fn parse_add<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Add> {
+    pub fn parse_add_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Add> {
         // we can use the set parser here and convert the request
-        match self.parse_set_no_stats(input) {
+        match self._parse_set_request(input) {
             Ok((input, request)) => {
                 ADD.increment();
                 Ok((
@@ -62,68 +32,37 @@ impl RequestParser {
             }
         }
     }
-}
 
-impl Compose for Add {
-    fn compose(&self, session: &mut dyn BufMut) -> usize {
+    pub(crate) fn _compose_add_request(&self, request: &Add, session: &mut dyn BufMut) -> usize {
         let verb = b"add ";
-        let flags = format!(" {}", self.flags).into_bytes();
-        let ttl = format!(" {}", self.ttl.get().unwrap_or(0)).into_bytes();
-        let vlen = format!(" {}", self.value.len()).into_bytes();
-        let header_end = if self.noreply {
+        let flags = format!(" {}", request.flags).into_bytes();
+        let ttl = format!(" {}", request.ttl.get().unwrap_or(0)).into_bytes();
+        let vlen = format!(" {}", request.value.len()).into_bytes();
+        let header_end = if request.noreply {
             " noreply\r\n".as_bytes()
         } else {
             "\r\n".as_bytes()
         };
 
         let size = verb.len()
-            + self.key.len()
+            + request.key.len()
             + flags.len()
             + ttl.len()
             + vlen.len()
             + header_end.len()
-            + self.value.len()
+            + request.value.len()
             + CRLF.len();
 
         session.put_slice(verb);
-        session.put_slice(&self.key);
+        session.put_slice(&request.key);
         session.put_slice(&flags);
         session.put_slice(&ttl);
         session.put_slice(&vlen);
         session.put_slice(header_end);
-        session.put_slice(&self.value);
+        session.put_slice(&request.value);
         session.put_slice(CRLF);
 
         size
-    }
-}
-
-impl Klog for Add {
-    type Response = Response;
-
-    fn klog(&self, response: &Self::Response) {
-        let (code, len) = match response {
-            Response::Stored(ref res) => {
-                ADD_STORED.increment();
-                (STORED, res.len())
-            }
-            Response::NotStored(ref res) => {
-                ADD_NOT_STORED.increment();
-                (NOT_STORED, res.len())
-            }
-            _ => {
-                return;
-            }
-        };
-        klog!(
-            "\"add {} {} {} {}\" {} {}",
-            string_key(self.key()),
-            self.flags(),
-            self.ttl.get().unwrap_or(0),
-            self.value().len(),
-            code,
-            len
-        );
     }
 }
 
@@ -133,11 +72,11 @@ mod tests {
 
     #[test]
     fn parse() {
-        let parser = RequestParser::new();
+        let protocol = TextProtocol::new();
 
         // basic add command
         assert_eq!(
-            parser.parse_request(b"add 0 0 0 1\r\n0\r\n"),
+            protocol._parse_request(b"add 0 0 0 1\r\n0\r\n"),
             Ok((
                 &b""[..],
                 Request::Add(Add {
@@ -152,7 +91,7 @@ mod tests {
 
         // noreply
         assert_eq!(
-            parser.parse_request(b"add 0 0 0 1 noreply\r\n0\r\n"),
+            protocol._parse_request(b"add 0 0 0 1 noreply\r\n0\r\n"),
             Ok((
                 &b""[..],
                 Request::Add(Add {

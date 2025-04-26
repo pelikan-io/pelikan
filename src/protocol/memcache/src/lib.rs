@@ -6,6 +6,11 @@
 extern crate logger;
 
 pub mod binary;
+pub mod text;
+
+pub use binary::BinaryProtocol;
+pub use text::TextProtocol;
+
 mod request;
 mod response;
 mod storage;

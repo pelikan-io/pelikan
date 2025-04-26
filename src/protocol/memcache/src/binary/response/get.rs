@@ -1,12 +1,22 @@
 use super::*;
 
 impl BinaryProtocol {
-	pub(crate) fn parse_get_response<'a>(&self, request: &Get, input: &'a [u8], header: ResponseHeader) -> IResult<&'a [u8], Response> {
+    pub(crate) fn parse_get_response<'a>(
+        &self,
+        request: &Get,
+        input: &'a [u8],
+        header: ResponseHeader,
+    ) -> IResult<&'a [u8], Response> {
         self._parse_get_response(request, input, header)
     }
 
-	fn _parse_get_response<'a>(&self, request: &Get, input: &'a [u8], header: ResponseHeader) -> IResult<&'a [u8], Response> {
-         match header.status {
+    fn _parse_get_response<'a>(
+        &self,
+        request: &Get,
+        input: &'a [u8],
+        header: ResponseHeader,
+    ) -> IResult<&'a [u8], Response> {
+        match header.status {
             0 => {
                 if header.total_body_len > 0 {
                     Err(nom::Err::Failure(nom::error::Error::new(
@@ -32,20 +42,28 @@ impl BinaryProtocol {
                     Ok((input, Response::found(&request.keys[0], flags, None, value)))
                 }
             }
-            _ => {
-                Err(nom::Err::Failure(nom::error::Error::new(
-                    input,
-                    nom::error::ErrorKind::Tag,
-                )))
-            }
+            _ => Err(nom::Err::Failure(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            ))),
         }
     }
 
-    pub(crate) fn compose_get_response(&self, request: &Get, response: &Response, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
-    	self._compose_get_response(request, response, buffer)
+    pub(crate) fn compose_get_response(
+        &self,
+        request: &Get,
+        response: &Response,
+        buffer: &mut dyn BufMut,
+    ) -> std::result::Result<usize, std::io::Error> {
+        self._compose_get_response(request, response, buffer)
     }
 
-    fn _compose_get_response(&self, request: &Get, response: &Response, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
+    fn _compose_get_response(
+        &self,
+        request: &Get,
+        response: &Response,
+        buffer: &mut dyn BufMut,
+    ) -> std::result::Result<usize, std::io::Error> {
         match response {
             Response::Values(values) => {
                 buffer.put_slice(&[0x81, 0x00]);
@@ -56,7 +74,9 @@ impl BinaryProtocol {
                 }
                 buffer.put_slice(&[0x04, 0x00, 0x00, 0x00]);
 
-                let total_body_len = values.values[0].key().len() + values.values[0].value().map(|v| v.len()).unwrap_or(0) + 4;
+                let total_body_len = values.values[0].key().len()
+                    + values.values[0].value().map(|v| v.len()).unwrap_or(0)
+                    + 4;
 
                 buffer.put_u32(total_body_len as _);
                 buffer.put_u32(request.opaque.unwrap_or(0));
@@ -74,13 +94,17 @@ impl BinaryProtocol {
                 Ok(24 + total_body_len)
             }
             Response::NotFound(_) => {
-                buffer.put_slice(&[0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+                buffer.put_slice(&[
+                    0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                ]);
 
                 Ok(24)
             }
-            _ => {
-                Err(std::io::Error::new(std::io::ErrorKind::Other, "unexpected response"))
-            }
+            _ => Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "unexpected response",
+            )),
         }
     }
 }

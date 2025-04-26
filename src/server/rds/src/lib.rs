@@ -7,10 +7,9 @@
 use config::*;
 use entrystore::Seg;
 use logger::*;
-use protocol_resp::{Request, RequestParser, Response};
+use protocol_resp::{Protocol, Request, Response};
 use server::{Process, ProcessBuilder};
 
-type Parser = RequestParser;
 type Storage = Seg;
 
 /// This structure represents a running `Rds` process.
@@ -32,10 +31,10 @@ impl Rds {
         let storage = Storage::new(&config)?;
 
         // initialize parser
-        let parser = Parser::new();
+        let parser = Protocol::default();
 
         // initialize process
-        let process_builder = ProcessBuilder::<Parser, Request, Response, Storage>::new(
+        let process_builder = ProcessBuilder::<Protocol, Request, Response, Storage>::new(
             &config, log_drain, parser, storage,
         )?
         .version(env!("CARGO_PKG_VERSION"));

@@ -1,14 +1,16 @@
 use super::*;
 
 impl BinaryProtocol {
-	#[cfg(feature = "metrics")]
-    pub(crate) fn parse_set_request<'a>(&self, input: &'a [u8], header: RequestHeader) -> IResult<&'a [u8], Set> {
+    #[cfg(feature = "metrics")]
+    pub(crate) fn parse_set_request<'a>(
+        &self,
+        input: &'a [u8],
+        header: RequestHeader,
+    ) -> IResult<&'a [u8], Set> {
         SET.increment();
 
         match self._parse_set_request(input, header) {
-            Ok((input, request)) => {
-                Ok((input, request))
-            }
+            Ok((input, request)) => Ok((input, request)),
             Err(e) => {
                 if !e.is_incomplete() {
                     SET_EX.increment();
@@ -19,38 +21,47 @@ impl BinaryProtocol {
     }
 
     #[cfg(not(feature = "metrics"))]
-    pub(crate) fn parse_set_request<'a>(&self, input: &'a [u8], header: RequestHeader) -> IResult<&'a [u8], Set> {
+    pub(crate) fn parse_set_request<'a>(
+        &self,
+        input: &'a [u8],
+        header: RequestHeader,
+    ) -> IResult<&'a [u8], Set> {
         self._parse_set_request(input, header)
     }
 
-    fn _parse_set_request<'a>(&self, input: &'a [u8], header: RequestHeader) -> IResult<&'a [u8], Set> {
+    fn _parse_set_request<'a>(
+        &self,
+        input: &'a [u8],
+        header: RequestHeader,
+    ) -> IResult<&'a [u8], Set> {
         // validation
 
-        if header.key_len == 0 || header.key_len as usize > self.max_key_len as usize{
-        	return Err(nom::Err::Failure(nom::error::Error::new(
+        if header.key_len == 0 || header.key_len as usize > self.max_key_len as usize {
+            return Err(nom::Err::Failure(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
             )));
         }
 
         if header.extras_len != 8 {
-        	return Err(nom::Err::Failure(nom::error::Error::new(
+            return Err(nom::Err::Failure(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
             )));
         }
 
         if header.total_body_len < (header.key_len as u32 + header.extras_len as u32) {
-        	return Err(nom::Err::Failure(nom::error::Error::new(
+            return Err(nom::Err::Failure(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
             )));
         }
 
-        let value_len = header.total_body_len as usize - header.key_len as usize - header.extras_len as usize;
+        let value_len =
+            header.total_body_len as usize - header.key_len as usize - header.extras_len as usize;
 
         if value_len == 0 || value_len > self.max_value_size as usize {
-        	return Err(nom::Err::Failure(nom::error::Error::new(
+            return Err(nom::Err::Failure(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
             )));
@@ -61,7 +72,7 @@ impl BinaryProtocol {
         let (input, key) = take(header.key_len as usize)(input)?;
 
         if !is_key_valid(key) {
-        	return Err(nom::Err::Failure(nom::error::Error::new(
+            return Err(nom::Err::Failure(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
             )));
@@ -86,29 +97,47 @@ impl BinaryProtocol {
         ))
     }
 
-    pub(crate) fn compose_set_request(&self, request: &Set, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
-    	self._compose_set_request(request, buffer)
+    pub(crate) fn compose_set_request(
+        &self,
+        request: &Set,
+        buffer: &mut dyn BufMut,
+    ) -> std::result::Result<usize, std::io::Error> {
+        self._compose_set_request(request, buffer)
     }
 
-    fn _compose_set_request(&self, request: &Set, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
-    	if request.key.len() > u64::MAX as _ {
-			return Err(std::io::Error::new(std::io::ErrorKind::Other, "request key too large for binary protocol"));
-		}
+    fn _compose_set_request(
+        &self,
+        request: &Set,
+        buffer: &mut dyn BufMut,
+    ) -> std::result::Result<usize, std::io::Error> {
+        if request.key.len() > u64::MAX as _ {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "request key too large for binary protocol",
+            ));
+        }
 
-		let total_body_len: u32 = (request.key.len() + request.value.len() + 8).try_into().map_err(|_e| {
-			std::io::Error::new(std::io::ErrorKind::Other, "request body too large for binary protocol")
-		})?;
+        let total_body_len: u32 = (request.key.len() + request.value.len() + 8)
+            .try_into()
+            .map_err(|_e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "request body too large for binary protocol",
+                )
+            })?;
 
-		buffer.put_slice(&[0x80, 0x01]);
-		buffer.put_u16(request.key.len() as _);
-		buffer.put_slice(&[0x00, 0x00, 0x00, 0x00]);
-		buffer.put_u32(total_body_len);
-		buffer.put_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
-		buffer.put_u32(request.flags);
-		buffer.put_i32(request.ttl.get().unwrap_or(0));
-		buffer.put_slice(&request.key);
-		buffer.put_slice(&request.value);
+        buffer.put_slice(&[0x80, 0x01]);
+        buffer.put_u16(request.key.len() as _);
+        buffer.put_slice(&[0x00, 0x00, 0x00, 0x00]);
+        buffer.put_u32(total_body_len);
+        buffer.put_slice(&[
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ]);
+        buffer.put_u32(request.flags);
+        buffer.put_i32(request.ttl.get().unwrap_or(0));
+        buffer.put_slice(&request.key);
+        buffer.put_slice(&request.value);
 
-		Ok(24 + total_body_len as usize)
+        Ok(24 + total_body_len as usize)
     }
 }

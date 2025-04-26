@@ -3,33 +3,13 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use protocol_common::BufMut;
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Decr {
-    pub(crate) key: Box<[u8]>,
-    pub(crate) value: u64,
-    pub(crate) noreply: bool,
-}
-
-impl Decr {
-    pub fn key(&self) -> &[u8] {
-        self.key.as_ref()
-    }
-
-    pub fn value(&self) -> u64 {
-        self.value
-    }
-
-    pub fn noreply(&self) -> bool {
-        self.noreply
-    }
-}
-
-impl RequestParser {
+impl TextProtocol {
     // this is to be called after parsing the command, so we do not match the verb
-    pub fn parse_decr<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Decr> {
+    pub fn parse_decr_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Decr> {
         // we can use the incr parser here and convert the request
-        match self.parse_incr_no_stats(input) {
+        match self._parse_incr_request(input) {
             Ok((input, request)) => {
                 DECR.increment();
                 Ok((
@@ -50,47 +30,24 @@ impl RequestParser {
             }
         }
     }
-}
 
-impl Compose for Decr {
-    fn compose(&self, session: &mut dyn BufMut) -> usize {
+    pub(crate) fn _compose_decr_request(&self, request: &Decr, session: &mut dyn BufMut) -> usize {
         let verb = b"decr ";
-        let value = format!(" {}", self.value).into_bytes();
-        let header_end = if self.noreply {
+        let value = format!(" {}", request.value).into_bytes();
+        let header_end = if request.noreply {
             " noreply\r\n".as_bytes()
         } else {
             "\r\n".as_bytes()
         };
 
-        let size = verb.len() + self.key.len() + value.len() + header_end.len();
+        let size = verb.len() + request.key.len() + value.len() + header_end.len();
 
         session.put_slice(verb);
-        session.put_slice(&self.key);
+        session.put_slice(&request.key);
         session.put_slice(&value);
         session.put_slice(header_end);
 
         size
-    }
-}
-
-impl Klog for Decr {
-    type Response = Response;
-
-    fn klog(&self, response: &Self::Response) {
-        let (code, len) = match response {
-            Response::Numeric(ref res) => {
-                DECR_STORED.increment();
-                (STORED, res.len())
-            }
-            Response::NotFound(ref res) => {
-                DECR_NOT_FOUND.increment();
-                (NOT_FOUND, res.len())
-            }
-            _ => {
-                return;
-            }
-        };
-        klog!("\"decr {}\" {} {}", string_key(self.key()), code, len);
     }
 }
 
@@ -100,11 +57,11 @@ mod tests {
 
     #[test]
     fn parse() {
-        let parser = RequestParser::new();
+        let protocol = TextProtocol::new();
 
         // basic decr command
         assert_eq!(
-            parser.parse_request(b"decr 0 1\r\n"),
+            protocol._parse_request(b"decr 0 1\r\n"),
             Ok((
                 &b""[..],
                 Request::Decr(Decr {

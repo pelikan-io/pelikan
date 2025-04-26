@@ -3,21 +3,11 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use protocol_common::BufMut;
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Get {
-    pub(crate) keys: Box<[Box<[u8]>]>,
-}
-
-impl Get {
-    pub fn keys(&self) -> &[Box<[u8]>] {
-        self.keys.as_ref()
-    }
-}
-
-impl RequestParser {
+impl TextProtocol {
     // this is to be called after parsing the command, so we do not match the verb
-    pub(crate) fn parse_get_no_stats<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Get> {
+    pub(crate) fn _parse_get_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Get> {
         let mut keys = Vec::new();
 
         let (mut input, _) = space1(input)?;
@@ -62,13 +52,16 @@ impl RequestParser {
             input,
             Get {
                 keys: keys.to_owned().into_boxed_slice(),
+                cas: false,
+                key: true,
+                opaque: None,
             },
         ))
     }
 
     // this is to be called after parsing the command, so we do not match the verb
-    pub fn parse_get<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Get> {
-        match self.parse_get_no_stats(input) {
+    pub fn parse_get_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Get> {
+        match self._parse_get_request(input) {
             Ok((input, request)) => {
                 GET.increment();
                 let keys = request.keys.len() as u64;
@@ -85,16 +78,14 @@ impl RequestParser {
             }
         }
     }
-}
 
-impl Compose for Get {
-    fn compose(&self, session: &mut dyn BufMut) -> usize {
+    pub(crate) fn _compose_get_request(&self, request: &Get, session: &mut dyn BufMut) -> usize {
         let verb = b"get";
 
         let mut size = verb.len() + CRLF.len();
 
         session.put_slice(verb);
-        for key in self.keys.iter() {
+        for key in request.keys.iter() {
             session.put_slice(b" ");
             session.put_slice(key);
             size += 1 + key.len();
@@ -105,81 +96,49 @@ impl Compose for Get {
     }
 }
 
-impl Klog for Get {
-    type Response = Response;
-
-    fn klog(&self, response: &Self::Response) {
-        if let Response::Values(ref res) = response {
-            let mut hit_keys = 0;
-            let mut miss_keys = 0;
-
-            for value in res.values() {
-                if value.len().is_none() {
-                    miss_keys += 1;
-
-                    klog!(
-                        "\"get {}\" {} 0",
-                        String::from_utf8_lossy(value.key()),
-                        MISS
-                    );
-                } else {
-                    hit_keys += 1;
-
-                    klog!(
-                        "\"get {}\" {} {}",
-                        String::from_utf8_lossy(value.key()),
-                        HIT,
-                        value.len().unwrap(),
-                    );
-                }
-            }
-
-            GET_KEY_HIT.add(hit_keys as _);
-            GET_KEY_MISS.add(miss_keys as _);
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn parse() {
-        let parser = RequestParser::new();
+        let protocol = TextProtocol::new();
 
         // basic get command
         assert_eq!(
-            parser.parse_request(b"get key\r\n"),
+            protocol._parse_request(b"get key\r\n"),
             Ok((
                 &b""[..],
                 Request::Get(Get {
                     keys: vec![b"key".to_vec().into_boxed_slice()].into_boxed_slice(),
+                    cas: false,
+                    key: true,
+                    opaque: None,
                 })
             ))
         );
 
         // command name is not case sensitive
         assert_eq!(
-            parser.parse_request(b"get key \r\n"),
-            parser.parse_request(b"GET key \r\n"),
+            protocol._parse_request(b"get key \r\n"),
+            protocol._parse_request(b"GET key \r\n"),
         );
 
         // trailing spaces don't matter
         assert_eq!(
-            parser.parse_request(b"get key\r\n"),
-            parser.parse_request(b"get key \r\n"),
+            protocol._parse_request(b"get key\r\n"),
+            protocol._parse_request(b"get key \r\n"),
         );
 
         // multiple trailing spaces is fine too
         assert_eq!(
-            parser.parse_request(b"get key\r\n"),
-            parser.parse_request(b"get key      \r\n"),
+            protocol._parse_request(b"get key\r\n"),
+            protocol._parse_request(b"get key      \r\n"),
         );
 
         // request can have multiple keys
         assert_eq!(
-            parser.parse_request(b"get a b c\r\n"),
+            protocol._parse_request(b"get a b c\r\n"),
             Ok((
                 &b""[..],
                 Request::Get(Get {
@@ -189,17 +148,23 @@ mod tests {
                         b"c".to_vec().into_boxed_slice(),
                     ]
                     .into_boxed_slice(),
+                    cas: false,
+                    key: true,
+                    opaque: None,
                 })
             ))
         );
 
         // key is binary safe
         assert_eq!(
-            parser.parse_request(b"get evil\0key \r\n"),
+            protocol._parse_request(b"get evil\0key \r\n"),
             Ok((
                 &b""[..],
                 Request::Get(Get {
-                    keys: vec![b"evil\0key".to_vec().into_boxed_slice(),].into_boxed_slice()
+                    keys: vec![b"evil\0key".to_vec().into_boxed_slice(),].into_boxed_slice(),
+                    cas: false,
+                    key: true,
+                    opaque: None,
                 })
             ))
         );

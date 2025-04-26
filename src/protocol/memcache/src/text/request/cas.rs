@@ -3,46 +3,11 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use protocol_common::BufMut;
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Cas {
-    pub(crate) key: Box<[u8]>,
-    pub(crate) value: Box<[u8]>,
-    pub(crate) flags: u32,
-    pub(crate) ttl: Ttl,
-    pub(crate) cas: u64,
-    pub(crate) noreply: bool,
-}
-
-impl Cas {
-    pub fn key(&self) -> &[u8] {
-        &self.key
-    }
-
-    pub fn value(&self) -> &[u8] {
-        &self.value
-    }
-
-    pub fn ttl(&self) -> Ttl {
-        self.ttl
-    }
-
-    pub fn flags(&self) -> u32 {
-        self.flags
-    }
-
-    pub fn cas(&self) -> u64 {
-        self.cas
-    }
-
-    pub fn noreply(&self) -> bool {
-        self.noreply
-    }
-}
-
-impl RequestParser {
+impl TextProtocol {
     // this is to be called after parsing the command, so we do not match the verb
-    pub(crate) fn parse_cas_no_stats<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Cas> {
+    pub(crate) fn _parse_cas_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Cas> {
         let mut noreply = false;
 
         let (input, _) = space1(input)?;
@@ -102,8 +67,8 @@ impl RequestParser {
     }
 
     // this is to be called after parsing the command, so we do not match the verb
-    pub fn parse_cas<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Cas> {
-        match self.parse_cas_no_stats(input) {
+    pub fn parse_cas_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Cas> {
+        match self._parse_cas_request(input) {
             Ok((input, request)) => {
                 CAS.increment();
                 Ok((input, request))
@@ -117,76 +82,40 @@ impl RequestParser {
             }
         }
     }
-}
 
-impl Compose for Cas {
-    fn compose(&self, session: &mut dyn BufMut) -> usize {
+    pub(crate) fn _compose_cas_request(&self, request: &Cas, session: &mut dyn BufMut) -> usize {
         let verb = b"cas ";
-        let flags = format!(" {}", self.flags).into_bytes();
-        let ttl = format!(" {}", self.ttl.get().unwrap_or(0)).into_bytes();
-        let vlen = format!(" {}", self.value.len()).into_bytes();
-        let cas = format!(" {}", self.cas).into_bytes();
-        let header_end = if self.noreply {
+        let flags = format!(" {}", request.flags).into_bytes();
+        let ttl = format!(" {}", request.ttl.get().unwrap_or(0)).into_bytes();
+        let vlen = format!(" {}", request.value.len()).into_bytes();
+        let cas = format!(" {}", request.cas).into_bytes();
+        let header_end = if request.noreply {
             " noreply\r\n".as_bytes()
         } else {
             "\r\n".as_bytes()
         };
 
         let size = verb.len()
-            + self.key.len()
+            + request.key.len()
             + flags.len()
             + ttl.len()
             + vlen.len()
             + cas.len()
             + header_end.len()
-            + self.value.len()
+            + request.value.len()
             + CRLF.len();
 
         session.put_slice(verb);
-        session.put_slice(&self.key);
+        session.put_slice(&request.key);
         session.put_slice(&flags);
         session.put_slice(&ttl);
         session.put_slice(&vlen);
         session.put_slice(&cas);
         session.put_slice(header_end);
-        session.put_slice(&self.value);
+        session.put_slice(&request.value);
         session.put_slice(CRLF);
 
         size
-    }
-}
-
-impl Klog for Cas {
-    type Response = Response;
-
-    fn klog(&self, response: &Self::Response) {
-        let (code, len) = match response {
-            Response::Stored(ref res) => {
-                CAS_STORED.increment();
-                (STORED, res.len())
-            }
-            Response::Exists(ref res) => {
-                CAS_EXISTS.increment();
-                (EXISTS, res.len())
-            }
-            Response::NotFound(ref res) => {
-                CAS_NOT_FOUND.increment();
-                (NOT_FOUND, res.len())
-            }
-            _ => {
-                return;
-            }
-        };
-        klog!(
-            "\"cas {} {} {} {} {}\" {} {}",
-            string_key(self.key()),
-            self.flags(),
-            self.ttl.get().unwrap_or(0),
-            self.value().len(),
-            self.cas(),
-            code,
-            len
-        );
     }
 }
 
@@ -196,11 +125,11 @@ mod tests {
 
     #[test]
     fn parse() {
-        let parser = RequestParser::new();
+        let protocol = TextProtocol::new();
 
         // basic cas command
         assert_eq!(
-            parser.parse_request(b"cas 0 0 0 1 42\r\n0\r\n"),
+            protocol._parse_request(b"cas 0 0 0 1 42\r\n0\r\n"),
             Ok((
                 &b""[..],
                 Request::Cas(Cas {
@@ -216,7 +145,7 @@ mod tests {
 
         // noreply
         assert_eq!(
-            parser.parse_request(b"cas 0 0 0 1 42 noreply\r\n0\r\n"),
+            protocol._parse_request(b"cas 0 0 0 1 42 noreply\r\n0\r\n"),
             Ok((
                 &b""[..],
                 Request::Cas(Cas {

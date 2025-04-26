@@ -80,7 +80,9 @@ impl Response {
     }
 
     pub fn found(key: &[u8], flags: u32, cas: Option<u64>, data: &[u8]) -> Self {
-        Self::Values(Values { values: vec![Value::new(key, flags, cas, data)].into()})
+        Self::Values(Values {
+            values: vec![Value::new(key, flags, cas, data)].into(),
+        })
     }
 
     pub fn hangup() -> Self {

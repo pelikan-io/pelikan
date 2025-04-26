@@ -2,9 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use bytes::BytesMut;
 use crate::klog::{klog_1, Status};
 use crate::{Error, *};
+use bytes::BytesMut;
 use momento::cache::GetResponse;
 use pelikan_net::*;
 use protocol_memcache::*;
@@ -16,7 +16,7 @@ pub async fn get(
     request: Get,
 ) -> Result<(), Error> {
     GET.increment();
-    
+
     if request.keys().len() != 1 {
         return Err(Error::from(ErrorKind::InvalidInput));
     }
@@ -39,29 +39,29 @@ pub async fn get(
     let protocol = protocol_memcache::binary::BinaryProtocol::default();
 
     match timeout(Duration::from_millis(200), client.get(cache_name, key_str)).await {
-        Ok(Ok(response)) => {
-            match response {
-                GetResponse::Hit { value } => {
-                    GET_KEY_HIT.increment();
+        Ok(Ok(response)) => match response {
+            GetResponse::Hit { value } => {
+                GET_KEY_HIT.increment();
 
-                    let value: Vec<u8> = value.into();
-                    let length = value.len();
+                let value: Vec<u8> = value.into();
+                let length = value.len();
 
-                    let response = Response::found(&key, 0, None, &value);
-                    let _ = protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
+                let response = Response::found(&key, 0, None, &value);
+                let _ =
+                    protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
 
-                    klog_1(&"get", &key, Status::Hit, length);
-                }
-                GetResponse::Miss => {
-                    GET_KEY_MISS.increment();
-
-                    let response = Response::not_found(false);
-                    let _ = protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
-
-                    klog_1(&"get", &key, Status::Miss, 0);
-                }
+                klog_1(&"get", &key, Status::Hit, length);
             }
-        }
+            GetResponse::Miss => {
+                GET_KEY_MISS.increment();
+
+                let response = Response::not_found(false);
+                let _ =
+                    protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
+
+                klog_1(&"get", &key, Status::Miss, 0);
+            }
+        },
         Ok(Err(e)) => {
             // we got some error from the momento client
             // log and incr stats and move on treating it

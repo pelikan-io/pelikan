@@ -2,9 +2,9 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use bytes::BytesMut;
 use crate::klog::{klog_set, Status};
 use crate::{Error, *};
+use bytes::BytesMut;
 use momento::cache::SetRequest;
 use pelikan_net::*;
 use protocol_memcache::*;
@@ -57,7 +57,8 @@ pub async fn set(
                 );
             } else {
                 let response = Response::stored(false);
-                let _ = protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
+                let _ =
+                    protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
 
                 klog_set(
                     &key,

@@ -11,23 +11,6 @@ use crate::*;
 use core::convert::TryFrom;
 use core::slice::Windows;
 
-#[derive(Default, Copy, Clone)]
-pub struct Parser {}
-
-impl Parser {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Parse<Request> for Parser {
-    fn parse(&self, buffer: &[u8]) -> Result<ParseOk<Request>, std::io::Error> {
-        match parse_keyword(buffer)? {
-            Keyword::Ping => parse_ping(buffer),
-        }
-    }
-}
-
 struct ParseState<'a> {
     single_byte: Windows<'a, u8>,
     double_byte: Windows<'a, u8>,
@@ -52,7 +35,7 @@ impl<'a> ParseState<'a> {
     }
 }
 
-fn parse_keyword(buffer: &[u8]) -> Result<Keyword, std::io::Error> {
+pub(crate) fn parse_keyword(buffer: &[u8]) -> Result<Keyword, std::io::Error> {
     let command;
     {
         let mut parse_state = ParseState::new(buffer);
@@ -70,7 +53,7 @@ fn parse_keyword(buffer: &[u8]) -> Result<Keyword, std::io::Error> {
 }
 
 #[allow(clippy::unnecessary_wraps)]
-fn parse_ping(buffer: &[u8]) -> Result<ParseOk<Request>, std::io::Error> {
+pub(crate) fn parse_ping(buffer: &[u8]) -> Result<ParseOk<Request>, std::io::Error> {
     let mut parse_state = ParseState::new(buffer);
 
     // this was already checked for when determining the command

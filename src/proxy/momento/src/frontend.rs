@@ -2,11 +2,12 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use protocol_memcache::Protocol;
-use protocol_memcache::binary::BinaryProtocol;
 use crate::protocol::*;
 use crate::*;
 use pelikan_net::TCP_SEND_BYTE;
+use protocol_memcache::binary::BinaryProtocol;
+use protocol_memcache::text::TextProtocol;
+use protocol_memcache::Protocol;
 use session::Buf;
 
 pub(crate) async fn handle_memcache_client(
@@ -20,7 +21,7 @@ pub(crate) async fn handle_memcache_client(
     let mut buf = Buffer::new(INITIAL_BUFFER_SIZE);
 
     // initialize the request parser
-    let parser = memcache::RequestParser::new();
+    let protocol = TextProtocol::default();
 
     // handle incoming data from the client
     loop {
@@ -30,7 +31,7 @@ pub(crate) async fn handle_memcache_client(
 
         let borrowed_buf = buf.borrow();
 
-        match parser.parse(borrowed_buf) {
+        match protocol.parse_request(borrowed_buf) {
             Ok(request) => {
                 let consumed = request.consumed();
                 let request = request.into_inner();

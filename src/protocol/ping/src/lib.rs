@@ -12,11 +12,53 @@
 #[macro_use]
 extern crate logger;
 
+use crate::wire::parse::parse_keyword;
+use crate::wire::parse::parse_ping;
+use crate::wire::Keyword;
 pub use protocol_common::*;
 
 mod ping;
 
 pub use ping::*;
+
+#[derive(Default, Clone)]
+pub struct PingProtocol {
+    _unusued: (),
+}
+
+impl Protocol<Request, Response> for PingProtocol {
+    fn parse_request(
+        &self,
+        buffer: &[u8],
+    ) -> std::result::Result<protocol_common::ParseOk<Request>, std::io::Error> {
+        match parse_keyword(buffer)? {
+            Keyword::Ping => parse_ping(buffer),
+        }
+    }
+
+    fn compose_request(
+        &self,
+        _: &Request,
+        _: &mut dyn protocol_common::BufMut,
+    ) -> std::result::Result<usize, std::io::Error> {
+        todo!()
+    }
+    fn parse_response(
+        &self,
+        _: &Request,
+        _: &[u8],
+    ) -> std::result::Result<protocol_common::ParseOk<Response>, std::io::Error> {
+        todo!()
+    }
+    fn compose_response(
+        &self,
+        _: &Request,
+        _: &Response,
+        _: &mut dyn protocol_common::BufMut,
+    ) -> std::result::Result<usize, std::io::Error> {
+        todo!()
+    }
+}
 
 #[cfg(feature = "stats")]
 use stats::*;

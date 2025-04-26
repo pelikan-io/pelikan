@@ -3,26 +3,11 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use protocol_common::BufMut;
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct FlushAll {
-    delay: u32,
-    noreply: bool,
-}
-
-impl FlushAll {
-    pub fn delay(&self) -> u32 {
-        self.delay
-    }
-
-    pub fn noreply(&self) -> bool {
-        self.noreply
-    }
-}
-
-impl RequestParser {
+impl TextProtocol {
     // this is to be called after parsing the command, so we do not match the verb
-    pub fn parse_flush_all_no_stats<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], FlushAll> {
+    pub fn _parse_flush_all_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], FlushAll> {
         let mut input = input;
 
         let mut delay = 0;
@@ -65,8 +50,8 @@ impl RequestParser {
     }
 
     // this is to be called after parsing the command, so we do not match the verb
-    pub fn parse_flush_all<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], FlushAll> {
-        match self.parse_flush_all_no_stats(input) {
+    pub fn parse_flush_all_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], FlushAll> {
+        match self._parse_flush_all_request(input) {
             Ok((input, request)) => {
                 FLUSH_ALL.increment();
                 Ok((input, request))
@@ -80,17 +65,19 @@ impl RequestParser {
             }
         }
     }
-}
 
-impl Compose for FlushAll {
-    fn compose(&self, session: &mut dyn BufMut) -> usize {
+    pub(crate) fn _compose_flush_all_request(
+        &self,
+        request: &FlushAll,
+        session: &mut dyn BufMut,
+    ) -> usize {
         let verb = b"flush_all";
-        let delay = if self.delay != 0 {
-            format!(" {}", self.delay).into_bytes()
+        let delay = if request.delay != 0 {
+            format!(" {}", request.delay).into_bytes()
         } else {
             vec![]
         };
-        let header_end = if self.noreply {
+        let header_end = if request.noreply {
             " noreply\r\n".as_bytes()
         } else {
             "\r\n".as_bytes()
@@ -106,23 +93,17 @@ impl Compose for FlushAll {
     }
 }
 
-impl Klog for FlushAll {
-    type Response = Response;
-
-    fn klog(&self, _response: &Self::Response) {}
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn parse() {
-        let parser = RequestParser::new();
+        let protocol = TextProtocol::new();
 
         // basic flush_all command
         assert_eq!(
-            parser.parse_request(b"flush_all\r\n"),
+            protocol._parse_request(b"flush_all\r\n"),
             Ok((
                 &b""[..],
                 Request::FlushAll(FlushAll {
@@ -134,7 +115,7 @@ mod tests {
 
         // noreply
         assert_eq!(
-            parser.parse_request(b"flush_all noreply\r\n"),
+            protocol._parse_request(b"flush_all noreply\r\n"),
             Ok((
                 &b""[..],
                 Request::FlushAll(FlushAll {
@@ -146,7 +127,7 @@ mod tests {
 
         // delay
         assert_eq!(
-            parser.parse_request(b"flush_all 42\r\n"),
+            protocol._parse_request(b"flush_all 42\r\n"),
             Ok((
                 &b""[..],
                 Request::FlushAll(FlushAll {
@@ -158,7 +139,7 @@ mod tests {
 
         // delay and noreply
         assert_eq!(
-            parser.parse_request(b"flush_all 42 noreply\r\n"),
+            protocol._parse_request(b"flush_all 42 noreply\r\n"),
             Ok((
                 &b""[..],
                 Request::FlushAll(FlushAll {

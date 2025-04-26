@@ -1,7 +1,8 @@
 use crate::Config;
+use protocol_ping::Protocol;
 
 use ::config::BufConfig;
-use protocol_ping::{Compose, Parse, Request, Response};
+use protocol_ping::{Compose, Request, Response};
 use session::{Buf, BufMut, Buffer};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -25,7 +26,7 @@ pub async fn run(config: Arc<Config>) {
 
             tokio::spawn(async move {
                 // initialize parser and the read and write bufs
-                let parser = protocol_ping::RequestParser::new();
+                let protocol = protocol_ping::PingProtocol::default();
                 let mut read_buffer = Buffer::new(buf_size);
                 let mut write_buffer = Buffer::new(buf_size);
 
@@ -51,7 +52,7 @@ pub async fn run(config: Arc<Config>) {
                     };
 
                     // parse the read buffer
-                    let request = match parser.parse(read_buffer.borrow()) {
+                    let request = match protocol.parse_request(read_buffer.borrow()) {
                         Ok(request) => {
                             // got a complete request, consume the
                             // bytes for the request by advancing

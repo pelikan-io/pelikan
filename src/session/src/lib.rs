@@ -26,7 +26,7 @@ use core::fmt::Debug;
 use core::marker::PhantomData;
 use metriken::*;
 use pelikan_net::*;
-use protocol_common::{Compose, Parse};
+use protocol_common::Compose;
 use std::collections::VecDeque;
 use std::io::{Error, ErrorKind, Read, Result, Write};
 use std::os::unix::prelude::AsRawFd;

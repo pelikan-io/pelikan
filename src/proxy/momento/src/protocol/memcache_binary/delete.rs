@@ -1,6 +1,6 @@
-use bytes::BytesMut;
 use crate::klog::{klog_1, Status};
 use crate::{Error, *};
+use bytes::BytesMut;
 use pelikan_net::*;
 use protocol_memcache::*;
 
@@ -29,7 +29,12 @@ pub async fn delete(
 
     let protocol = protocol_memcache::binary::BinaryProtocol::default();
 
-    match timeout(Duration::from_millis(200), client.delete(cache_name, key.clone())).await {
+    match timeout(
+        Duration::from_millis(200),
+        client.delete(cache_name, key.clone()),
+    )
+    .await
+    {
         Ok(Ok(_result)) => {
             // it appears we can't tell deleted from not found in the momento
             // protocol, so we treat all non-error responses as if the key has
@@ -41,7 +46,11 @@ pub async fn delete(
                 klog_1(&"delete", &key, Status::Deleted, 0);
             } else {
                 let response = Response::deleted(false);
-                let _ = protocol.compose_response(&Request::Delete(request), &response, &mut response_buf);
+                let _ = protocol.compose_response(
+                    &Request::Delete(request),
+                    &response,
+                    &mut response_buf,
+                );
 
                 klog_1(&"delete", &key, Status::Deleted, response_buf.len());
                 SESSION_SEND.increment();

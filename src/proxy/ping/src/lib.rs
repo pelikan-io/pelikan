@@ -7,11 +7,11 @@ use logger::configure_logging;
 use protocol_ping::*;
 use proxy::{Process, ProcessBuilder};
 
-type BackendParser = ResponseParser;
+type BackendProtocol = PingProtocol;
 type BackendRequest = Request;
 type BackendResponse = Response;
 
-type FrontendParser = RequestParser;
+type FrontendProtocol = PingProtocol;
 type FrontendRequest = Request;
 type FrontendResponse = Response;
 
@@ -36,19 +36,20 @@ impl Pingproxy {
         common::metrics::init();
 
         // initialize parsers
-        let request_parser = RequestParser::new();
-        let response_parser = ResponseParser::new();
+        let frontend_protocol = FrontendProtocol::default();
+        let backend_protocol = BackendProtocol::default();
 
         // initialize process
-        let process_builder = ProcessBuilder::<
-            BackendParser,
-            BackendRequest,
-            BackendResponse,
-            FrontendParser,
-            FrontendRequest,
-            FrontendResponse,
-        >::new(&config, log_drain, response_parser, request_parser)
-        .expect("failed to launch");
+        let process_builder =
+            ProcessBuilder::<
+                BackendProtocol,
+                BackendRequest,
+                BackendResponse,
+                FrontendProtocol,
+                FrontendRequest,
+                FrontendResponse,
+            >::new(&config, log_drain, frontend_protocol, backend_protocol)
+            .expect("failed to launch");
         let process = process_builder.spawn();
 
         Self { process }

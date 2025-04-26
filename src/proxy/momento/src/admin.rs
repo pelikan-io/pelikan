@@ -84,13 +84,13 @@ async fn handle_admin_client(mut socket: tokio::net::TcpStream) {
     let mut buf = Buffer::new(INITIAL_BUFFER_SIZE);
 
     // initialize the request parser
-    let parser = AdminRequestParser::new();
+    let parser = AdminProtocol::default();
     loop {
         if do_read(&mut socket, &mut buf).await.is_err() {
             break;
         }
 
-        match parser.parse(buf.borrow()) {
+        match parser.parse_request(buf.borrow()) {
             Ok(request) => {
                 ADMIN_REQUEST_PARSE.increment();
 
@@ -98,7 +98,7 @@ async fn handle_admin_client(mut socket: tokio::net::TcpStream) {
                 let request = request.into_inner();
 
                 match request {
-                    AdminRequest::Stats { .. } => {
+                    AdminRequest::Stats => {
                         ADMIN_RESPONSE_COMPOSE.increment();
 
                         if stats_response(&mut socket).await.is_err() {
