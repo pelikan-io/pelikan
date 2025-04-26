@@ -22,3 +22,6 @@ protocol-common = { path = "../../protocol/common" }
 
 [dev-dependencies]
 criterion = "0.5.1"
+
+[features]
+metrics = []

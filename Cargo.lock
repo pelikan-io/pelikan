@@ -1726,6 +1726,7 @@ name = "momento_proxy"
 version = "0.3.2"
 dependencies = [
  "backtrace",
+ "bytes",
  "clap",
  "clocksource",
  "common",

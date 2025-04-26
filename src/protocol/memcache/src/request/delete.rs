@@ -8,6 +8,7 @@ use super::*;
 pub struct Delete {
     pub(crate) key: Box<[u8]>,
     pub(crate) noreply: bool,
+    pub(crate) opaque: Option<u32>,
 }
 
 impl Delete {
@@ -55,6 +56,7 @@ impl RequestParser {
             Delete {
                 key: key.to_owned().into_boxed_slice(),
                 noreply,
+                opaque: None,
             },
         ))
     }
@@ -133,6 +135,7 @@ mod tests {
                 Request::Delete(Delete {
                     key: b"0".to_vec().into_boxed_slice(),
                     noreply: false,
+                    opaque: None,
                 })
             ))
         );

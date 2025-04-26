@@ -1,16 +1,16 @@
 use super::*;
 
 impl BinaryProtocol {
-	// this is to be called after parsing the command, so we do not match the verb
+	#[cfg(feature = "metrics")]
     pub(crate) fn parse_set_request<'a>(&self, input: &'a [u8], header: RequestHeader) -> IResult<&'a [u8], Set> {
-        match self.parse_set_no_stats(input, header) {
+        SET.increment();
+
+        match self._parse_set_request(input, header) {
             Ok((input, request)) => {
-                SET.increment();
                 Ok((input, request))
             }
             Err(e) => {
                 if !e.is_incomplete() {
-                    SET.increment();
                     SET_EX.increment();
                 }
                 Err(e)
@@ -18,7 +18,12 @@ impl BinaryProtocol {
         }
     }
 
-    fn parse_set_no_stats<'a>(&self, input: &'a [u8], header: RequestHeader) -> IResult<&'a [u8], Set> {
+    #[cfg(not(feature = "metrics"))]
+    pub(crate) fn parse_set_request<'a>(&self, input: &'a [u8], header: RequestHeader) -> IResult<&'a [u8], Set> {
+        self._parse_set_request(input, header)
+    }
+
+    fn _parse_set_request<'a>(&self, input: &'a [u8], header: RequestHeader) -> IResult<&'a [u8], Set> {
         // validation
 
         if header.key_len == 0 || header.key_len as usize > self.max_key_len as usize{
@@ -82,10 +87,10 @@ impl BinaryProtocol {
     }
 
     pub(crate) fn compose_set_request(&self, request: &Set, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
-    	self.compose_set_request_no_stats(request, buffer)
+    	self._compose_set_request(request, buffer)
     }
 
-    fn compose_set_request_no_stats(&self, request: &Set, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
+    fn _compose_set_request(&self, request: &Set, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
     	if request.key.len() > u64::MAX as _ {
 			return Err(std::io::Error::new(std::io::ErrorKind::Other, "request key too large for binary protocol"));
 		}

@@ -14,6 +14,8 @@ pub(crate) async fn handle_memcache_client(
     mut client: CacheClient,
     cache_name: String,
 ) {
+    debug!("accepted memcache text client");
+
     // initialize a buffer for incoming bytes from the client
     let mut buf = Buffer::new(INITIAL_BUFFER_SIZE);
 
@@ -84,6 +86,8 @@ pub(crate) async fn handle_memcache_binary_client(
     mut client: CacheClient,
     cache_name: String,
 ) {
+    debug!("accepted memcache binary client");
+
     // initialize a buffer for incoming bytes from the client
     let mut buf = Buffer::new(INITIAL_BUFFER_SIZE);
 
@@ -105,7 +109,7 @@ pub(crate) async fn handle_memcache_binary_client(
 
                 match request {
                     memcache::Request::Delete(r) => {
-                        if memcache::delete(&mut client, &cache_name, &mut socket, &r)
+                        if memcache_binary::delete(&mut client, &cache_name, &mut socket, r)
                             .await
                             .is_err()
                         {
@@ -113,7 +117,7 @@ pub(crate) async fn handle_memcache_binary_client(
                         }
                     }
                     memcache::Request::Get(r) => {
-                        if memcache::get(&mut client, &cache_name, &mut socket, r.keys())
+                        if memcache_binary::get(&mut client, &cache_name, &mut socket, r)
                             .await
                             .is_err()
                         {
@@ -121,7 +125,7 @@ pub(crate) async fn handle_memcache_binary_client(
                         }
                     }
                     memcache::Request::Set(r) => {
-                        if memcache::set(&mut client, &cache_name, &mut socket, &r)
+                        if memcache_binary::set(&mut client, &cache_name, &mut socket, r)
                             .await
                             .is_err()
                         {
@@ -154,6 +158,8 @@ pub(crate) async fn handle_resp_client(
     mut client: CacheClient,
     cache_name: String,
 ) {
+    debug!("accepted resp client");
+
     // initialize a buffer for incoming bytes from the client
     let mut buf = Buffer::new(INITIAL_BUFFER_SIZE);
 

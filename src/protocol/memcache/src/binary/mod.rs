@@ -48,6 +48,10 @@ impl BinaryProtocol {
     			let (input, request) = self.parse_set_request(input, header)?;
     			Ok((input, Request::Set(request)))
     		}
+    		0x04 => {
+    			let (input, request) = self.parse_delete_request(input, header)?;
+    			Ok((input, Request::Delete(request)))
+    		}
     		_ => {
     			Err(nom::Err::Failure(nom::error::Error::new(
                     input,
@@ -59,6 +63,9 @@ impl BinaryProtocol {
 
 	fn _compose_request(&self, request: &Request, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
 		match request {
+			Request::Delete(r) => {
+				self.compose_delete_request(r, buffer)
+			}
 			Request::Get(r) => {
 				self.compose_get_request(r, buffer)
 			}
@@ -91,6 +98,12 @@ impl BinaryProtocol {
     	}
 
     	match request {
+    		Request::Delete(request) => {
+    			if header.opcode == 0x05 {
+    				let (input, response) = self.parse_delete_response(request, input, header)?;
+    				return Ok((input, response));
+    			}
+    		}
     		Request::Get(request) => {
     			if header.opcode == 0x00 {
     				let (input, response) = self.parse_get_response(request, input, header)?;
@@ -114,6 +127,7 @@ impl BinaryProtocol {
 
 	fn _compose_response(&self, request: &Request, response: &Response, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
 		match request {
+			Request::Delete(request) => self.compose_delete_response(request, response, buffer),
 			Request::Get(request) => self.compose_get_response(request, response, buffer),
 			Request::Set(request) => self.compose_set_response(request, response, buffer),
 			_ => {

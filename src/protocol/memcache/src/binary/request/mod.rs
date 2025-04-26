@@ -1,5 +1,6 @@
 use super::*;
 
+mod delete;
 mod get;
 mod set;
 

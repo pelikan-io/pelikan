@@ -1,8 +1,8 @@
 use super::*;
 
+mod delete;
 mod get;
 mod set;
-
 
 #[repr(C)]
 pub(crate) struct ResponseHeader {

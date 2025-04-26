@@ -285,7 +285,7 @@ impl Request {
     }
 
     pub fn delete(key: Box<[u8]>, noreply: bool) -> Self {
-        Self::Delete(Delete { key, noreply })
+        Self::Delete(Delete { key, noreply, opaque: None })
     }
 
     pub fn get(keys: Box<[Box<[u8]>]>) -> Self {

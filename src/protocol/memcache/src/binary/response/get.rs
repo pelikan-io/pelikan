@@ -2,10 +2,10 @@ use super::*;
 
 impl BinaryProtocol {
 	pub(crate) fn parse_get_response<'a>(&self, request: &Get, input: &'a [u8], header: ResponseHeader) -> IResult<&'a [u8], Response> {
-        self.parse_get_response_no_stats(request, input, header)
+        self._parse_get_response(request, input, header)
     }
 
-	fn parse_get_response_no_stats<'a>(&self, request: &Get, input: &'a [u8], header: ResponseHeader) -> IResult<&'a [u8], Response> {
+	fn _parse_get_response<'a>(&self, request: &Get, input: &'a [u8], header: ResponseHeader) -> IResult<&'a [u8], Response> {
          match header.status {
             0 => {
                 if header.total_body_len > 0 {
@@ -42,10 +42,10 @@ impl BinaryProtocol {
     }
 
     pub(crate) fn compose_get_response(&self, request: &Get, response: &Response, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
-    	self.compose_get_response_no_stats(request, response, buffer)
+    	self._compose_get_response(request, response, buffer)
     }
 
-    fn compose_get_response_no_stats(&self, request: &Get, response: &Response, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
+    fn _compose_get_response(&self, request: &Get, response: &Response, buffer: &mut dyn BufMut) -> std::result::Result<usize, std::io::Error> {
         match response {
             Response::Values(values) => {
                 buffer.put_slice(&[0x81, 0x00]);
@@ -79,7 +79,7 @@ impl BinaryProtocol {
                 Ok(24)
             }
             _ => {
-                return Err(std::io::Error::new(std::io::ErrorKind::Other, "unexpected response"));
+                Err(std::io::Error::new(std::io::ErrorKind::Other, "unexpected response"))
             }
         }
     }
