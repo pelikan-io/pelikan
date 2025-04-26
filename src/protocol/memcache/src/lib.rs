@@ -17,7 +17,7 @@ pub use request::*;
 pub use response::*;
 pub use storage::*;
 
-pub use protocol_common::{Compose, Parse, ParseOk};
+pub use protocol_common::{Compose, Parse, ParseOk, Protocol};
 
 pub use common::expiry::TimeType;
 use logger::Klog;

@@ -16,7 +16,6 @@ mod decr;
 mod delete;
 mod flush_all;
 mod get;
-mod gets;
 mod incr;
 mod prepend;
 mod quit;
@@ -30,7 +29,6 @@ pub use decr::Decr;
 pub use delete::Delete;
 pub use flush_all::FlushAll;
 pub use get::Get;
-pub use gets::Gets;
 pub use incr::Incr;
 pub use prepend::Prepend;
 pub use quit::Quit;
@@ -145,12 +143,12 @@ impl RequestParser {
                 Ok((input, Request::Incr(request)))
             }
             (input, Command::Get) => {
-                let (input, request) = self.parse_get(input)?;
+                let (input, request) = self.parse_get(false, input)?;
                 Ok((input, Request::Get(request)))
             }
             (input, Command::Gets) => {
-                let (input, request) = self.parse_gets(input)?;
-                Ok((input, Request::Gets(request)))
+                let (input, request) = self.parse_get(true, input)?;
+                Ok((input, Request::Get(request)))
             }
             (input, Command::Prepend) => {
                 let (input, request) = self.parse_prepend(input)?;
@@ -204,7 +202,6 @@ impl Compose for Request {
             Self::FlushAll(r) => r.compose(session),
             Self::Incr(r) => r.compose(session),
             Self::Get(r) => r.compose(session),
-            Self::Gets(r) => r.compose(session),
             Self::Prepend(r) => r.compose(session),
             Self::Quit(r) => r.compose(session),
             Self::Replace(r) => r.compose(session),
@@ -226,7 +223,6 @@ impl Klog for Request {
             Self::FlushAll(r) => r.klog(response),
             Self::Incr(r) => r.klog(response),
             Self::Get(r) => r.klog(response),
-            Self::Gets(r) => r.klog(response),
             Self::Prepend(r) => r.klog(response),
             Self::Quit(r) => r.klog(response),
             Self::Replace(r) => r.klog(response),
@@ -245,7 +241,6 @@ pub enum Request {
     FlushAll(FlushAll),
     Incr(Incr),
     Get(Get),
-    Gets(Gets),
     Prepend(Prepend),
     Quit(Quit),
     Replace(Replace),
@@ -294,11 +289,11 @@ impl Request {
     }
 
     pub fn get(keys: Box<[Box<[u8]>]>) -> Self {
-        Self::Get(Get { keys })
+        Self::Get(Get { key: true, cas: false, opaque: None, keys })
     }
 
     pub fn gets(keys: Box<[Box<[u8]>]>) -> Self {
-        Self::Gets(Gets { keys })
+        Self::Get(Get { key: true, cas: true, opaque: None, keys })
     }
 
     pub fn incr(key: Box<[u8]>, value: u64, noreply: bool) -> Self {
@@ -340,8 +335,13 @@ impl Display for Request {
             Request::Delete(_) => write!(f, "delete"),
             Request::FlushAll(_) => write!(f, "flush_all"),
             Request::Incr(_) => write!(f, "incr"),
-            Request::Get(_) => write!(f, "get"),
-            Request::Gets(_) => write!(f, "gets"),
+            Request::Get(r) => {
+                if r.cas {
+                    write!(f, "gets")
+                } else {
+                    write!(f, "get")
+                }
+            }
             Request::Prepend(_) => write!(f, "prepend"),
             Request::Quit(_) => write!(f, "quit"),
             Request::Replace(_) => write!(f, "replace"),

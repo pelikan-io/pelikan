@@ -21,8 +21,8 @@ path = ".."
 members = ["."]
 
 [[bin]]
-name = "memcache"
-path = "fuzz_targets/memcache.rs"
+name = "memcache_text"
+path = "fuzz_targets/memcache_text.rs"
 test = false
 doc = false
 

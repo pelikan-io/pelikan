@@ -6,10 +6,17 @@ use super::*;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Get {
+    pub(crate) key: bool,
+    pub(crate) cas: bool,
+    pub(crate) opaque: Option<u32>,
     pub(crate) keys: Box<[Box<[u8]>]>,
 }
 
 impl Get {
+    pub fn cas(&self) -> bool {
+        self.cas
+    }
+
     pub fn keys(&self) -> &[Box<[u8]>] {
         self.keys.as_ref()
     }
@@ -17,7 +24,7 @@ impl Get {
 
 impl RequestParser {
     // this is to be called after parsing the command, so we do not match the verb
-    pub(crate) fn parse_get_no_stats<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Get> {
+    pub(crate) fn parse_get_no_stats<'a>(&self, cas: bool, input: &'a [u8]) -> IResult<&'a [u8], Get> {
         let mut keys = Vec::new();
 
         let (mut input, _) = space1(input)?;
@@ -61,14 +68,17 @@ impl RequestParser {
         Ok((
             input,
             Get {
+                key: true,
+                cas,
+                opaque: None,
                 keys: keys.to_owned().into_boxed_slice(),
             },
         ))
     }
 
     // this is to be called after parsing the command, so we do not match the verb
-    pub fn parse_get<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Get> {
-        match self.parse_get_no_stats(input) {
+    pub fn parse_get<'a>(&self, cas: bool, input: &'a [u8]) -> IResult<&'a [u8], Get> {
+        match self.parse_get_no_stats(cas, input) {
             Ok((input, request)) => {
                 GET.increment();
                 let keys = request.keys.len() as u64;
@@ -89,7 +99,11 @@ impl RequestParser {
 
 impl Compose for Get {
     fn compose(&self, session: &mut dyn BufMut) -> usize {
-        let verb = b"get";
+        let verb = if self.cas {
+            "gets".as_bytes()
+        } else {
+            "get".as_bytes()
+        };
 
         let mut size = verb.len() + CRLF.len();
 
@@ -113,12 +127,18 @@ impl Klog for Get {
             let mut hit_keys = 0;
             let mut miss_keys = 0;
 
+            let verb = if self.cas {
+                "gets"
+            } else {
+                "get"
+            };
+
             for value in res.values() {
                 if value.len().is_none() {
                     miss_keys += 1;
 
                     klog!(
-                        "\"get {}\" {} 0",
+                        "\"{verb} {}\" {} 0",
                         String::from_utf8_lossy(value.key()),
                         MISS
                     );
@@ -126,7 +146,7 @@ impl Klog for Get {
                     hit_keys += 1;
 
                     klog!(
-                        "\"get {}\" {} {}",
+                        "\"{verb} {}\" {} {}",
                         String::from_utf8_lossy(value.key()),
                         HIT,
                         value.len().unwrap(),
@@ -154,6 +174,9 @@ mod tests {
             Ok((
                 &b""[..],
                 Request::Get(Get {
+                    key: true,
+                    cas: false,
+                    opaque: None,
                     keys: vec![b"key".to_vec().into_boxed_slice()].into_boxed_slice(),
                 })
             ))
@@ -183,6 +206,9 @@ mod tests {
             Ok((
                 &b""[..],
                 Request::Get(Get {
+                    key: true,
+                    cas: false,
+                    opaque: None,
                     keys: vec![
                         b"a".to_vec().into_boxed_slice(),
                         b"b".to_vec().into_boxed_slice(),
@@ -199,6 +225,9 @@ mod tests {
             Ok((
                 &b""[..],
                 Request::Get(Get {
+                    key: true,
+                    cas: false,
+                    opaque: None,
                     keys: vec![b"evil\0key".to_vec().into_boxed_slice(),].into_boxed_slice()
                 })
             ))

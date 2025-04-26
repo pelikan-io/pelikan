@@ -4,19 +4,16 @@
 use libfuzzer_sys::fuzz_target;
 
 use protocol_memcache::*;
-use protocol_common::Parse;
+use protocol_common::Protocol;
 
-const MAX_KEY_LEN: usize = 128;
-const MAX_BATCH_SIZE: usize = 128;
-const MAX_VALUE_SIZE: usize = 4*4096;
+const MAX_KEY_LEN: usize = u16::MAX as usize;
+const MAX_BATCH_SIZE: usize = 1;
+const MAX_VALUE_SIZE: usize = u32::MAX as usize;
 
 fuzz_target!(|data: &[u8]| {
-    let parser = binary::request::Parser::new()
-        .max_value_size(MAX_VALUE_SIZE)
-        .max_batch_size(MAX_BATCH_SIZE)
-        .max_key_len(MAX_KEY_LEN);
+    let parser = binary::BinaryProtocol::default();
 
-    if let Ok(request) = parser.parse(data) {
+    if let Ok(request) = parser.parse_request(data) {
         match request.into_inner() {
             Request::Get(get) => {
                 if get.keys().is_empty() {
@@ -26,17 +23,6 @@ fuzz_target!(|data: &[u8]| {
                     panic!("batch size exceeds max");
                 }
                 for key in get.keys().iter() {
-                    validate_key(key);
-                }
-            }
-            Request::Gets(gets) => {
-                if gets.keys().is_empty() {
-                    panic!("no keys");
-                }
-                if gets.keys().len() > MAX_BATCH_SIZE {
-                    panic!("batch size exceeds max");
-                }
-                for key in gets.keys().iter() {
                     validate_key(key);
                 }
             }
