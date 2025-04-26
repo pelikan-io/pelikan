@@ -6,7 +6,8 @@ use std::collections::HashSet;
 use std::io::Write;
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::cache::SetFetchResponse;
+use momento::CacheClient;
 use protocol_resp::{SetMembers, SMEMBERS, SMEMBERS_EX};
 use tokio::time;
 
@@ -17,7 +18,7 @@ use crate::ProxyError;
 use super::update_method_metrics;
 
 pub async fn smembers(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &SetMembers,
@@ -40,9 +41,9 @@ pub async fn smembers(
             }
         };
 
-        let (set, status) = match response.value {
-            Some(set) => (set, Status::Hit),
-            None => (HashSet::default(), Status::Miss),
+        let (set, status) = match response {
+            SetFetchResponse::Hit { values } => (values.into(), Status::Hit),
+            SetFetchResponse::Miss => (HashSet::default(), Status::Miss),
         };
 
         write!(response_buf, "*{}\r\n", set.len())?;

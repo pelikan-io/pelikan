@@ -5,18 +5,17 @@
 use std::io::Write;
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::CacheClient;
 use protocol_resp::{HashIncrBy, HINCRBY, HINCRBY_EX};
 
 use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
 use crate::ProxyError;
-use crate::COLLECTION_TTL;
 
 use super::update_method_metrics;
 
 pub async fn hincrby(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &HashIncrBy,
@@ -24,13 +23,7 @@ pub async fn hincrby(
     update_method_metrics(&HINCRBY, &HINCRBY_EX, async move {
         let response = match tokio::time::timeout(
             Duration::from_millis(200),
-            client.dictionary_increment(
-                cache_name,
-                req.key(),
-                req.field(),
-                req.increment(),
-                COLLECTION_TTL,
-            ),
+            client.dictionary_increment(cache_name, req.key(), req.field(), req.increment()),
         )
         .await
         {

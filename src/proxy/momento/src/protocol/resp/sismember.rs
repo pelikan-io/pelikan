@@ -4,8 +4,10 @@
 
 use std::time::Duration;
 
-use momento::SimpleCacheClient;
+use momento::cache::SetFetchResponse;
+use momento::CacheClient;
 use protocol_resp::{SetIsMember, SISMEMBER, SISMEMBER_EX, SISMEMBER_HIT, SISMEMBER_MISS};
+use std::collections::HashSet;
 use tokio::time;
 
 use crate::error::ProxyResult;
@@ -15,7 +17,7 @@ use crate::ProxyError;
 use super::update_method_metrics;
 
 pub async fn sismember(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &SetIsMember,
@@ -50,13 +52,20 @@ pub async fn sismember(
             }
         };
 
-        let status = match response.value {
-            Some(set) if set.contains(req.field()) => {
-                SISMEMBER_HIT.increment();
-                response_buf.extend_from_slice(b":1\r\n");
-                Status::Hit
+        let status = match response {
+            SetFetchResponse::Hit { values } => {
+                let values: HashSet<Vec<u8>> = values.into();
+                if values.contains(req.field()) {
+                    SISMEMBER_HIT.increment();
+                    response_buf.extend_from_slice(b":1\r\n");
+                    Status::Hit
+                } else {
+                    SISMEMBER_MISS.increment();
+                    response_buf.extend_from_slice(b":0\r\n");
+                    Status::Miss
+                }
             }
-            _ => {
+            SetFetchResponse::Miss => {
                 SISMEMBER_MISS.increment();
                 response_buf.extend_from_slice(b":0\r\n");
                 Status::Miss

@@ -6,7 +6,7 @@ use std::io::Write;
 use super::update_method_metrics;
 
 pub async fn del(
-    client: &mut SimpleCacheClient,
+    client: &mut CacheClient,
     cache_name: &str,
     response_buf: &mut Vec<u8>,
     req: &Del,
@@ -14,7 +14,7 @@ pub async fn del(
     let keys: Vec<&[u8]> = req.keys().iter().map(|k| &**k).collect();
 
     for key in keys {
-        let mut client = client.clone();
+        let client = client.clone();
 
         update_method_metrics(&DEL, &DEL_EX, async move {
             match timeout(Duration::from_millis(200), client.delete(cache_name, key)).await {

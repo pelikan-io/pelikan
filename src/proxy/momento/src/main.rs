@@ -5,16 +5,16 @@
 #[macro_use]
 extern crate logger;
 
+use ::config::{AdminConfig, MomentoProxyConfig, TimeType};
 use backtrace::Backtrace;
 use clap::{Arg, Command};
-use config::momento_proxy::Protocol;
-use config::*;
 use core::num::NonZeroUsize;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::time::Duration;
 use logger::configure_logging;
 use logger::Drain;
 use metriken::*;
+use momento::cache::{configurations, CollectionTtl};
 use momento::*;
 use pelikan_net::TCP_RECV_BYTE;
 use protocol_admin::*;
@@ -302,19 +302,20 @@ async fn spawn(
     }
     let auth_token =
         std::env::var("MOMENTO_AUTHENTICATION").expect("MOMENTO_AUTHENTICATION must be set");
-    let credential_provider = CredentialProviderBuilder::from_string(auth_token)
-        .build()
-        .unwrap_or_else(|e| {
-            eprintln!("failed to initialize credential provider. error: {e}");
-            std::process::exit(1);
-        });
-    let client_builder = match SimpleCacheClientBuilder::new(credential_provider, DEFAULT_TTL) {
-        Ok(c) => c,
-        Err(e) => {
-            eprintln!("could not create cache client: {}", e);
-            std::process::exit(1);
-        }
-    };
+    let credential_provider = CredentialProvider::from_string(auth_token).unwrap_or_else(|e| {
+        eprintln!("failed to initialize credential provider. error: {e}");
+        std::process::exit(1);
+    });
+    let client_builder = CacheClient::builder()
+        .default_ttl(DEFAULT_TTL)
+        .configuration(configurations::Laptop::latest())
+        .credential_provider(credential_provider);
+
+    // Validate client can build early
+    client_builder.clone().build().unwrap_or_else(|e| {
+        eprintln!("could not create cache client: {}", e);
+        std::process::exit(1);
+    });
 
     if config.caches().is_empty() {
         error!("no caches specified in the config");
@@ -339,7 +340,6 @@ async fn spawn(
                 std::process::exit(1);
             }
         };
-        let ttl = cache.default_ttl();
 
         let tcp_listener = match std::net::TcpListener::bind(addr) {
             Ok(v) => {
@@ -368,8 +368,6 @@ async fn spawn(
         };
 
         tokio::spawn(async move {
-            let client_builder = client_builder.default_ttl(ttl).expect("bad default ttl");
-
             info!(
                 "starting proxy frontend listener for cache `{}` on: {}",
                 cache.cache_name(),
