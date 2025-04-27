@@ -79,7 +79,7 @@ pub async fn set(
                 }
             }
         }
-        Ok(Err(e)) => {
+        Ok(Err(_e)) => {
             BACKEND_EX.increment();
 
             SET_EX.increment();
@@ -94,12 +94,18 @@ pub async fn set(
                 0,
             );
 
-            let message = format!("SERVER_ERROR {e}\r\n");
+            // TODO(brian): we need to be able to send proper errors back
 
-            SESSION_SEND_BYTE.add(message.len() as _);
-            TCP_SEND_BYTE.add(message.len() as _);
+            let response = Response::not_stored(false);
+            let _ =
+                protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
 
-            if let Err(e) = socket.write_all(message.as_bytes()).await {
+            // let message = format!("SERVER_ERROR {e}\r\n");
+
+            SESSION_SEND_BYTE.add(response_buf.len() as _);
+            TCP_SEND_BYTE.add(response_buf.len() as _);
+
+            if let Err(e) = socket.write_all(&response_buf).await {
                 SESSION_SEND_EX.increment();
                 // hangup if we can't send a response back
                 return Err(e);
@@ -122,12 +128,18 @@ pub async fn set(
                 0,
             );
 
-            let message = "SERVER_ERROR backend timeout\r\n";
+            // TODO(brian): we need to be able to send proper errors back
 
-            SESSION_SEND_BYTE.add(message.len() as _);
-            TCP_SEND_BYTE.add(message.len() as _);
+            let response = Response::not_stored(false);
+            let _ =
+                protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
 
-            if let Err(e) = socket.write_all(message.as_bytes()).await {
+            // let message = "SERVER_ERROR backend timeout\r\n";
+
+            SESSION_SEND_BYTE.add(response_buf.len() as _);
+            TCP_SEND_BYTE.add(response_buf.len() as _);
+
+            if let Err(e) = socket.write_all(&response_buf).await {
                 SESSION_SEND_EX.increment();
                 // hangup if we can't send a response back
                 return Err(e);
