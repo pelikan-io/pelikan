@@ -30,14 +30,8 @@ impl Klog for Incr {
 
     fn klog(&self, response: &Self::Response) {
         let (code, len) = match response {
-            Response::Numeric(ref res) => {
-                INCR_STORED.increment();
-                (STORED, res.len())
-            }
-            Response::NotFound(ref res) => {
-                INCR_NOT_FOUND.increment();
-                (NOT_STORED, res.len())
-            }
+            Response::Numeric(ref res) => (STORED, res.len()),
+            Response::NotFound(ref res) => (NOT_STORED, res.len()),
             _ => {
                 return;
             }

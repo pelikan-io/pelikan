@@ -4,7 +4,6 @@
 
 use crate::*;
 use clocksource::coarse::UnixInstant;
-use protocol_common::BufMut;
 use std::borrow::Cow;
 use std::fmt::Display;
 use std::fmt::Formatter;

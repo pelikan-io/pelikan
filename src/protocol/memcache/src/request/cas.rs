@@ -45,18 +45,9 @@ impl Klog for Cas {
 
     fn klog(&self, response: &Self::Response) {
         let (code, len) = match response {
-            Response::Stored(ref res) => {
-                CAS_STORED.increment();
-                (STORED, res.len())
-            }
-            Response::Exists(ref res) => {
-                CAS_EXISTS.increment();
-                (EXISTS, res.len())
-            }
-            Response::NotFound(ref res) => {
-                CAS_NOT_FOUND.increment();
-                (NOT_FOUND, res.len())
-            }
+            Response::Stored(ref res) => (STORED, res.len()),
+            Response::Exists(ref res) => (EXISTS, res.len()),
+            Response::NotFound(ref res) => (NOT_FOUND, res.len()),
             _ => {
                 return;
             }

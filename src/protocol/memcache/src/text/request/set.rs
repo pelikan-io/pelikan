@@ -65,14 +65,18 @@ impl TextProtocol {
     pub fn parse_set_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Set> {
         match self._parse_set_request(input) {
             Ok((input, request)) => {
+                #[cfg(feature = "metrics")]
                 SET.increment();
+
                 Ok((input, request))
             }
             Err(e) => {
+                #[cfg(feature = "metrics")]
                 if !e.is_incomplete() {
                     SET.increment();
                     SET_EX.increment();
                 }
+
                 Err(e)
             }
         }

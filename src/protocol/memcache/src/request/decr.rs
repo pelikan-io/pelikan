@@ -30,14 +30,8 @@ impl Klog for Decr {
 
     fn klog(&self, response: &Self::Response) {
         let (code, len) = match response {
-            Response::Numeric(ref res) => {
-                DECR_STORED.increment();
-                (STORED, res.len())
-            }
-            Response::NotFound(ref res) => {
-                DECR_NOT_FOUND.increment();
-                (NOT_FOUND, res.len())
-            }
+            Response::Numeric(ref res) => (STORED, res.len()),
+            Response::NotFound(ref res) => (NOT_FOUND, res.len()),
             _ => {
                 return;
             }

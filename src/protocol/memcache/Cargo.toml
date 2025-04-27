@@ -17,7 +17,7 @@ bytes = { workspace = true }
 common = { path = "../../common", default-features = false }
 clocksource = { workspace = true }
 logger = { path = "../../logger" }
-metriken = { workspace = true }
+metriken = { workspace = true, optional = true }
 nom = { workspace = true }
 protocol-common = { path = "../../protocol/common" }
 
@@ -25,4 +25,4 @@ protocol-common = { path = "../../protocol/common" }
 criterion = "0.5.1"
 
 [features]
-metrics = []
+metrics = ["metriken"]

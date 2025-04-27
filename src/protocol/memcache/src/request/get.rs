@@ -27,23 +27,16 @@ impl Klog for Get {
 
     fn klog(&self, response: &Self::Response) {
         if let Response::Values(ref res) = response {
-            let mut hit_keys = 0;
-            let mut miss_keys = 0;
-
             let verb = if self.cas { "gets" } else { "get" };
 
             for value in res.values() {
                 if value.len().is_none() {
-                    miss_keys += 1;
-
                     klog!(
                         "\"{verb} {}\" {} 0",
                         String::from_utf8_lossy(value.key()),
                         MISS
                     );
                 } else {
-                    hit_keys += 1;
-
                     klog!(
                         "\"{verb} {}\" {} {}",
                         String::from_utf8_lossy(value.key()),
@@ -52,9 +45,6 @@ impl Klog for Get {
                     );
                 }
             }
-
-            GET_KEY_HIT.add(hit_keys as _);
-            GET_KEY_MISS.add(miss_keys as _);
         }
     }
 }

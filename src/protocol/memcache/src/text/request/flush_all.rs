@@ -53,14 +53,18 @@ impl TextProtocol {
     pub fn parse_flush_all_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], FlushAll> {
         match self._parse_flush_all_request(input) {
             Ok((input, request)) => {
+                #[cfg(feature = "metrics")]
                 FLUSH_ALL.increment();
+
                 Ok((input, request))
             }
             Err(e) => {
+                #[cfg(feature = "metrics")]
                 if !e.is_incomplete() {
                     FLUSH_ALL.increment();
                     FLUSH_ALL_EX.increment();
                 }
+
                 Err(e)
             }
         }

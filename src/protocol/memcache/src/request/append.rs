@@ -40,14 +40,8 @@ impl Klog for Append {
 
     fn klog(&self, response: &Self::Response) {
         let (code, len) = match response {
-            Response::Stored(ref res) => {
-                APPEND_STORED.increment();
-                (STORED, res.len())
-            }
-            Response::NotStored(ref res) => {
-                APPEND_NOT_STORED.increment();
-                (NOT_STORED, res.len())
-            }
+            Response::Stored(ref res) => (STORED, res.len()),
+            Response::NotStored(ref res) => (NOT_STORED, res.len()),
             _ => {
                 return;
             }

@@ -70,14 +70,18 @@ impl TextProtocol {
     pub fn parse_cas_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Cas> {
         match self._parse_cas_request(input) {
             Ok((input, request)) => {
+                #[cfg(feature = "metrics")]
                 CAS.increment();
+
                 Ok((input, request))
             }
             Err(e) => {
+                #[cfg(feature = "metrics")]
                 if !e.is_incomplete() {
                     CAS.increment();
                     CAS_EX.increment();
                 }
+
                 Err(e)
             }
         }

@@ -63,17 +63,23 @@ impl TextProtocol {
     pub fn parse_get_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Get> {
         match self._parse_get_request(input) {
             Ok((input, request)) => {
-                GET.increment();
-                let keys = request.keys.len() as u64;
-                GET_KEY.add(keys);
-                let _ = GET_CARDINALITY.increment(keys);
+                #[cfg(feature = "metrics")]
+                {
+                    GET.increment();
+                    let keys = request.keys.len() as u64;
+                    GET_KEY.add(keys);
+                    let _ = GET_CARDINALITY.increment(keys);
+                }
+
                 Ok((input, request))
             }
             Err(e) => {
+                #[cfg(feature = "metrics")]
                 if !e.is_incomplete() {
                     GET.increment();
                     GET_EX.increment();
                 }
+
                 Err(e)
             }
         }

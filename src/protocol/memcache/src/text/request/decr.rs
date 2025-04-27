@@ -11,7 +11,9 @@ impl TextProtocol {
         // we can use the incr parser here and convert the request
         match self._parse_incr_request(input) {
             Ok((input, request)) => {
+                #[cfg(feature = "metrics")]
                 DECR.increment();
+
                 Ok((
                     input,
                     Decr {
@@ -22,10 +24,12 @@ impl TextProtocol {
                 ))
             }
             Err(e) => {
+                #[cfg(feature = "metrics")]
                 if !e.is_incomplete() {
                     DECR.increment();
                     DECR_EX.increment();
                 }
+
                 Err(e)
             }
         }

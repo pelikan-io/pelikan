@@ -10,19 +10,18 @@
 use libfuzzer_sys::fuzz_target;
 
 use protocol_memcache::*;
-use protocol_common::Parse;
 
 const MAX_KEY_LEN: usize = 128;
 const MAX_BATCH_SIZE: usize = 128;
 const MAX_VALUE_SIZE: usize = 4*4096;
 
 fuzz_target!(|data: &[u8]| {
-    let parser = RequestParser::new()
+    let protocol = TextProtocol::new()
         .max_value_size(MAX_VALUE_SIZE)
         .max_batch_size(MAX_BATCH_SIZE)
         .max_key_len(MAX_KEY_LEN);
 
-    if let Ok(request) = parser.parse(data) {
+    if let Ok(request) = protocol.parse_request(data) {
         match request.into_inner() {
             Request::Get(get) => {
                 if get.keys().is_empty() {

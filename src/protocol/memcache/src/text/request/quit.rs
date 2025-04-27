@@ -11,6 +11,7 @@ impl TextProtocol {
         let (input, _) = space0(input)?;
         let (input, _) = crlf(input)?;
 
+        #[cfg(feature = "metrics")]
         QUIT.increment();
 
         Ok((input, Quit {}))

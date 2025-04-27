@@ -2,38 +2,41 @@ use super::*;
 
 impl TextProtocol {
     #[cfg(feature = "metrics")]
-    pub(crate) fn parse_delete_response<'a>(
+    pub(crate) fn parse_cas_response<'a>(
         &self,
-        _request: &Delete,
+        _request: &Cas,
         input: &'a [u8],
     ) -> IResult<&'a [u8], Response> {
         crate::response(input)
     }
 
     #[cfg(not(feature = "metrics"))]
-    pub(crate) fn parse_delete_response<'a>(
+    pub(crate) fn parse_cas_response<'a>(
         &self,
-        _request: &Delete,
+        _request: &Cas,
         input: &'a [u8],
     ) -> IResult<&'a [u8], Response> {
         crate::response(input)
     }
 
     #[allow(unused_variables)]
-    pub(crate) fn compose_delete_response(
+    pub(crate) fn compose_cas_response(
         &self,
-        request: &Delete,
+        request: &Cas,
         response: &Response,
         buffer: &mut dyn BufMut,
     ) -> std::result::Result<usize, std::io::Error> {
         #[cfg(feature = "metrics")]
         {
             match response {
-                Response::Deleted(_) => {
-                    DELETE_DELETED.increment();
+                Response::Stored(_) => {
+                    CAS_STORED.increment();
+                }
+                Response::Exists(_) => {
+                    CAS_EXISTS.increment();
                 }
                 Response::NotFound(_) => {
-                    DELETE_NOT_FOUND.increment();
+                    CAS_NOT_FOUND.increment();
                 }
                 _ => {
                     return Err(std::io::Error::new(

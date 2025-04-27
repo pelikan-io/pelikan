@@ -4,16 +4,15 @@
 use libfuzzer_sys::fuzz_target;
 
 use protocol_memcache::*;
-use protocol_common::Protocol;
 
 const MAX_KEY_LEN: usize = u16::MAX as usize;
 const MAX_BATCH_SIZE: usize = 1;
 const MAX_VALUE_SIZE: usize = u32::MAX as usize;
 
 fuzz_target!(|data: &[u8]| {
-    let parser = binary::BinaryProtocol::default();
+    let protocol = binary::BinaryProtocol::default();
 
-    if let Ok(request) = parser.parse_request(data) {
+    if let Ok(request) = protocol.parse_request(data) {
         match request.into_inner() {
             Request::Get(get) => {
                 if get.keys().is_empty() {

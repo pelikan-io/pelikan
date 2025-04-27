@@ -10,9 +10,13 @@ impl TextProtocol {
         // we can use the get parser here and convert the request
         match self._parse_get_request(input) {
             Ok((input, request)) => {
-                GETS.increment();
-                let keys = request.keys.len() as u64;
-                GETS_KEY.add(keys);
+                #[cfg(feature = "metrics")]
+                {
+                    GETS.increment();
+                    let keys = request.keys.len() as u64;
+                    GETS_KEY.add(keys);
+                }
+
                 Ok((
                     input,
                     Get {
@@ -24,10 +28,12 @@ impl TextProtocol {
                 ))
             }
             Err(e) => {
+                #[cfg(feature = "metrics")]
                 if !e.is_incomplete() {
                     GETS.increment();
                     GETS_EX.increment();
                 }
+
                 Err(e)
             }
         }

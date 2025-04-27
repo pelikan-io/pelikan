@@ -26,14 +26,8 @@ impl Klog for Delete {
 
     fn klog(&self, response: &Self::Response) {
         let (code, len) = match response {
-            Response::Deleted(ref res) => {
-                DELETE_DELETED.increment();
-                (DELETED, res.len())
-            }
-            Response::NotFound(ref res) => {
-                DELETE_NOT_FOUND.increment();
-                (NOT_FOUND, res.len())
-            }
+            Response::Deleted(ref res) => (DELETED, res.len()),
+            Response::NotFound(ref res) => (NOT_FOUND, res.len()),
             _ => {
                 return;
             }

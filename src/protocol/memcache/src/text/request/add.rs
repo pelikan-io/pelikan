@@ -11,7 +11,9 @@ impl TextProtocol {
         // we can use the set parser here and convert the request
         match self._parse_set_request(input) {
             Ok((input, request)) => {
+                #[cfg(feature = "metrics")]
                 ADD.increment();
+
                 Ok((
                     input,
                     Add {
@@ -24,10 +26,12 @@ impl TextProtocol {
                 ))
             }
             Err(e) => {
+                #[cfg(feature = "metrics")]
                 if !e.is_incomplete() {
                     ADD.increment();
                     ADD_EX.increment();
                 }
+
                 Err(e)
             }
         }

@@ -50,14 +50,18 @@ impl TextProtocol {
     pub fn parse_incr_request<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Incr> {
         match self._parse_incr_request(input) {
             Ok((input, request)) => {
+                #[cfg(feature = "metrics")]
                 INCR.increment();
+
                 Ok((input, request))
             }
             Err(e) => {
+                #[cfg(feature = "metrics")]
                 if !e.is_incomplete() {
                     INCR.increment();
                     INCR_EX.increment();
                 }
+
                 Err(e)
             }
         }

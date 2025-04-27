@@ -159,6 +159,54 @@ impl TextProtocol {
 
         Ok(len)
     }
+
+    fn _parse_response<'a>(
+        &self,
+        request: &Request,
+        buffer: &'a [u8],
+    ) -> IResult<&'a [u8], Response> {
+        match request {
+            Request::Add(r) => self.parse_add_response(r, buffer),
+            Request::Append(r) => self.parse_append_response(r, buffer),
+            Request::Cas(r) => self.parse_cas_response(r, buffer),
+            Request::Decr(r) => self.parse_decr_response(r, buffer),
+            Request::Delete(r) => self.parse_delete_response(r, buffer),
+            Request::FlushAll(r) => self.parse_flush_all_response(r, buffer),
+            Request::Get(r) => self.parse_get_response(r, buffer),
+            Request::Incr(r) => self.parse_incr_response(r, buffer),
+            Request::Prepend(r) => self.parse_prepend_response(r, buffer),
+            Request::Replace(r) => self.parse_replace_response(r, buffer),
+            Request::Set(r) => self.parse_set_response(r, buffer),
+            _ => todo!(),
+        }
+    }
+
+    fn _compose_response(
+        &self,
+        request: &Request,
+        response: &Response,
+        buffer: &mut dyn BufMut,
+    ) -> std::result::Result<usize, std::io::Error> {
+        match request {
+            Request::Add(request) => self.compose_add_response(request, response, buffer),
+            Request::Append(request) => self.compose_append_response(request, response, buffer),
+            Request::Cas(request) => self.compose_cas_response(request, response, buffer),
+            Request::Decr(request) => self.compose_decr_response(request, response, buffer),
+            Request::Delete(request) => self.compose_delete_response(request, response, buffer),
+            Request::FlushAll(request) => {
+                self.compose_flush_all_response(request, response, buffer)
+            }
+            Request::Get(request) => self.compose_get_response(request, response, buffer),
+            Request::Incr(request) => self.compose_incr_response(request, response, buffer),
+            Request::Prepend(request) => self.compose_prepend_response(request, response, buffer),
+            // Request::Quit(request) => self.compose_quit_response(request, response, buffer),
+            Request::Replace(request) => self.compose_replace_response(request, response, buffer),
+            Request::Set(request) => self.compose_set_response(request, response, buffer),
+            _ => todo!(),
+        }
+
+        // Ok(len)
+    }
 }
 
 impl Protocol<Request, Response> for TextProtocol {
@@ -183,18 +231,22 @@ impl Protocol<Request, Response> for TextProtocol {
 
     fn parse_response(
         &self,
-        _request: &Request,
-        _buffer: &[u8],
+        request: &Request,
+        buffer: &[u8],
     ) -> std::result::Result<ParseOk<Response>, std::io::Error> {
-        todo!()
+        match self._parse_response(request, buffer) {
+            Ok((input, response)) => Ok(ParseOk::new(response, buffer.len() - input.len())),
+            Err(Err::Incomplete(_)) => Err(std::io::Error::from(std::io::ErrorKind::WouldBlock)),
+            Err(_) => Err(std::io::Error::from(std::io::ErrorKind::InvalidInput)),
+        }
     }
 
     fn compose_response(
         &self,
-        _request: &Request,
-        _response: &Response,
-        _buffer: &mut dyn BufMut,
+        request: &Request,
+        response: &Response,
+        buffer: &mut dyn BufMut,
     ) -> std::result::Result<usize, std::io::Error> {
-        todo!()
+        self._compose_response(request, response, buffer)
     }
 }
