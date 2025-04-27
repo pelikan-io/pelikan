@@ -25,4 +25,5 @@ protocol-common = { path = "../../protocol/common" }
 criterion = "0.5.1"
 
 [features]
+default = ["metrics"]
 metrics = ["metriken"]

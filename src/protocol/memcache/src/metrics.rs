@@ -44,6 +44,12 @@ pub static GETS_KEY_HIT: Counter = Counter::new();
 #[metric(name = "gets_key_miss")]
 pub static GETS_KEY_MISS: Counter = Counter::new();
 
+#[metric(
+    name = "gets_cardinality",
+    description = "distribution of key cardinality for gets requests"
+)]
+pub static GETS_CARDINALITY: AtomicHistogram = AtomicHistogram::new(7, 20);
+
 /*
  * SET
  */

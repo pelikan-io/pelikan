@@ -33,19 +33,19 @@ impl TextProtocol {
                     let hit = v.values.len();
                     let miss = request.keys.len() - hit;
 
-                    if get.cas {
-                        GETS_KEY_HIT.add(hit);
-                        GETS_KEY_MISS.add(miss);
+                    if request.cas {
+                        GETS_KEY_HIT.add(hit as _);
+                        GETS_KEY_MISS.add(miss as _);
                     } else {
-                        GET_KEY_HIT.add(hit);
-                        GET_KEY_MISS.add(miss);
+                        GET_KEY_HIT.add(hit as _);
+                        GET_KEY_MISS.add(miss as _);
                     }
                 }
                 Response::NotFound(_) => {
-                    if get.cas {
-                        GETS_KEY_MISS.add(request.keys.len());
+                    if request.cas {
+                        GETS_KEY_MISS.add(request.keys.len() as _);
                     } else {
-                        GET_KEY_MISS.add(request.keys.len());
+                        GET_KEY_MISS.add(request.keys.len() as _);
                     }
                 }
                 _ => {
