@@ -67,16 +67,18 @@ impl BinaryProtocol {
         match response {
             Response::Values(values) => {
                 buffer.put_slice(&[0x81, 0x00]);
-                if request.key {
+                if !request.key {
                     buffer.put_slice(&[0x00, 0x00]);
                 } else {
                     buffer.put_u16(values.values[0].key().len() as u16);
                 }
                 buffer.put_slice(&[0x04, 0x00, 0x00, 0x00]);
 
-                let total_body_len = values.values[0].key().len()
-                    + values.values[0].value().map(|v| v.len()).unwrap_or(0)
-                    + 4;
+                let mut total_body_len = values.values[0].value().map(|v| v.len()).unwrap_or(0) + 4;
+
+                if request.key {
+                    total_body_len += values.values[0].key().len();
+                }
 
                 buffer.put_u32(total_body_len as _);
                 buffer.put_u32(request.opaque.unwrap_or(0));
@@ -106,5 +108,37 @@ impl BinaryProtocol {
                 "unexpected response",
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use bytes::BytesMut;
+
+    #[test]
+    fn compose_response_hit() {
+        let request = Request::Get(Get {
+            keys: vec!["Hello".as_bytes().into()].into(),
+            opaque: Some(0),
+            cas: true,
+            key: false,
+        });
+        let response = Response::found("Hello".as_bytes(), 0, Some(0), "World".as_bytes());
+
+        let mut buffer = BytesMut::new();
+
+        let protocol = BinaryProtocol::default();
+
+        let _ = protocol.compose_response(&request, &response, &mut buffer);
+
+        assert_eq!(
+            &*buffer,
+            &[
+                0x81, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00,
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x57, 0x6f, 0x72, 0x6c, 0x64
+            ]
+        );
     }
 }

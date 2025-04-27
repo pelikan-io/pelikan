@@ -2285,6 +2285,7 @@ dependencies = [
 name = "protocol-memcache"
 version = "0.3.2"
 dependencies = [
+ "bytes",
  "clocksource",
  "common",
  "criterion",
