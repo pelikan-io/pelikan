@@ -69,6 +69,10 @@ pub async fn get(
             error!("backend error for get: {}", e);
             BACKEND_EX.increment();
 
+            let response = Response::not_found(false);
+            let _ =
+                protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
+
             klog_1(&"get", &key, Status::ServerError, 0);
         }
         Err(_) => {
@@ -76,6 +80,10 @@ pub async fn get(
             // treating it as a miss
             BACKEND_EX.increment();
             BACKEND_EX_TIMEOUT.increment();
+
+            let response = Response::not_found(false);
+            let _ =
+                protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
 
             klog_1(&"get", &key, Status::Timeout, 0);
         }
