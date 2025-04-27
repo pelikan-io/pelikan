@@ -205,33 +205,4 @@ pub(crate) fn is_key_valid(key: &[u8]) -> bool {
     true
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::binary::BinaryProtocol;
-    use crate::Request;
-    use protocol_common::Protocol;
 
-    #[test]
-    fn fuzz_1() {
-        let protocol = BinaryProtocol::default();
-
-        let buffer = [
-            128, 0, 0, 1, 0, 0, 0, 5, 0, 0, 0, 0, 1, 0, 249, 0, 0, 245, 138, 121, 120, 255, 65,
-            255, 255,
-        ];
-
-        match protocol
-            .parse_request(&buffer)
-            .map(|v| (v.consumed(), v.into_inner()))
-        {
-            Ok((consumed, Request::Get(get))) => {
-                assert_eq!(consumed, buffer.len());
-                assert_eq!(get.keys.len(), 1);
-                assert_eq!(&*get.keys[0], &[255]);
-            }
-            _ => {
-                panic!("wrong request type");
-            }
-        }
-    }
-}

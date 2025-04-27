@@ -137,3 +137,148 @@ impl BinaryProtocol {
         Ok(24 + klen as usize)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::binary::BinaryProtocol;
+    use crate::Request;
+    use protocol_common::Protocol;
+
+    #[test]
+    fn get() {
+        let protocol = BinaryProtocol::default();
+
+        let buffer = [
+            0x80, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x48, 0x65, 0x6C, 0x6C, 0x6F
+        ];
+
+        match protocol
+            .parse_request(&buffer)
+            .map(|v| (v.consumed(), v.into_inner()))
+        {
+            Ok((consumed, Request::Get(get))) => {
+                assert_eq!(consumed, buffer.len());
+                assert_eq!(get.keys.len(), 1);
+                assert_eq!(&*get.keys[0], "Hello".as_bytes());
+
+                assert!(get.cas);
+                assert!(!get.key);
+                assert_eq!(get.opaque, Some(0));
+            }
+            Ok((_consumed, request)) => {
+                panic!("wrong request type: {:?}", request);
+            }
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::WouldBlock {
+                    panic!("incomplete");
+                } else {
+                    panic!("corrupt");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn get_with_opaque() {
+        let protocol = BinaryProtocol::default();
+
+        let buffer = [
+            0x80, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0xDE, 0xCA, 0xFB, 0xAD,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x48, 0x65, 0x6C, 0x6C, 0x6F
+        ];
+
+        match protocol
+            .parse_request(&buffer)
+            .map(|v| (v.consumed(), v.into_inner()))
+        {
+            Ok((consumed, Request::Get(get))) => {
+                assert_eq!(consumed, buffer.len());
+                assert_eq!(get.keys.len(), 1);
+                assert_eq!(&*get.keys[0], "Hello".as_bytes());
+
+                assert!(get.cas);
+                assert!(!get.key);
+                assert_eq!(get.opaque, Some(0xDECAFBAD));
+            }
+            Ok((_consumed, request)) => {
+                panic!("wrong request type: {:?}", request);
+            }
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::WouldBlock {
+                    panic!("incomplete");
+                } else {
+                    panic!("corrupt");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn incomplete() {
+        let protocol = BinaryProtocol::default();
+
+        let buffer = [
+            0x80, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0xDE, 0xCA, 0xFB, 0xAD,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x48, 0x65, 0x6C, 0x6C
+        ];
+
+        match protocol
+            .parse_request(&buffer)
+            .map(|v| (v.consumed(), v.into_inner()))
+        {
+            Ok(_) => {
+                panic!("should be incomplete");
+            }
+            Err(e) => {
+                if e.kind() != std::io::ErrorKind::WouldBlock {
+                    panic!("corrupt");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn get_with_extra_bytes() {
+        let protocol = BinaryProtocol::default();
+
+        let buffer = [
+            0x80, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x48, 0x65, 0x6C, 0x6C, 0x6F, 0xC0, 0xFF, 0xEE
+        ];
+
+        match protocol
+            .parse_request(&buffer)
+            .map(|v| (v.consumed(), v.into_inner()))
+        {
+            Ok((consumed, Request::Get(get))) => {
+                assert_eq!(consumed, buffer.len() - 3);
+                assert_eq!(get.keys.len(), 1);
+                assert_eq!(&*get.keys[0], "Hello".as_bytes());
+
+                assert!(get.cas);
+                assert!(!get.key);
+                assert_eq!(get.opaque, Some(0));
+            }
+            Ok((_consumed, request)) => {
+                panic!("wrong request type: {:?}", request);
+            }
+            Err(e) => {
+                if e.kind() == std::io::ErrorKind::WouldBlock {
+                    panic!("incomplete");
+                } else {
+                    panic!("corrupt");
+                }
+            }
+        }
+    }
+}
+

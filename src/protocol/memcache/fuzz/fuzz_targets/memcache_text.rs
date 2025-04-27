@@ -13,7 +13,7 @@ use protocol_memcache::*;
 
 const MAX_KEY_LEN: usize = 128;
 const MAX_BATCH_SIZE: usize = 128;
-const MAX_VALUE_SIZE: usize = 4*4096;
+const MAX_VALUE_SIZE: usize = 4 * 4096;
 
 fuzz_target!(|data: &[u8]| {
     let protocol = TextProtocol::new()

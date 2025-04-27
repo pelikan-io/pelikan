@@ -47,6 +47,13 @@ impl RequestHeader {
             )));
         }
 
+        if header._reserved != 0x0000 {
+            return Err(nom::Err::Failure(nom::error::Error::new(
+                input,
+                nom::error::ErrorKind::Tag,
+            )));
+        }
+
         Ok((remaining, header))
     }
 }
