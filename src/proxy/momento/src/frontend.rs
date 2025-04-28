@@ -2,6 +2,10 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use std::collections::BTreeMap;
+use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use crossbeam_channel::*;
 use crate::protocol::*;
 use crate::*;
 use pelikan_net::TCP_SEND_BYTE;
@@ -83,71 +87,122 @@ pub(crate) async fn handle_memcache_client(
 }
 
 pub(crate) async fn handle_memcache_binary_client(
-    mut socket: tokio::net::TcpStream,
-    mut client: CacheClient,
+    socket: tokio::net::TcpStream,
+    client: CacheClient,
     cache_name: String,
 ) {
     debug!("accepted memcache binary client");
 
     // initialize a buffer for incoming bytes from the client
-    let mut buf = Buffer::new(INITIAL_BUFFER_SIZE);
+    let mut read_buffer = Buffer::new(INITIAL_BUFFER_SIZE);
+    let mut write_buffer = Buffer::new(INITIAL_BUFFER_SIZE);
 
     // initialize the protocol
     let protocol = BinaryProtocol::default();
 
+    // queue for response passing back from tasks
+    let (sender, receiver) = bounded::<std::io::Result<(u64, protocol_memcache::Request, protocol_memcache::Response)>>(1024);
+
+    let (mut read_half, mut write_half) = socket.into_split();
+
+    let alive = Arc::new(AtomicBool::new(true));
+    let alive2 = alive.clone();
+
+    tokio::spawn(async move {
+        let mut next_sequence: u64 = 1;
+        let mut backlog = BTreeMap::new();
+
+        let protocol = BinaryProtocol::default();
+
+        while alive2.load(Ordering::Relaxed) {
+            // info!("writer loop");
+            while let Ok(result) = receiver.recv() {
+                // println!("got backend result");
+                // queue_depth -= 1;
+                match result {
+                    Ok((sequence, request, response)) => {
+                        if sequence == next_sequence {
+                            info!("sending next: {next_sequence}");
+                            next_sequence += 1;
+                            if protocol.compose_response(&request, &response, &mut write_buffer).is_err() {
+                                alive2.store(false, Ordering::Relaxed);
+                                return;
+                            }
+
+                            'backlog: while !backlog.is_empty() {
+                                if let Some((request, response)) = backlog.remove(&next_sequence) {
+                                    info!("sending next: {next_sequence}");
+                                    next_sequence += 1;
+                                    if protocol.compose_response(&request, &response, &mut write_buffer).is_err() {
+                                        alive2.store(false, Ordering::Relaxed);
+                                        return;
+                                    }
+                                } else {
+                                    break 'backlog;
+                                }
+                            }
+                        } else {
+                            info!("queueing seq: {sequence}");
+                            backlog.insert(sequence, (request, response));
+                        }
+                    }
+                    Err(_e) => {
+                        alive2.store(false, Ordering::Relaxed);
+                        return;
+                    }
+                }
+            }
+
+            if write_buffer.remaining() > 0 {
+                // info!("non-blocking write");
+                if do_write2(&mut write_half, &mut write_buffer).await.is_err() {
+                    alive2.store(false, Ordering::Relaxed);
+                }
+            }
+        }
+    });
+
+    let mut sequence: u64 = 0;
+
     // loop to handle the connection
-    'connection: loop {
+    while alive.load(Ordering::Relaxed) {
+        // info!("reader loop");
+        // info!("rbuf: {} wbuf: {}", read_buffer.remaining(), write_buffer.remaining());
+
         // read data from the tcp stream into the buffer
-        if do_read(&mut socket, &mut buf).await.is_err() {
+        if do_read2(&mut read_half, &mut read_buffer).await.is_err() {
             // any read errors result in hangup
-            break 'connection;
+            alive.store(false, Ordering::Relaxed);
+            return;
         }
 
-        // there may be more than one request in the buffer, so loop to handle
-        // the requests
+        // dispatch all complete requests in the socket buffer as async tasks
         //
         // NOTE: errors in the request handlers typically indicate write errors.
         //       To eliminate possibility for desync, we hangup if there is an
         //       error. The request handlers should implement graceful handling
         //       of backend errors.
         'requests: loop {
-            let borrowed_buf = buf.borrow();
+            let borrowed_buf = read_buffer.borrow();
 
             match protocol.parse_request(borrowed_buf) {
                 Ok(request) => {
+                    // info!("handle request");
+
                     let consumed = request.consumed();
                     let request = request.into_inner();
 
-                    match request {
-                        memcache::Request::Delete(r) => {
-                            if memcache_binary::delete(&mut client, &cache_name, &mut socket, r)
-                                .await
-                                .is_err()
-                            {
-                                break 'connection;
-                            }
-                        }
-                        memcache::Request::Get(r) => {
-                            if memcache_binary::get(&mut client, &cache_name, &mut socket, r)
-                                .await
-                                .is_err()
-                            {
-                                break 'connection;
-                            }
-                        }
-                        memcache::Request::Set(r) => {
-                            if memcache_binary::set(&mut client, &cache_name, &mut socket, r)
-                                .await
-                                .is_err()
-                            {
-                                break 'connection;
-                            }
-                        }
-                        _ => {
-                            debug!("unsupported command: {}", request);
-                        }
-                    }
-                    buf.advance(consumed);
+                    read_buffer.advance(consumed);
+
+                    let sender = sender.clone();
+                    let client = client.clone();
+                    let cache_name = cache_name.clone();
+
+                    sequence = sequence.wrapping_add(1);
+
+                    tokio::spawn(async move {
+                        handle_memcache_binary_request(sender, client, cache_name, sequence, request).await;
+                    });
                 }
                 Err(e) => match e.kind() {
                     ErrorKind::WouldBlock => {
@@ -158,13 +213,65 @@ pub(crate) async fn handle_memcache_binary_client(
                     _ => {
                         // invalid request
                         trace!("malformed request: {:?}", borrowed_buf);
-                        let _ = socket
-                            .write_all(b"CLIENT_ERROR malformed request\r\n")
-                            .await;
-                        break 'connection;
+                        // let _ = socket
+                        //     .write_all(b"CLIENT_ERROR malformed request\r\n")
+                            // .await;
+                        alive.store(false, Ordering::Relaxed);
+                return;
                     }
                 },
             }
+        }
+    }
+
+    // println!("hangup");
+}
+
+async fn handle_memcache_binary_request(
+    channel: Sender<std::result::Result<(u64, protocol_memcache::Request, protocol_memcache::Response), std::io::Error>>,
+    mut client: CacheClient,
+    cache_name: String,
+    sequence: u64,
+    request: protocol_memcache::Request,
+) {
+    // info!("handling request");
+    let result = match request {
+        // memcache::Request::Delete(r) => {
+        //     if memcache_binary::delete(&mut client, &cache_name, &mut socket, r)
+        //         .await
+        //         .is_err()
+        //     {
+        //         break 'connection;
+        //     }
+        // }
+        memcache::Request::Get(ref r) => {
+            memcache_binary::get(&mut client, &cache_name, r).await
+        }
+        memcache::Request::Set(ref r) => {
+            memcache_binary::set(&mut client, &cache_name, r).await
+        }
+        // memcache::Request::Set(r) => {
+        //     if memcache_binary::set(&mut client, &cache_name, &mut socket, r)
+        //         .await
+        //         .is_err()
+        //     {
+        //         break 'connection;
+        //     }
+        // }
+        _ => {
+            debug!("unsupported command: {}", request);
+            Err(Error::new(ErrorKind::Other, "unsupported"))
+        }
+    };
+
+    match result {
+        Ok(response) => {
+            // info!("returning response");
+            let _ = channel.send(Ok((sequence, request, response)));
+        }
+        Err(e) => {
+            // info!("returning error");
+            let _ = channel.send(Err(e));
         }
     }
 }

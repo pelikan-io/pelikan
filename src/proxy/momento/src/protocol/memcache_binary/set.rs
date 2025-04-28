@@ -4,17 +4,14 @@
 
 use crate::klog::{klog_set, Status};
 use crate::{Error, *};
-use bytes::BytesMut;
 use momento::cache::SetRequest;
-use pelikan_net::*;
 use protocol_memcache::*;
 
 pub async fn set(
     client: &mut CacheClient,
     cache_name: &str,
-    socket: &mut tokio::net::TcpStream,
-    request: Set,
-) -> Result<(), Error> {
+    request: &Set,
+) -> Result<Response, Error> {
     SET.increment();
 
     let key = (*request.key()).to_owned();
@@ -23,15 +20,15 @@ pub async fn set(
 
     if value.is_empty() {
         error!("empty values are not supported by momento");
-        let _ = socket.write_all(b"ERROR\r\n").await;
+        // let _ = socket.write_all(b"ERROR\r\n").await;
 
         return Err(Error::from(ErrorKind::InvalidInput));
     }
 
-    let mut response_buf = BytesMut::new();
+    // let mut response_buf = BytesMut::new();
     BACKEND_REQUEST.increment();
 
-    let protocol = protocol_memcache::binary::BinaryProtocol::default();
+    // let protocol = protocol_memcache::binary::BinaryProtocol::default();
 
     let ttl = request
         .ttl()
@@ -55,28 +52,34 @@ pub async fn set(
                     Status::Stored,
                     0,
                 );
+
+                let response = Response::stored(true);
+                Ok(response)
             } else {
                 let response = Response::stored(false);
-                let _ =
-                    protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
+                // let _ =
+                //     protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
 
+                // TODO(brian): this doesn't log the correct size now
                 klog_set(
                     &key,
                     flags,
                     ttl.map(|v| v.as_secs()).unwrap_or(0) as _,
                     value.len(),
                     Status::Stored,
-                    response_buf.len(),
+                    value.len(),
                 );
-                SESSION_SEND.increment();
-                SESSION_SEND_BYTE.add(response_buf.len() as _);
-                TCP_SEND_BYTE.add(response_buf.len() as _);
 
-                if let Err(e) = socket.write_all(&response_buf).await {
-                    SESSION_SEND_EX.increment();
-                    // hangup if we can't send a response back
-                    return Err(e);
-                }
+                Ok(response)
+                // SESSION_SEND.increment();
+                // SESSION_SEND_BYTE.add(response_buf.len() as _);
+                // TCP_SEND_BYTE.add(response_buf.len() as _);
+
+                // if let Err(e) = socket.write_all(&response_buf).await {
+                //     SESSION_SEND_EX.increment();
+                //     // hangup if we can't send a response back
+                //     return Err(e);
+                // }
             }
         }
         Ok(Err(_e)) => {
@@ -97,18 +100,20 @@ pub async fn set(
             // TODO(brian): we need to be able to send proper errors back
 
             let response = Response::not_stored(false);
-            let _ = protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
+            // let _ = protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
 
             // let message = format!("SERVER_ERROR {e}\r\n");
 
-            SESSION_SEND_BYTE.add(response_buf.len() as _);
-            TCP_SEND_BYTE.add(response_buf.len() as _);
+            // SESSION_SEND_BYTE.add(response_buf.len() as _);
+            // TCP_SEND_BYTE.add(response_buf.len() as _);
 
-            if let Err(e) = socket.write_all(&response_buf).await {
-                SESSION_SEND_EX.increment();
-                // hangup if we can't send a response back
-                return Err(e);
-            }
+            // if let Err(e) = socket.write_all(&response_buf).await {
+            //     SESSION_SEND_EX.increment();
+            //     // hangup if we can't send a response back
+            //     return Err(e);
+            // }
+
+            Ok(response)
         }
         Err(_) => {
             // timeout
@@ -130,20 +135,22 @@ pub async fn set(
             // TODO(brian): we need to be able to send proper errors back
 
             let response = Response::not_stored(false);
-            let _ = protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
+            // let _ = protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
 
             // let message = "SERVER_ERROR backend timeout\r\n";
 
-            SESSION_SEND_BYTE.add(response_buf.len() as _);
-            TCP_SEND_BYTE.add(response_buf.len() as _);
+            // SESSION_SEND_BYTE.add(response_buf.len() as _);
+            // TCP_SEND_BYTE.add(response_buf.len() as _);
 
-            if let Err(e) = socket.write_all(&response_buf).await {
-                SESSION_SEND_EX.increment();
-                // hangup if we can't send a response back
-                return Err(e);
-            }
+            // if let Err(e) = socket.write_all(&response_buf).await {
+            //     SESSION_SEND_EX.increment();
+            //     // hangup if we can't send a response back
+            //     return Err(e);
+            // }
+
+            Ok(response)
         }
     }
 
-    Ok(())
+    // Ok(())
 }

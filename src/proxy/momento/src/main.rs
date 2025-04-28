@@ -5,6 +5,8 @@
 #[macro_use]
 extern crate logger;
 
+use tokio::net::tcp::OwnedWriteHalf;
+use tokio::net::tcp::OwnedReadHalf;
 use ::config::{AdminConfig, MomentoProxyConfig, TimeType};
 use backtrace::Backtrace;
 use clap::{Arg, Command};
@@ -394,6 +396,86 @@ async fn do_read(
     buf: &mut Buffer,
 ) -> Result<NonZeroUsize, Error> {
     match socket.read(buf.borrow_mut()).await {
+        Ok(0) => {
+            SESSION_RECV.increment();
+            // zero length reads mean we got a HUP. close it
+            Err(Error::from(ErrorKind::ConnectionReset))
+        }
+        Ok(n) => {
+            SESSION_RECV.increment();
+            SESSION_RECV_BYTE.add(n as _);
+            TCP_RECV_BYTE.add(n as _);
+            // non-zero means we have some data, mark the buffer as
+            // having additional content
+            unsafe {
+                buf.advance_mut(n);
+            }
+
+            // if the buffer is low on space, we will grow the
+            // buffer
+            if buf.remaining_mut() * 2 < INITIAL_BUFFER_SIZE {
+                buf.reserve(INITIAL_BUFFER_SIZE);
+            }
+
+            // SAFETY: we have already checked that the number of bytes read was
+            // greater than zero, so this unchecked conversion is safe
+            Ok(unsafe { NonZeroUsize::new_unchecked(n) })
+        }
+        Err(e) => {
+            SESSION_RECV.increment();
+            SESSION_RECV_EX.increment();
+            // we has some other error reading from the socket,
+            // return an error so the connection can be closed
+            Err(e)
+        }
+    }
+}
+
+async fn do_read2(
+    socket: &mut OwnedReadHalf,
+    buf: &mut Buffer,
+) -> Result<NonZeroUsize, Error> {
+    match socket.read(buf.borrow_mut()).await {
+        Ok(0) => {
+            SESSION_RECV.increment();
+            // zero length reads mean we got a HUP. close it
+            Err(Error::from(ErrorKind::ConnectionReset))
+        }
+        Ok(n) => {
+            SESSION_RECV.increment();
+            SESSION_RECV_BYTE.add(n as _);
+            TCP_RECV_BYTE.add(n as _);
+            // non-zero means we have some data, mark the buffer as
+            // having additional content
+            unsafe {
+                buf.advance_mut(n);
+            }
+
+            // if the buffer is low on space, we will grow the
+            // buffer
+            if buf.remaining_mut() * 2 < INITIAL_BUFFER_SIZE {
+                buf.reserve(INITIAL_BUFFER_SIZE);
+            }
+
+            // SAFETY: we have already checked that the number of bytes read was
+            // greater than zero, so this unchecked conversion is safe
+            Ok(unsafe { NonZeroUsize::new_unchecked(n) })
+        }
+        Err(e) => {
+            SESSION_RECV.increment();
+            SESSION_RECV_EX.increment();
+            // we has some other error reading from the socket,
+            // return an error so the connection can be closed
+            Err(e)
+        }
+    }
+}
+
+async fn do_write2(
+    socket: &mut OwnedWriteHalf,
+    buf: &mut Buffer,
+) -> Result<NonZeroUsize, Error> {
+    match socket.write(buf.chunk()).await {
         Ok(0) => {
             SESSION_RECV.increment();
             // zero length reads mean we got a HUP. close it

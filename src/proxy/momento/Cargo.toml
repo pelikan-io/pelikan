@@ -16,6 +16,7 @@ clap = { workspace = true }
 clocksource = { workspace = true }
 common = { path = "../../common" }
 config = { path = "../../config" }
+crossbeam-channel = { workspace = true }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }

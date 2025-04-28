@@ -1731,6 +1731,7 @@ dependencies = [
  "clocksource",
  "common",
  "config",
+ "crossbeam-channel",
  "libc",
  "logger",
  "metriken",
