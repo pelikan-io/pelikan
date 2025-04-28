@@ -13,17 +13,18 @@ pub(crate) async fn listener(
     cache_name: String,
     protocol: Protocol,
 ) {
+    let client = client_builder.clone().build().unwrap_or_else(|e| {
+        // Note: this will not happen since we validated the client build in the main thread already
+        eprintln!("could not create cache client: {}", e);
+        std::process::exit(1);
+    });
     // this acts as our listener thread and spawns tasks for each client
     loop {
         // accept a new client
         if let Ok((socket, _)) = listener.accept().await {
             TCP_ACCEPT.increment();
 
-            let client = client_builder.clone().build().unwrap_or_else(|e| {
-                // Note: this will not happen since we validated the client build in the main thread already
-                eprintln!("could not create cache client: {}", e);
-                std::process::exit(1);
-            });
+            let client = client.clone();
             let cache_name = cache_name.clone();
 
             // spawn a task for managing requests for the client
