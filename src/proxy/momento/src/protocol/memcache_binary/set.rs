@@ -97,8 +97,7 @@ pub async fn set(
             // TODO(brian): we need to be able to send proper errors back
 
             let response = Response::not_stored(false);
-            let _ =
-                protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
+            let _ = protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
 
             // let message = format!("SERVER_ERROR {e}\r\n");
 
@@ -131,8 +130,7 @@ pub async fn set(
             // TODO(brian): we need to be able to send proper errors back
 
             let response = Response::not_stored(false);
-            let _ =
-                protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
+            let _ = protocol.compose_response(&Request::Set(request), &response, &mut response_buf);
 
             // let message = "SERVER_ERROR backend timeout\r\n";
 

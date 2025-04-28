@@ -70,8 +70,7 @@ pub async fn get(
             BACKEND_EX.increment();
 
             let response = Response::not_found(false);
-            let _ =
-                protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
+            let _ = protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
 
             klog_1(&"get", &key, Status::ServerError, 0);
         }
@@ -82,8 +81,7 @@ pub async fn get(
             BACKEND_EX_TIMEOUT.increment();
 
             let response = Response::not_found(false);
-            let _ =
-                protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
+            let _ = protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
 
             klog_1(&"get", &key, Status::Timeout, 0);
         }

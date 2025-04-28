@@ -95,61 +95,76 @@ pub(crate) async fn handle_memcache_binary_client(
     // initialize the protocol
     let protocol = BinaryProtocol::default();
 
-    // handle incoming data from the client
-    loop {
+    // loop to handle the connection
+    'connection: loop {
+        // read data from the tcp stream into the buffer
         if do_read(&mut socket, &mut buf).await.is_err() {
-            break;
+            // any read errors result in hangup
+            break 'connection;
         }
 
-        let borrowed_buf = buf.borrow();
+        // there may be more than one request in the buffer, so loop to handle
+        // the requests
+        //
+        // NOTE: errors in the request handlers typically indicate write errors.
+        //       To eliminate possibility for desync, we hangup if there is an
+        //       error. The request handlers should implement graceful handling
+        //       of backend errors.
+        'requests: loop {
+            let borrowed_buf = buf.borrow();
 
-        match protocol.parse_request(borrowed_buf) {
-            Ok(request) => {
-                let consumed = request.consumed();
-                let request = request.into_inner();
+            match protocol.parse_request(borrowed_buf) {
+                Ok(request) => {
+                    let consumed = request.consumed();
+                    let request = request.into_inner();
 
-                match request {
-                    memcache::Request::Delete(r) => {
-                        if memcache_binary::delete(&mut client, &cache_name, &mut socket, r)
-                            .await
-                            .is_err()
-                        {
-                            break;
+                    match request {
+                        memcache::Request::Delete(r) => {
+                            if memcache_binary::delete(&mut client, &cache_name, &mut socket, r)
+                                .await
+                                .is_err()
+                            {
+                                break 'connection;
+                            }
+                        }
+                        memcache::Request::Get(r) => {
+                            if memcache_binary::get(&mut client, &cache_name, &mut socket, r)
+                                .await
+                                .is_err()
+                            {
+                                break 'connection;
+                            }
+                        }
+                        memcache::Request::Set(r) => {
+                            if memcache_binary::set(&mut client, &cache_name, &mut socket, r)
+                                .await
+                                .is_err()
+                            {
+                                break 'connection;
+                            }
+                        }
+                        _ => {
+                            debug!("unsupported command: {}", request);
                         }
                     }
-                    memcache::Request::Get(r) => {
-                        if memcache_binary::get(&mut client, &cache_name, &mut socket, r)
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
-                    }
-                    memcache::Request::Set(r) => {
-                        if memcache_binary::set(&mut client, &cache_name, &mut socket, r)
-                            .await
-                            .is_err()
-                        {
-                            break;
-                        }
+                    buf.advance(consumed);
+                }
+                Err(e) => match e.kind() {
+                    ErrorKind::WouldBlock => {
+                        // more data needs to be read from the stream, so stop
+                        // processing requests
+                        break 'requests;
                     }
                     _ => {
-                        debug!("unsupported command: {}", request);
+                        // invalid request
+                        trace!("malformed request: {:?}", borrowed_buf);
+                        let _ = socket
+                            .write_all(b"CLIENT_ERROR malformed request\r\n")
+                            .await;
+                        break 'connection;
                     }
-                }
-                buf.advance(consumed);
+                },
             }
-            Err(e) => match e.kind() {
-                ErrorKind::WouldBlock => {}
-                _ => {
-                    // invalid request
-                    trace!("malformed request: {:?}", borrowed_buf);
-                    let _ = socket
-                        .write_all(b"CLIENT_ERROR malformed request\r\n")
-                        .await;
-                    break;
-                }
-            },
         }
     }
 }

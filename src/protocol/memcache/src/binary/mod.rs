@@ -204,5 +204,3 @@ pub(crate) fn is_key_valid(key: &[u8]) -> bool {
 
     true
 }
-
-
