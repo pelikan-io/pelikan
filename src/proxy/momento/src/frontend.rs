@@ -2,10 +2,11 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use std::sync::atomic::AtomicU64;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
-use crossbeam_channel::*;
+use tokio::sync::mpsc;
 use crate::protocol::*;
 use crate::*;
 use pelikan_net::TCP_SEND_BYTE;
@@ -101,40 +102,51 @@ pub(crate) async fn handle_memcache_binary_client(
     let protocol = BinaryProtocol::default();
 
     // queue for response passing back from tasks
-    let (sender, receiver) = bounded::<std::io::Result<(u64, protocol_memcache::Request, protocol_memcache::Response)>>(1024);
+    let (sender, mut receiver) = mpsc::channel::<std::io::Result<(u64, protocol_memcache::Request, protocol_memcache::Response)>>(1024);
 
     let (mut read_half, mut write_half) = socket.into_split();
 
-    let alive = Arc::new(AtomicBool::new(true));
-    let alive2 = alive.clone();
+    let sequence = Arc::new(AtomicU64::new(0));
+    let sequence2 = sequence.clone();
+
+    let read_alive = Arc::new(AtomicBool::new(true));
+    let read_alive2 = read_alive.clone();
+
+    let write_alive = Arc::new(AtomicBool::new(true));
+    let write_alive2 = write_alive.clone();
 
     tokio::spawn(async move {
-        let mut next_sequence: u64 = 1;
+        let mut next_sequence: u64 = 0;
         let mut backlog = BTreeMap::new();
 
         let protocol = BinaryProtocol::default();
 
-        while alive2.load(Ordering::Relaxed) {
-            // info!("writer loop");
-            while let Ok(result) = receiver.recv() {
-                // println!("got backend result");
-                // queue_depth -= 1;
+        while write_alive2.load(Ordering::Relaxed) {
+            if !read_alive2.load(Ordering::Relaxed) && next_sequence == sequence2.load(Ordering::Relaxed) {
+                write_alive2.store(false, Ordering::Relaxed);
+                return;
+            }
+
+            debug!("writer loop");
+            if let Some(result) = receiver.recv().await {
                 match result {
                     Ok((sequence, request, response)) => {
                         if sequence == next_sequence {
-                            info!("sending next: {next_sequence}");
+                            debug!("sending next: {next_sequence}");
                             next_sequence += 1;
                             if protocol.compose_response(&request, &response, &mut write_buffer).is_err() {
-                                alive2.store(false, Ordering::Relaxed);
+                                read_alive2.store(false, Ordering::Relaxed);
+                                write_alive2.store(false, Ordering::Relaxed);
                                 return;
                             }
 
                             'backlog: while !backlog.is_empty() {
                                 if let Some((request, response)) = backlog.remove(&next_sequence) {
-                                    info!("sending next: {next_sequence}");
+                                    debug!("sending next: {next_sequence}");
                                     next_sequence += 1;
                                     if protocol.compose_response(&request, &response, &mut write_buffer).is_err() {
-                                        alive2.store(false, Ordering::Relaxed);
+                                        read_alive2.store(false, Ordering::Relaxed);
+                                        write_alive2.store(false, Ordering::Relaxed);
                                         return;
                                     }
                                 } else {
@@ -142,38 +154,35 @@ pub(crate) async fn handle_memcache_binary_client(
                                 }
                             }
                         } else {
-                            info!("queueing seq: {sequence}");
+                            debug!("queueing seq: {sequence}");
                             backlog.insert(sequence, (request, response));
                         }
                     }
                     Err(_e) => {
-                        alive2.store(false, Ordering::Relaxed);
+                        read_alive2.store(false, Ordering::Relaxed);
+                        write_alive2.store(false, Ordering::Relaxed);
                         return;
                     }
                 }
             }
 
-            if write_buffer.remaining() > 0 {
-                // info!("non-blocking write");
+            while write_buffer.remaining() > 0 {
+                debug!("non-blocking write");
                 if do_write2(&mut write_half, &mut write_buffer).await.is_err() {
-                    alive2.store(false, Ordering::Relaxed);
+                    read_alive2.store(false, Ordering::Relaxed);
+                    write_alive2.store(false, Ordering::Relaxed);
+                    return;
                 }
             }
         }
     });
 
-    let mut sequence: u64 = 0;
-
     // loop to handle the connection
-    while alive.load(Ordering::Relaxed) {
-        // info!("reader loop");
-        // info!("rbuf: {} wbuf: {}", read_buffer.remaining(), write_buffer.remaining());
-
+    while read_alive.load(Ordering::Relaxed) {
         // read data from the tcp stream into the buffer
         if do_read2(&mut read_half, &mut read_buffer).await.is_err() {
             // any read errors result in hangup
-            alive.store(false, Ordering::Relaxed);
-            return;
+            read_alive.store(false, Ordering::Relaxed);
         }
 
         // dispatch all complete requests in the socket buffer as async tasks
@@ -187,7 +196,7 @@ pub(crate) async fn handle_memcache_binary_client(
 
             match protocol.parse_request(borrowed_buf) {
                 Ok(request) => {
-                    // info!("handle request");
+                    debug!("read request");
 
                     let consumed = request.consumed();
                     let request = request.into_inner();
@@ -198,7 +207,7 @@ pub(crate) async fn handle_memcache_binary_client(
                     let client = client.clone();
                     let cache_name = cache_name.clone();
 
-                    sequence = sequence.wrapping_add(1);
+                    let sequence = sequence.fetch_add(1, Ordering::Relaxed);
 
                     tokio::spawn(async move {
                         handle_memcache_binary_request(sender, client, cache_name, sequence, request).await;
@@ -213,22 +222,29 @@ pub(crate) async fn handle_memcache_binary_client(
                     _ => {
                         // invalid request
                         trace!("malformed request: {:?}", borrowed_buf);
-                        // let _ = socket
-                        //     .write_all(b"CLIENT_ERROR malformed request\r\n")
-                            // .await;
-                        alive.store(false, Ordering::Relaxed);
-                return;
+                        read_alive.store(false, Ordering::Relaxed);
+                        return;
                     }
                 },
             }
         }
     }
 
-    // println!("hangup");
+    for _ in 0..60 {
+        if write_alive.load(Ordering::Relaxed) {
+            // time delay for write half to complete
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        } else {
+            break;
+        }
+    }
+
+    // shutdown write half
+    write_alive.store(false, Ordering::Relaxed);
 }
 
 async fn handle_memcache_binary_request(
-    channel: Sender<std::result::Result<(u64, protocol_memcache::Request, protocol_memcache::Response), std::io::Error>>,
+    channel: mpsc::Sender<std::result::Result<(u64, protocol_memcache::Request, protocol_memcache::Response), std::io::Error>>,
     mut client: CacheClient,
     cache_name: String,
     sequence: u64,
@@ -250,14 +266,6 @@ async fn handle_memcache_binary_request(
         memcache::Request::Set(ref r) => {
             memcache_binary::set(&mut client, &cache_name, r).await
         }
-        // memcache::Request::Set(r) => {
-        //     if memcache_binary::set(&mut client, &cache_name, &mut socket, r)
-        //         .await
-        //         .is_err()
-        //     {
-        //         break 'connection;
-        //     }
-        // }
         _ => {
             debug!("unsupported command: {}", request);
             Err(Error::new(ErrorKind::Other, "unsupported"))
@@ -267,11 +275,11 @@ async fn handle_memcache_binary_request(
     match result {
         Ok(response) => {
             // info!("returning response");
-            let _ = channel.send(Ok((sequence, request, response)));
+            let _ = channel.send(Ok((sequence, request, response))).await;
         }
         Err(e) => {
             // info!("returning error");
-            let _ = channel.send(Err(e));
+            let _ = channel.send(Err(e)).await;
         }
     }
 }

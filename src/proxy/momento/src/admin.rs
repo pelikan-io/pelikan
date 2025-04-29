@@ -14,10 +14,8 @@ pub static ADMIN_CONN_ACCEPT: Counter = Counter::new();
 #[metric(name = "admin_conn_close")]
 pub static ADMIN_CONN_CLOSE: Counter = Counter::new();
 
-pub(crate) async fn admin(mut log_drain: Box<dyn logger::Drain>, admin_listener: TcpListener) {
+pub(crate) async fn admin(admin_listener: TcpListener) {
     loop {
-        let _ = log_drain.flush();
-
         // accept a new client
         if let Ok(Ok((socket, _))) =
             timeout(Duration::from_millis(1), admin_listener.accept()).await
