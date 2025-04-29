@@ -301,30 +301,6 @@ impl Request {
     ) -> Self {
         Self::Set(Set::new(key, value, expire_time, mode, get_old))
     }
-
-    pub fn sorted_set_cardinality(key: &[u8]) -> Self {
-        Self::SortedSetCardinality(SortedSetCardinality::new(key))
-    }
-
-    pub fn sorted_set_increment(key: &[u8], increment: &[u8], member: &[u8]) -> Self {
-        Self::SortedSetIncrement(SortedSetIncrement::new(key, increment, member))
-    }
-
-    pub fn sorted_set_score(key: &[u8], member: &[u8]) -> Self {
-        Self::SortedSetScore(SortedSetScore::new(key, member))
-    }
-
-    pub fn sorted_set_multi_score(key: &[u8], members: &[&[u8]]) -> Self {
-        Self::SortedSetMultiScore(SortedSetMultiScore::new(key, members))
-    }
-
-    pub fn sorted_set_remove(key: &[u8], members: &[&[u8]]) -> Self {
-        Self::SortedSetRemove(SortedSetRemove::new(key, members))
-    }
-
-    pub fn sorted_set_rank(key: &[u8], member: &[u8], with_score: bool) -> Self {
-        Self::SortedSetRank(SortedSetRank::new(key, member, with_score))
-    }
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
