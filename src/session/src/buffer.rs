@@ -117,7 +117,7 @@ impl Buffer {
         }
 
         // if its not too large, we don't compact
-        if self.remaining_mut() <= self.target_size || self.cap == self.target_size {
+        if self.cap == self.target_size {
             return;
         }
 
@@ -144,7 +144,7 @@ impl Buffer {
         let target = if self.write_offset > MB {
             (1 + (self.write_offset / MB)) * MB
         } else {
-            self.write_offset.next_power_of_two()
+            (self.write_offset + 1).next_power_of_two()
         };
 
         SESSION_BUFFER_BYTE.sub((self.cap - target) as _);
