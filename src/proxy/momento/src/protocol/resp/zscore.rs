@@ -42,11 +42,14 @@ pub async fn zscore(
 
         match response {
             SortedSetGetScoreResponse::Hit { score } => {
-                write!(response_buf, ":{}\r\n", score)?;
+                // Return string representation of the floating-point score
+                let score_str = score.to_string();
+                write!(response_buf, "${}\r\n{}\r\n", score_str.len(), score_str)?;
                 klog_1(&"zscore", &req.key(), Status::Hit, response_buf.len());
             }
             SortedSetGetScoreResponse::Miss => {
-                write!(response_buf, ":0\r\n")?;
+                // Return nil if the score is not found
+                write!(response_buf, "_\r\n")?;
                 klog_1(&"zscore", &req.key(), Status::Miss, response_buf.len());
             }
         }
