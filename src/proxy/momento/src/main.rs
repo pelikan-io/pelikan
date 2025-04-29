@@ -283,7 +283,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .expect("failed to launch tokio runtime");
 
-    runtime.block_on(async move { spawn(config, log_drain).await })
+    runtime.block_on(spawn(config, log_drain))
 }
 
 async fn spawn(
@@ -304,6 +304,10 @@ async fn spawn(
     }
     let auth_token =
         std::env::var("MOMENTO_AUTHENTICATION").expect("MOMENTO_AUTHENTICATION must be set");
+    let connection_count = std::env::var("MOMENTO_CONNECTIONS_PER_CACHE")
+        .unwrap_or_else(|_| "4".to_string())
+        .parse()
+        .expect("MOMENTO_CONNECTIONS_PER_CACHE must be an integer");
     let credential_provider = CredentialProvider::from_string(auth_token).unwrap_or_else(|e| {
         eprintln!("failed to initialize credential provider. error: {e}");
         std::process::exit(1);
@@ -311,7 +315,8 @@ async fn spawn(
     let client_builder = CacheClient::builder()
         .default_ttl(DEFAULT_TTL)
         .configuration(configurations::Laptop::latest())
-        .credential_provider(credential_provider);
+        .credential_provider(credential_provider)
+        .with_num_connections(connection_count);
 
     // Validate client can build early
     client_builder.clone().build().unwrap_or_else(|e| {
