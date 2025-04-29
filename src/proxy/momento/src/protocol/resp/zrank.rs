@@ -43,11 +43,16 @@ pub async fn zrank(
 
         match response {
             SortedSetGetRankResponse::Hit { rank } => {
-                write!(response_buf, ":{}\r\n", rank)?;
+                if req.with_score() {
+                    write!(response_buf, "*2\r\n:{}\r\n${}\r\n", rank, req.member().len())?;
+                    response_buf.extend_from_slice(req.member());
+                    response_buf.extend_from_slice(b"\r\n");
+                } else {
+                    write!(response_buf, ":{}\r\n", rank)?;
+                }
                 klog_1(&"zrank", &req.key(), Status::Hit, response_buf.len());
             }
             SortedSetGetRankResponse::Miss => {
-                // return nil
                 write!(response_buf, "_\r\n")?;
                 klog_1(&"zrank", &req.key(), Status::Miss, response_buf.len());
             }
