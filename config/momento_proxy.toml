@@ -21,6 +21,9 @@ cache_name = "users"
 # the TTL, in seconds, to use when items are set as 'no expiry' (TTL is zero)
 # NOTE: accepted values are between 1 and 4_294_967 (inclusive)
 default_ttl = 900
+# The number of connections to the service for this cache.
+# Defaults to 4
+# connection_count = 4
 # the protocol can be "memcache" or "resp" (Redis), the default is memcache
 # protocol = "memcache"
 
@@ -34,6 +37,9 @@ cache_name = "products"
 # the TTL, in seconds, to use when items are set as 'no expiry' (TTL is zero)
 # NOTE: accepted values are between 1 and 4_294_967 (inclusive)
 default_ttl = 1800
+# The number of connections to the service for this cache.
+# Defaults to 4
+# connection_count = 4
 # the protocol can be "memcache" or "resp" (Redis), the default is memcache
 protocol = "memcache"
 
@@ -47,6 +53,9 @@ cache_name = "ratings"
 # the TTL, in seconds, to use when items are set as 'no expiry' (TTL is zero)
 # NOTE: accepted values are between 1 and 4_294_967 (inclusive)
 default_ttl = 300
+# The number of connections to the service for this cache.
+# Defaults to 4
+# connection_count = 4
 # the protocol can be "memcache" or "resp" (Redis), the default is memcache
 protocol = "resp"
 
