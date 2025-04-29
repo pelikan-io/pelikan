@@ -36,6 +36,7 @@ pub async fn zadd(
             let zincry_request =
                 SortedSetIncrement::new(req.key(), &req.members()[0].0, &req.members()[0].1);
             zincrby(client, cache_name, response_buf, &zincry_request).await?;
+            return Ok(());
         }
 
         // Otherwise it's a regular ZADD call, and we should convert scores to f64 values before making Momento call
