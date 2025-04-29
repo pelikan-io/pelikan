@@ -16,7 +16,7 @@ pub static ZINCRBY_EX: Counter = Counter::new();
 #[derive(Debug, PartialEq, Eq)]
 pub struct SortedSetIncrement {
     key: Arc<[u8]>,
-    increment: i64,
+    increment: Arc<[u8]>,
     member: Arc<[u8]>,
 }
 
@@ -42,7 +42,7 @@ impl TryFrom<Message> for SortedSetIncrement {
         let _command = take_bulk_string(&mut array)?;
         let key = take_bulk_string(&mut array)?
             .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
-        let increment = take_bulk_string_as_i64(&mut array)?
+        let increment = take_bulk_string(&mut array)?
             .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
         let member = take_bulk_string(&mut array)?
             .ok_or_else(|| Error::new(ErrorKind::Other, "malformed content"))?;
@@ -56,10 +56,10 @@ impl TryFrom<Message> for SortedSetIncrement {
 }
 
 impl SortedSetIncrement {
-    pub fn new(key: &[u8], increment: i64, member: &[u8]) -> Self {
+    pub fn new(key: &[u8], increment: &[u8], member: &[u8]) -> Self {
         Self {
             key: key.into(),
-            increment,
+            increment: increment.into(),
             member: member.into(),
         }
     }
@@ -68,8 +68,8 @@ impl SortedSetIncrement {
         &self.key
     }
 
-    pub fn increment(&self) -> i64 {
-        self.increment
+    pub fn increment(&self) -> &[u8] {
+        &self.increment
     }
 
     pub fn member(&self) -> &[u8] {
@@ -83,7 +83,7 @@ impl From<&SortedSetIncrement> for Message {
             inner: Some(vec![
                 Message::BulkString(BulkString::new(b"ZINCRBY")),
                 Message::BulkString(BulkString::new(value.key())),
-                Message::BulkString(BulkString::new(value.increment().to_string().as_bytes())),
+                Message::BulkString(BulkString::new(value.increment())),
                 Message::BulkString(BulkString::new(value.member())),
             ]),
         })
@@ -105,12 +105,12 @@ mod tests {
         let parser = RequestParser::new();
         assert_eq!(
             parser.parse(b"ZINCRBY z 1 a\r\n").unwrap().into_inner(),
-            Request::SortedSetIncrement(SortedSetIncrement::new(b"z", 1, b"a"))
+            Request::SortedSetIncrement(SortedSetIncrement::new(b"z", b"1", b"a"))
         );
 
         assert_eq!(
-            parser.parse(b"ZINCRBY z 1 a\r\n").unwrap().into_inner(),
-            Request::SortedSetIncrement(SortedSetIncrement::new(b"z", 1, b"a"))
+            parser.parse(b"ZINCRBY z +inf a\r\n").unwrap().into_inner(),
+            Request::SortedSetIncrement(SortedSetIncrement::new(b"z", b"+inf", b"a"))
         );
 
         assert_eq!(
@@ -118,7 +118,15 @@ mod tests {
                 .parse(b"*4\r\n$7\r\nZINCRBY\r\n$1\r\nz\r\n$1\r\n1\r\n$1\r\na\r\n")
                 .unwrap()
                 .into_inner(),
-            Request::SortedSetIncrement(SortedSetIncrement::new(b"z", 1, b"a"))
+            Request::SortedSetIncrement(SortedSetIncrement::new(b"z", b"1", b"a"))
+        );
+
+        assert_eq!(
+            parser
+                .parse(b"*4\r\n$7\r\nZINCRBY\r\n$1\r\nz\r\n$4\r\n-inf\r\n$1\r\na\r\n")
+                .unwrap()
+                .into_inner(),
+            Request::SortedSetIncrement(SortedSetIncrement::new(b"z", b"-inf", b"a"))
         );
     }
 }

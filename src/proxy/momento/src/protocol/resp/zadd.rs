@@ -14,34 +14,7 @@ use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
 use crate::ProxyError;
 
-use super::{update_method_metrics, zincrby};
-
-fn parse_score(score: &[u8]) -> Result<f64, std::io::Error> {
-    // Momento calls cannot accept f64::INFINITY, so using f64::MAX instead
-    if score == "-inf".as_bytes() {
-        return Ok(f64::MIN);
-    } else if score == "+inf".as_bytes() {
-        return Ok(f64::MAX);
-    } else {
-        if let Some(float) = std::str::from_utf8(&score)
-            .map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::Other, "score string is not valid utf8")
-            })?
-            .parse::<f64>()
-            .map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::Other, "score string is not a f64")
-            })
-            .map(Some)?
-        {
-            return Ok(float);
-        } else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "score string is not a valid f64",
-            ));
-        }
-    }
-}
+use super::{parse_sorted_set_score, update_method_metrics, zincrby};
 
 pub async fn zadd(
     client: &mut CacheClient,
@@ -60,17 +33,15 @@ pub async fn zadd(
                     "INCR option requires exactly one score-member pair",
                 )));
             }
-            // TODO: ZINCRBY should probably accept a f64 score
-            let score: i64 = parse_score(&*req.members()[0].0)? as i64;
-            let member = req.members()[0].1.clone();
-            let zincry_request = SortedSetIncrement::new(req.key(), score, &member);
+            let zincry_request =
+                SortedSetIncrement::new(req.key(), &req.members()[0].0, &req.members()[0].1);
             zincrby(client, cache_name, response_buf, &zincry_request).await?;
         }
 
         // Otherwise it's a regular ZADD call, and we should convert scores to f64 values before making Momento call
         let mut converted_members: Vec<SortedSetElement<Vec<u8>>> = Vec::new();
         for (score, member) in req.members() {
-            match parse_score(score) {
+            match parse_sorted_set_score(score) {
                 Ok(float_score) => converted_members.push(SortedSetElement {
                     value: (**member).into(),
                     score: float_score,

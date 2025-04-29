@@ -306,7 +306,7 @@ impl Request {
         Self::SortedSetCardinality(SortedSetCardinality::new(key))
     }
 
-    pub fn sorted_set_increment(key: &[u8], increment: i64, member: &[u8]) -> Self {
+    pub fn sorted_set_increment(key: &[u8], increment: &[u8], member: &[u8]) -> Self {
         Self::SortedSetIncrement(SortedSetIncrement::new(key, increment, member))
     }
 

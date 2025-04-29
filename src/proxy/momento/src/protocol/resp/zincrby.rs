@@ -13,7 +13,7 @@ use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
 use crate::ProxyError;
 
-use super::update_method_metrics;
+use super::{parse_sorted_set_score, update_method_metrics};
 
 pub async fn zincrby(
     client: &mut CacheClient,
@@ -28,7 +28,7 @@ pub async fn zincrby(
                 cache_name,
                 req.key(),
                 req.member(),
-                req.increment() as f64,
+                parse_sorted_set_score(req.increment())?,
             ),
         )
         .await
@@ -44,7 +44,9 @@ pub async fn zincrby(
             }
         };
 
-        write!(response_buf, ":{}\r\n", response.score)?;
+        // Return string representation of the floating-point score
+        let score_str = response.score.to_string();
+        write!(response_buf, "${}\r\n{}\r\n", score_str.len(), score_str)?;
         klog_1(&"zincrby", &req.key(), Status::Hit, response_buf.len());
 
         Ok(())
