@@ -72,7 +72,7 @@ pub async fn zrange(
 
                 let stop = match stop {
                     StartStopValue::Inclusive(s) => *s as f64,
-                    StartStopValue::Exclusive(s) => (*s - 1) as f64,
+                    StartStopValue::Exclusive(s) => (*s + 1) as f64,
                     StartStopValue::PositiveInfinity => f64::INFINITY,
                     StartStopValue::NegativeInfinity => f64::NEG_INFINITY,
                 };
