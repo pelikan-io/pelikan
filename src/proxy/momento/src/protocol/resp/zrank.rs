@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use momento::cache::SortedSetGetRankResponse;
 use momento::CacheClient;
-use protocol_resp::{SortedSetRank, ZRANK, ZRANK_EX};
+use protocol_resp::{SortedSetRank, ZRANK, ZRANK_EX, ZRANK_HIT, ZRANK_MISS};
 use tokio::time;
 
 use crate::error::ProxyResult;
@@ -43,8 +43,14 @@ pub async fn zrank(
 
         match response {
             SortedSetGetRankResponse::Hit { rank } => {
+                ZRANK_HIT.increment();
                 if req.with_score() {
-                    write!(response_buf, "*2\r\n:{}\r\n${}\r\n", rank, req.member().len())?;
+                    write!(
+                        response_buf,
+                        "*2\r\n:{}\r\n${}\r\n",
+                        rank,
+                        req.member().len()
+                    )?;
                     response_buf.extend_from_slice(req.member());
                     response_buf.extend_from_slice(b"\r\n");
                 } else {
@@ -53,6 +59,7 @@ pub async fn zrank(
                 klog_1(&"zrank", &req.key(), Status::Hit, response_buf.len());
             }
             SortedSetGetRankResponse::Miss => {
+                ZRANK_MISS.increment();
                 write!(response_buf, "_\r\n")?;
                 klog_1(&"zrank", &req.key(), Status::Miss, response_buf.len());
             }

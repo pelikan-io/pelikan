@@ -13,6 +13,12 @@ pub static ZRANK: Counter = Counter::new();
 #[metric(name = "zrank_ex")]
 pub static ZRANK_EX: Counter = Counter::new();
 
+#[metric(name = "zrank_hit")]
+pub static ZRANK_HIT: Counter = Counter::new();
+
+#[metric(name = "zrank_miss")]
+pub static ZRANK_MISS: Counter = Counter::new();
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct SortedSetRank {
     key: Arc<[u8]>,

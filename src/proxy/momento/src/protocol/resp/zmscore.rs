@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use momento::cache::{SortedSetGetScoreResponse, SortedSetGetScoresResponse};
 use momento::CacheClient;
-use protocol_resp::{SortedSetMultiScore, ZMSCORE, ZMSCORE_EX};
+use protocol_resp::{SortedSetMultiScore, ZMSCORE, ZMSCORE_EX, ZMSCORE_HIT, ZMSCORE_MISS};
 use tokio::time;
 
 use crate::error::ProxyResult;
@@ -51,12 +51,14 @@ pub async fn zmscore(
                 for response in responses {
                     match response {
                         SortedSetGetScoreResponse::Hit { score } => {
+                            ZMSCORE_HIT.increment();
                             let score_str = score.to_string();
                             response_buf.extend_from_slice(
                                 format!("${}\r\n{}\r\n", score_str.len(), score_str).as_bytes(),
                             );
                         }
                         SortedSetGetScoreResponse::Miss => {
+                            ZMSCORE_MISS.increment();
                             // Add nil to list if the element was not found
                             response_buf.extend_from_slice(b"_\r\n");
                         }
@@ -66,6 +68,7 @@ pub async fn zmscore(
             }
             SortedSetGetScoresResponse::Miss => {
                 // Return list of nil for each missing element
+                ZMSCORE_MISS.increment();
                 response_buf.extend_from_slice(format!("*{}\r\n", num_members).as_bytes());
                 for _ in 0..num_members {
                     response_buf.extend_from_slice(b"_\r\n");

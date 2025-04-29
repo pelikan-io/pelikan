@@ -13,6 +13,12 @@ pub static ZCARD: Counter = Counter::new();
 #[metric(name = "zcard_ex")]
 pub static ZCARD_EX: Counter = Counter::new();
 
+#[metric(name = "zcard_hit")]
+pub static ZCARD_HIT: Counter = Counter::new();
+
+#[metric(name = "zcard_miss")]
+pub static ZCARD_MISS: Counter = Counter::new();
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct SortedSetCardinality {
     key: Arc<[u8]>,

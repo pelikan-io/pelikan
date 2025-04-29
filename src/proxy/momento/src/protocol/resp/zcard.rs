@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use momento::cache::SortedSetLengthResponse;
 use momento::CacheClient;
-use protocol_resp::{SortedSetCardinality, ZCARD, ZCARD_EX};
+use protocol_resp::{SortedSetCardinality, ZCARD, ZCARD_EX, ZCARD_HIT, ZCARD_MISS};
 use tokio::time;
 
 use crate::error::ProxyResult;
@@ -42,10 +42,12 @@ pub async fn zcard(
 
         match response {
             SortedSetLengthResponse::Hit { length } => {
+                ZCARD_HIT.increment();
                 write!(response_buf, ":{}\r\n", length)?;
                 klog_1(&"zcard", &req.key(), Status::Hit, response_buf.len());
             }
             SortedSetLengthResponse::Miss => {
+                ZCARD_MISS.increment();
                 write!(response_buf, ":0\r\n")?;
                 klog_1(&"zcard", &req.key(), Status::Miss, response_buf.len());
             }

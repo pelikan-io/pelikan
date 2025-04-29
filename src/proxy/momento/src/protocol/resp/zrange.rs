@@ -7,7 +7,10 @@ use std::time::Duration;
 
 use momento::cache::{SortedSetFetchByScoreRequest, SortedSetFetchResponse, SortedSetOrder};
 use momento::CacheClient;
-use protocol_resp::{MomentoSortedSetFetchArgs, SortedSetRange, StartStopValue, ZRANGE, ZRANGE_EX};
+use protocol_resp::{
+    MomentoSortedSetFetchArgs, SortedSetRange, StartStopValue, ZRANGE, ZRANGE_EX, ZRANGE_HIT,
+    ZRANGE_MISS,
+};
 use tokio::time;
 
 use crate::error::ProxyResult;
@@ -102,6 +105,7 @@ pub async fn zrange(
 
         match response {
             SortedSetFetchResponse::Hit { value } => {
+                ZRANGE_HIT.increment();
                 if req.with_scores() {
                     // Return elements and scores
                     response_buf
@@ -132,6 +136,7 @@ pub async fn zrange(
                 klog_1(&"zrange", &req.key(), Status::Hit, response_buf.len());
             }
             SortedSetFetchResponse::Miss => {
+                ZRANGE_MISS.increment();
                 // return empty list on miss
                 write!(response_buf, "*0\r\n")?;
                 klog_1(&"zrange", &req.key(), Status::Miss, response_buf.len());

@@ -13,6 +13,12 @@ pub static ZRANGE: Counter = Counter::new();
 #[metric(name = "zrange_ex")]
 pub static ZRANGE_EX: Counter = Counter::new();
 
+#[metric(name = "zrange_hit")]
+pub static ZRANGE_HIT: Counter = Counter::new();
+
+#[metric(name = "zrange_miss")]
+pub static ZRANGE_MISS: Counter = Counter::new();
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum MomentoSortedSetFetchArgs {
     ByRank(i64, i64), // inclusive start, exclusive stop

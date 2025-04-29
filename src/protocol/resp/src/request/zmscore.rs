@@ -13,6 +13,12 @@ pub static ZMSCORE: Counter = Counter::new();
 #[metric(name = "zmscore_ex")]
 pub static ZMSCORE_EX: Counter = Counter::new();
 
+#[metric(name = "zmscore_hit")]
+pub static ZMSCORE_HIT: Counter = Counter::new();
+
+#[metric(name = "zmscore_miss")]
+pub static ZMSCORE_MISS: Counter = Counter::new();
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct SortedSetMultiScore {
     key: Arc<[u8]>,

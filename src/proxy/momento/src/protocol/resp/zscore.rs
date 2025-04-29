@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use momento::cache::SortedSetGetScoreResponse;
 use momento::CacheClient;
-use protocol_resp::{SortedSetScore, ZSCORE, ZSCORE_EX};
+use protocol_resp::{SortedSetScore, ZSCORE, ZSCORE_EX, ZSCORE_HIT, ZSCORE_MISS};
 use tokio::time;
 
 use crate::error::ProxyResult;
@@ -42,12 +42,14 @@ pub async fn zscore(
 
         match response {
             SortedSetGetScoreResponse::Hit { score } => {
+                ZSCORE_HIT.increment();
                 // Return string representation of the floating-point score
                 let score_str = score.to_string();
                 write!(response_buf, "${}\r\n{}\r\n", score_str.len(), score_str)?;
                 klog_1(&"zscore", &req.key(), Status::Hit, response_buf.len());
             }
             SortedSetGetScoreResponse::Miss => {
+                ZSCORE_MISS.increment();
                 // Return nil if the score is not found
                 write!(response_buf, "_\r\n")?;
                 klog_1(&"zscore", &req.key(), Status::Miss, response_buf.len());
