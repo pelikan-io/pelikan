@@ -54,8 +54,6 @@ pub async fn get(
                 Ok(response)
                 // let _ =
                 //     protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
-
-                
             }
             GetResponse::Miss => {
                 GET_KEY_MISS.increment();
@@ -83,8 +81,6 @@ pub async fn get(
 
             Ok(response)
             // let _ = protocol.compose_response(&Request::Get(request), &response, &mut response_buf);
-
-            
         }
         Err(_) => {
             // we had a timeout, incr stats and move on

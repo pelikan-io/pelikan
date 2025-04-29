@@ -5,8 +5,6 @@
 #[macro_use]
 extern crate logger;
 
-use tokio::net::tcp::OwnedWriteHalf;
-use tokio::net::tcp::OwnedReadHalf;
 use ::config::{AdminConfig, MomentoProxyConfig, TimeType};
 use backtrace::Backtrace;
 use clap::{Arg, Command};
@@ -18,12 +16,14 @@ use logger::Drain;
 use metriken::*;
 use momento::cache::{configurations, CollectionTtl};
 use momento::*;
-use pelikan_net::{TCP_SEND_BYTE, TCP_RECV_BYTE};
+use pelikan_net::{TCP_RECV_BYTE, TCP_SEND_BYTE};
 use protocol_admin::*;
 use session::*;
 use std::borrow::{Borrow, BorrowMut};
 use std::io::{Error, ErrorKind};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::tcp::OwnedReadHalf;
+use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::time::timeout;
@@ -300,9 +300,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     runtime.block_on(spawn(config))
 }
 
-async fn spawn(
-    config: MomentoProxyConfig,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Error>> {
     let admin_addr = config
         .admin()
         .socket_addr()
@@ -445,10 +443,7 @@ async fn do_read(
     }
 }
 
-async fn do_read2(
-    socket: &mut OwnedReadHalf,
-    buf: &mut Buffer,
-) -> Result<NonZeroUsize, Error> {
+async fn do_read2(socket: &mut OwnedReadHalf, buf: &mut Buffer) -> Result<NonZeroUsize, Error> {
     match socket.read(buf.borrow_mut()).await {
         Ok(0) => {
             SESSION_RECV.increment();
@@ -459,6 +454,7 @@ async fn do_read2(
             SESSION_RECV.increment();
             SESSION_RECV_BYTE.add(n as _);
             TCP_RECV_BYTE.add(n as _);
+
             // non-zero means we have some data, mark the buffer as
             // having additional content
             unsafe {
@@ -485,10 +481,7 @@ async fn do_read2(
     }
 }
 
-async fn do_write2(
-    socket: &mut OwnedWriteHalf,
-    buf: &mut Buffer,
-) -> Result<NonZeroUsize, Error> {
+async fn do_write2(socket: &mut OwnedWriteHalf, buf: &mut Buffer) -> Result<NonZeroUsize, Error> {
     match socket.write(buf.chunk()).await {
         Ok(0) => {
             SESSION_SEND.increment();

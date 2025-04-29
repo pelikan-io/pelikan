@@ -2,11 +2,6 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::sync::atomic::AtomicU64;
-use std::collections::BTreeMap;
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-use tokio::sync::mpsc;
 use crate::protocol::*;
 use crate::*;
 use pelikan_net::TCP_SEND_BYTE;
@@ -14,6 +9,11 @@ use protocol_memcache::binary::BinaryProtocol;
 use protocol_memcache::text::TextProtocol;
 use protocol_memcache::Protocol;
 use session::Buf;
+use std::collections::BTreeMap;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicU64;
+use std::sync::Arc;
+use tokio::sync::mpsc;
 
 pub(crate) async fn handle_memcache_client(
     mut socket: tokio::net::TcpStream,
@@ -102,7 +102,9 @@ pub(crate) async fn handle_memcache_binary_client(
     let protocol = BinaryProtocol::default();
 
     // queue for response passing back from tasks
-    let (sender, mut receiver) = mpsc::channel::<std::io::Result<(u64, protocol_memcache::Request, protocol_memcache::Response)>>(1024);
+    let (sender, mut receiver) = mpsc::channel::<
+        std::io::Result<(u64, protocol_memcache::Request, protocol_memcache::Response)>,
+    >(1024);
 
     let (mut read_half, mut write_half) = socket.into_split();
 
@@ -122,7 +124,9 @@ pub(crate) async fn handle_memcache_binary_client(
         let protocol = BinaryProtocol::default();
 
         while write_alive2.load(Ordering::Relaxed) {
-            if !read_alive2.load(Ordering::Relaxed) && next_sequence == sequence2.load(Ordering::Relaxed) {
+            if !read_alive2.load(Ordering::Relaxed)
+                && next_sequence == sequence2.load(Ordering::Relaxed)
+            {
                 write_alive2.store(false, Ordering::Relaxed);
                 return;
             }
@@ -134,7 +138,10 @@ pub(crate) async fn handle_memcache_binary_client(
                         if sequence == next_sequence {
                             debug!("sending next: {next_sequence}");
                             next_sequence += 1;
-                            if protocol.compose_response(&request, &response, &mut write_buffer).is_err() {
+                            if protocol
+                                .compose_response(&request, &response, &mut write_buffer)
+                                .is_err()
+                            {
                                 read_alive2.store(false, Ordering::Relaxed);
                                 write_alive2.store(false, Ordering::Relaxed);
                                 return;
@@ -144,7 +151,10 @@ pub(crate) async fn handle_memcache_binary_client(
                                 if let Some((request, response)) = backlog.remove(&next_sequence) {
                                     debug!("sending next: {next_sequence}");
                                     next_sequence += 1;
-                                    if protocol.compose_response(&request, &response, &mut write_buffer).is_err() {
+                                    if protocol
+                                        .compose_response(&request, &response, &mut write_buffer)
+                                        .is_err()
+                                    {
                                         read_alive2.store(false, Ordering::Relaxed);
                                         write_alive2.store(false, Ordering::Relaxed);
                                         return;
@@ -210,7 +220,10 @@ pub(crate) async fn handle_memcache_binary_client(
                     let sequence = sequence.fetch_add(1, Ordering::Relaxed);
 
                     tokio::spawn(async move {
-                        handle_memcache_binary_request(sender, client, cache_name, sequence, request).await;
+                        handle_memcache_binary_request(
+                            sender, client, cache_name, sequence, request,
+                        )
+                        .await;
                     });
                 }
                 Err(e) => match e.kind() {
@@ -244,7 +257,12 @@ pub(crate) async fn handle_memcache_binary_client(
 }
 
 async fn handle_memcache_binary_request(
-    channel: mpsc::Sender<std::result::Result<(u64, protocol_memcache::Request, protocol_memcache::Response), std::io::Error>>,
+    channel: mpsc::Sender<
+        std::result::Result<
+            (u64, protocol_memcache::Request, protocol_memcache::Response),
+            std::io::Error,
+        >,
+    >,
     mut client: CacheClient,
     cache_name: String,
     sequence: u64,
@@ -260,12 +278,8 @@ async fn handle_memcache_binary_request(
         //         break 'connection;
         //     }
         // }
-        memcache::Request::Get(ref r) => {
-            memcache_binary::get(&mut client, &cache_name, r).await
-        }
-        memcache::Request::Set(ref r) => {
-            memcache_binary::set(&mut client, &cache_name, r).await
-        }
+        memcache::Request::Get(ref r) => memcache_binary::get(&mut client, &cache_name, r).await,
+        memcache::Request::Set(ref r) => memcache_binary::set(&mut client, &cache_name, r).await,
         _ => {
             debug!("unsupported command: {}", request);
             Err(Error::new(ErrorKind::Other, "unsupported"))

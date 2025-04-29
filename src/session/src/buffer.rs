@@ -98,8 +98,6 @@ impl Buffer {
 
         // if the buffer is oversized, shrink to the target size
         if self.cap > self.target_size {
-            trace!("shrinking buffer");
-
             SESSION_BUFFER_BYTE.sub((self.cap - self.target_size) as _);
 
             let layout = Layout::array::<u8>(self.cap).unwrap();
@@ -119,7 +117,7 @@ impl Buffer {
         }
 
         // if its not too large, we don't compact
-        if self.cap == self.target_size {
+        if self.remaining_mut() <= self.target_size || self.cap == self.target_size {
             return;
         }
 
