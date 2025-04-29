@@ -411,6 +411,9 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::SortedSetRank(r) => {
                     resp::zrank(&mut client, &cache_name, &mut response_buf, r).await?
                 }
+                resp::Request::SortedSetRange(r) => {
+                    resp::zrange(&mut client, &cache_name, &mut response_buf, r).await?
+                }
                 // TODO: add remaining sorted set commands
                 _ => return Err(ProxyError::UnsupportedCommand(request.command())),
             }

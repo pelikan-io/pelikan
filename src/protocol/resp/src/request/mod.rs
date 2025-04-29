@@ -45,6 +45,7 @@ mod sunion;
 mod zcard;
 mod zincrby;
 mod zmscore;
+mod zrange;
 mod zrank;
 mod zrem;
 mod zscore;
@@ -81,6 +82,7 @@ pub use set::*;
 pub use zcard::*;
 pub use zincrby::*;
 pub use zmscore::*;
+pub use zrange::*;
 pub use zrank::*;
 pub use zrem::*;
 pub use zscore::*;
@@ -214,6 +216,7 @@ decl_request! {
         SortedSetMultiScore(SortedSetMultiScore) => "zmscore",
         SortedSetRemove(SortedSetRemove) => "zrem",
         SortedSetRank(SortedSetRank) => "zrank",
+        SortedSetRange(SortedSetRange) => "zrange",
     }
 }
 
