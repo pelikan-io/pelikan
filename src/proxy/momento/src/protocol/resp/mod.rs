@@ -33,6 +33,7 @@ mod sismember;
 mod smembers;
 mod srem;
 mod sunion;
+mod zadd;
 mod zcard;
 mod zincrby;
 mod zmscore;
@@ -67,6 +68,7 @@ pub use hset::*;
 pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
+pub use zadd::*;
 pub use zcard::*;
 pub use zincrby::*;
 pub use zmscore::*;
@@ -74,6 +76,7 @@ pub use zrange::*;
 pub use zrank::*;
 pub use zrem::*;
 pub use zscore::*;
+
 pub(crate) fn momento_error_to_resp_error(buf: &mut Vec<u8>, command: &str, error: MomentoError) {
     use crate::BACKEND_EX;
 

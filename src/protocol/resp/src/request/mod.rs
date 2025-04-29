@@ -42,6 +42,7 @@ mod sismember;
 mod smembers;
 mod srem;
 mod sunion;
+mod zadd;
 mod zcard;
 mod zincrby;
 mod zmscore;
@@ -49,7 +50,6 @@ mod zrange;
 mod zrank;
 mod zrem;
 mod zscore;
-
 pub use self::lindex::*;
 pub use self::llen::*;
 pub use self::lpop::*;
@@ -79,6 +79,7 @@ pub use hset::*;
 pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
+pub use zadd::*;
 pub use zcard::*;
 pub use zincrby::*;
 pub use zmscore::*;
@@ -102,7 +103,7 @@ enum ResponseCode {
 }
 
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
-pub type ValueScorePair = (Arc<[u8]>, f64);
+pub type ScoreMemberPair = (Arc<[u8]>, Arc<[u8]>);
 
 /// Macro to deal with the boilerplate around the Request enum.
 macro_rules! decl_request {
@@ -217,6 +218,7 @@ decl_request! {
         SortedSetRemove(SortedSetRemove) => "zrem",
         SortedSetRank(SortedSetRank) => "zrank",
         SortedSetRange(SortedSetRange) => "zrange",
+        SortedSetAdd(SortedSetAdd) => "zadd",
     }
 }
 
@@ -323,8 +325,6 @@ impl Request {
     pub fn sorted_set_rank(key: &[u8], member: &[u8], with_score: bool) -> Self {
         Self::SortedSetRank(SortedSetRank::new(key, member, with_score))
     }
-
-    // TODO: add remaining sorted set commands
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
