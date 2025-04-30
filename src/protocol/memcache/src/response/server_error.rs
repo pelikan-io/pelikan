@@ -2,6 +2,8 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use crate::binary::response::header::{Opcode, ResponseStatus};
+
 use super::*;
 
 const MSG_PREFIX: &[u8] = b"SERVER_ERROR ";
@@ -18,6 +20,15 @@ impl ServerError {
 
     pub fn len(&self) -> usize {
         MSG_PREFIX.len() + self.inner.len() + 2
+    }
+
+    pub fn write_binary_response(&self, opcode: Opcode, buffer: &mut dyn BufMut) -> usize {
+        let mut header = ResponseStatus::InternalError.as_empty_response(opcode);
+        let message = self.inner.as_bytes();
+        header.total_body_len = message.len() as u32;
+        header.write_to(buffer);
+        buffer.put_slice(message);
+        24 + message.len()
     }
 }
 

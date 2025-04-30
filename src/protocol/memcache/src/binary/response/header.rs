@@ -85,7 +85,7 @@ impl MagicValue {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Opcode {
+pub enum Opcode {
     Unknown(u8),
     Get,
     Set,

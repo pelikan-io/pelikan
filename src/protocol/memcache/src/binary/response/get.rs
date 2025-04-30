@@ -110,10 +110,37 @@ impl BinaryProtocol {
                     .write_to(buffer);
                 Ok(24)
             }
-            _ => Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "unexpected response",
-            )),
+            Response::Error(error) => Ok(error.write_binary_response(Opcode::Get, buffer)),
+            Response::ClientError(client_error) => {
+                Ok(client_error.write_binary_response(Opcode::Get, buffer))
+            }
+            Response::ServerError(server_error) => {
+                Ok(server_error.write_binary_response(Opcode::Get, buffer))
+            }
+            Response::Stored(_stored) => Ok(response::ServerError {
+                inner: format!("unknown response: STORED"),
+            }
+            .write_binary_response(Opcode::Get, buffer)),
+            Response::NotStored(_not_stored) => Ok(response::ServerError {
+                inner: format!("unknown response: NOT_STORED"),
+            }
+            .write_binary_response(Opcode::Get, buffer)),
+            Response::Exists(_exists) => Ok(response::ServerError {
+                inner: format!("unknown response: EXISTS"),
+            }
+            .write_binary_response(Opcode::Get, buffer)),
+            Response::Numeric(_numeric) => Ok(response::ServerError {
+                inner: format!("unknown response: NUMERIC"),
+            }
+            .write_binary_response(Opcode::Get, buffer)),
+            Response::Deleted(_deleted) => Ok(response::ServerError {
+                inner: format!("unknown response: DELETED"),
+            }
+            .write_binary_response(Opcode::Get, buffer)),
+            Response::Hangup => Ok(response::ServerError {
+                inner: format!("HANGUP"),
+            }
+            .write_binary_response(Opcode::Get, buffer)),
         }
     }
 }
