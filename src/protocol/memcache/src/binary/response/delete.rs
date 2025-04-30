@@ -17,8 +17,8 @@ impl BinaryProtocol {
         header: ResponseHeader,
     ) -> IResult<&'a [u8], Response> {
         match header.status {
-            0 => Ok((input, Response::stored(request.noreply))),
-            5 => Ok((input, Response::not_stored(request.noreply))),
+            ResponseStatus::NoError => Ok((input, Response::stored(request.noreply))),
+            ResponseStatus::ItemNotStored => Ok((input, Response::not_stored(request.noreply))),
             _ => Err(nom::Err::Failure(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,

@@ -8,6 +8,8 @@ use crate::binary::response::ResponseHeader;
 use crate::*;
 use protocol_common::BufMut;
 use protocol_common::Protocol;
+use response::MagicValue;
+use response::Opcode;
 
 pub mod request;
 pub mod response;
@@ -85,7 +87,7 @@ impl BinaryProtocol {
     ) -> IResult<&'a [u8], Response> {
         let (input, header) = ResponseHeader::parse(buffer)?;
 
-        if header.magic != 0x81 {
+        if header.magic != MagicValue::Response {
             return Err(nom::Err::Failure(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
@@ -105,19 +107,19 @@ impl BinaryProtocol {
 
         match request {
             Request::Delete(request) => {
-                if header.opcode == 0x05 {
+                if header.opcode == Opcode::Delete {
                     let (input, response) = self.parse_delete_response(request, input, header)?;
                     return Ok((input, response));
                 }
             }
             Request::Get(request) => {
-                if header.opcode == 0x00 {
+                if header.opcode == Opcode::Get {
                     let (input, response) = self.parse_get_response(request, input, header)?;
                     return Ok((input, response));
                 }
             }
             Request::Set(request) => {
-                if header.opcode == 0x01 {
+                if header.opcode == Opcode::Set {
                     let (input, response) = self.parse_set_response(request, input, header)?;
                     return Ok((input, response));
                 }

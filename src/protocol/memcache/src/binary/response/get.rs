@@ -17,7 +17,7 @@ impl BinaryProtocol {
         header: ResponseHeader,
     ) -> IResult<&'a [u8], Response> {
         match header.status {
-            0 => {
+            ResponseStatus::NoError => {
                 if header.total_body_len > 0 {
                     Err(nom::Err::Failure(nom::error::Error::new(
                         input,
@@ -27,7 +27,7 @@ impl BinaryProtocol {
                     Ok((input, Response::not_found(false)))
                 }
             }
-            1 => {
+            ResponseStatus::KeyNotFound => {
                 if header.total_body_len < 5 || header.key_len != 0 {
                     Err(nom::Err::Failure(nom::error::Error::new(
                         input,

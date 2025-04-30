@@ -4,14 +4,13 @@ mod delete;
 mod get;
 mod set;
 
-#[repr(C)]
 pub(crate) struct ResponseHeader {
-    pub(crate) magic: u8,
-    pub(crate) opcode: u8,
+    pub(crate) magic: MagicValue,
+    pub(crate) opcode: Opcode,
     pub(crate) key_len: u16,
     pub(crate) extras_len: u8,
     pub(crate) data_type: u8,
-    pub(crate) status: u16,
+    pub(crate) status: ResponseStatus,
     pub(crate) total_body_len: u32,
     pub(crate) opaque: u32,
     pub(crate) cas: u64,
@@ -22,18 +21,18 @@ impl ResponseHeader {
         let (remaining, h) = take(24usize)(input)?;
 
         let header = Self {
-            magic: h[0],
-            opcode: h[1],
+            magic: MagicValue::from_u8(h[0]),
+            opcode: Opcode::from_u8(h[1]),
             key_len: u16::from_be_bytes([h[2], h[3]]),
             extras_len: h[4],
             data_type: h[5],
-            status: u16::from_be_bytes([h[6], h[7]]),
+            status: ResponseStatus::from_u16(u16::from_be_bytes([h[6], h[7]])),
             total_body_len: u32::from_be_bytes([h[8], h[9], h[10], h[11]]),
             opaque: u32::from_be_bytes([h[12], h[13], h[14], h[15]]),
             cas: u64::from_be_bytes([h[16], h[17], h[18], h[19], h[20], h[21], h[22], h[23]]),
         };
 
-        if header.magic != 0x81 {
+        if header.magic != MagicValue::Response {
             return Err(nom::Err::Failure(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
@@ -48,5 +47,152 @@ impl ResponseHeader {
         }
 
         Ok((remaining, header))
+    }
+
+    pub(crate) fn as_bytes(&self) -> [u8; 24] {
+        let status = self.status.to_u16();
+        [
+            self.magic.to_u8(),
+            self.opcode.to_u8(),
+            (self.key_len >> 8) as u8,
+            (self.key_len & 0xFF) as u8,
+            self.extras_len,
+            self.data_type,
+            (status >> 8) as u8,
+            (status & 0xFF) as u8,
+            (self.total_body_len >> 24) as u8,
+            (self.total_body_len >> 16) as u8,
+            (self.total_body_len >> 8) as u8,
+            (self.total_body_len & 0xFF) as u8,
+            (self.opaque >> 24) as u8,
+            (self.opaque >> 16) as u8,
+            (self.opaque >> 8) as u8,
+            (self.opaque & 0xFF) as u8,
+            (self.cas >> 56) as u8,
+            (self.cas >> 48) as u8,
+            (self.cas >> 40) as u8,
+            (self.cas >> 32) as u8,
+            (self.cas >> 24) as u8,
+            (self.cas >> 16) as u8,
+            (self.cas >> 8) as u8,
+            (self.cas & 0xFF) as u8,
+        ]
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MagicValue {
+    Unknown(u8),
+    Request,
+    Response,
+}
+impl MagicValue {
+    pub(crate) fn from_u8(value: u8) -> Self {
+        match value {
+            0x80 => MagicValue::Request,
+            0x81 => MagicValue::Response,
+            other => MagicValue::Unknown(other),
+        }
+    }
+
+    pub(crate) fn to_u8(&self) -> u8 {
+        match self {
+            MagicValue::Unknown(other) => *other,
+            MagicValue::Request => 0x80,
+            MagicValue::Response => 0x81,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Opcode {
+    Unknown(u8),
+    Get,
+    Set,
+    Delete,
+}
+impl Opcode {
+    pub(crate) fn from_u8(value: u8) -> Self {
+        match value {
+            0x00 => Opcode::Get,
+            0x01 => Opcode::Set,
+            0x04 => Opcode::Delete,
+            other => Opcode::Unknown(other),
+        }
+    }
+
+    pub(crate) fn to_u8(&self) -> u8 {
+        match self {
+            Opcode::Unknown(other) => *other,
+            Opcode::Get => 0x00,
+            Opcode::Set => 0x01,
+            Opcode::Delete => 0x04,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ResponseStatus {
+    Unknown(u16),
+    NoError,
+    KeyNotFound,
+    KeyExists,
+    ValueTooLarge,
+    InvalidArguments,
+    ItemNotStored,
+    IncrDecrOnNonNumericValue,
+    VBucketBelongsToAnotherServer,
+    AuthenticationError,
+    AuthenticationContinue,
+    UnknownCommand,
+    OutOfMemory,
+    NotSupported,
+    InternalError,
+    Busy,
+    TemporaryFailure,
+}
+impl ResponseStatus {
+    pub(crate) fn from_u16(value: u16) -> Self {
+        match value {
+            0x0000 => ResponseStatus::NoError,
+            0x0001 => ResponseStatus::KeyNotFound,
+            0x0002 => ResponseStatus::KeyExists,
+            0x0003 => ResponseStatus::ValueTooLarge,
+            0x0004 => ResponseStatus::InvalidArguments,
+            0x0005 => ResponseStatus::ItemNotStored,
+            0x0006 => ResponseStatus::IncrDecrOnNonNumericValue,
+            0x0007 => ResponseStatus::VBucketBelongsToAnotherServer,
+            0x0008 => ResponseStatus::AuthenticationError,
+            0x0009 => ResponseStatus::AuthenticationContinue,
+            0x0081 => ResponseStatus::UnknownCommand,
+            0x0082 => ResponseStatus::OutOfMemory,
+            0x0083 => ResponseStatus::NotSupported,
+            0x0084 => ResponseStatus::InternalError,
+            0x0085 => ResponseStatus::Busy,
+            0x0086 => ResponseStatus::TemporaryFailure,
+            other => ResponseStatus::Unknown(other),
+        }
+    }
+
+    pub(crate) fn to_u16(&self) -> u16 {
+        match self {
+            ResponseStatus::Unknown(other) => *other,
+            ResponseStatus::NoError => 0x0000,
+            ResponseStatus::KeyNotFound => 0x0001,
+            ResponseStatus::KeyExists => 0x0002,
+            ResponseStatus::ValueTooLarge => 0x0003,
+            ResponseStatus::InvalidArguments => 0x0004,
+            ResponseStatus::ItemNotStored => 0x0005,
+            ResponseStatus::IncrDecrOnNonNumericValue => 0x0006,
+            ResponseStatus::VBucketBelongsToAnotherServer => 0x0007,
+            ResponseStatus::AuthenticationError => 0x0008,
+            ResponseStatus::AuthenticationContinue => 0x0009,
+            ResponseStatus::UnknownCommand => 0x0081,
+            ResponseStatus::OutOfMemory => 0x0082,
+            ResponseStatus::NotSupported => 0x0083,
+            ResponseStatus::InternalError => 0x0084,
+            ResponseStatus::Busy => 0x0085,
+            ResponseStatus::TemporaryFailure => 0x0086,
+        }
     }
 }
