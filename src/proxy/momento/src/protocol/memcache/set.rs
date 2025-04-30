@@ -5,26 +5,29 @@
 use crate::klog::{klog_set, Status};
 use crate::{Error, *};
 use momento::cache::SetRequest;
-use pelikan_net::*;
 use protocol_memcache::*;
 
 pub async fn set(
     client: &mut CacheClient,
     cache_name: &str,
-    socket: &mut tokio::net::TcpStream,
-    request: &protocol_memcache::Set,
-) -> Result<(), Error> {
+    request: &Set,
+    flags: bool,
+) -> Result<Response, Error> {
     SET.increment();
 
-    let key = request.key();
-    let value = request.value();
-
-    if value.is_empty() {
-        error!("empty values are not supported by momento");
-        let _ = socket.write_all(b"ERROR\r\n").await;
-
-        return Err(Error::from(ErrorKind::InvalidInput));
+    if request.value().is_empty() {
+        SET_EX.increment();
+        return Ok(Response::client_error("empty values not supported"));
     }
+
+    let key = (*request.key()).to_owned();
+    let value = if flags {
+        let mut value = request.flags().to_be_bytes().to_vec();
+        value.extend_from_slice(request.value());
+        value
+    } else {
+        (*request.value()).to_owned()
+    };
 
     BACKEND_REQUEST.increment();
 
@@ -35,12 +38,13 @@ pub async fn set(
 
     match timeout(
         Duration::from_millis(200),
-        client.send_request(SetRequest::new(cache_name, key, value).ttl(ttl)),
+        client.send_request(SetRequest::new(cache_name, key.clone(), value.clone()).ttl(ttl)),
     )
     .await
     {
         Ok(Ok(_result)) => {
             SET_STORED.increment();
+
             if request.noreply() {
                 klog_set(
                     &key,
@@ -50,23 +54,20 @@ pub async fn set(
                     Status::Stored,
                     0,
                 );
+
+                Ok(Response::stored(true))
             } else {
+                // TODO(brian): this doesn't log the correct size now
                 klog_set(
                     &key,
                     request.flags(),
-                    request.ttl().get().unwrap_or(0),
+                    ttl.map(|v| v.as_secs()).unwrap_or(0) as _,
                     value.len(),
                     Status::Stored,
-                    8,
+                    value.len(),
                 );
-                SESSION_SEND.increment();
-                SESSION_SEND_BYTE.add(8);
-                TCP_SEND_BYTE.add(8);
-                if let Err(e) = socket.write_all(b"STORED\r\n").await {
-                    SESSION_SEND_EX.increment();
-                    // hangup if we can't send a response back
-                    return Err(e);
-                }
+
+                Ok(Response::stored(false))
             }
         }
         Ok(Err(e)) => {
@@ -84,16 +85,7 @@ pub async fn set(
                 0,
             );
 
-            let message = format!("SERVER_ERROR {e}\r\n");
-
-            SESSION_SEND_BYTE.add(message.len() as _);
-            TCP_SEND_BYTE.add(message.len() as _);
-
-            if let Err(e) = socket.write_all(message.as_bytes()).await {
-                SESSION_SEND_EX.increment();
-                // hangup if we can't send a response back
-                return Err(e);
-            }
+            Ok(Response::server_error(format!("{e}")))
         }
         Err(_) => {
             // timeout
@@ -112,18 +104,7 @@ pub async fn set(
                 0,
             );
 
-            let message = "SERVER_ERROR backend timeout\r\n";
-
-            SESSION_SEND_BYTE.add(message.len() as _);
-            TCP_SEND_BYTE.add(message.len() as _);
-
-            if let Err(e) = socket.write_all(message.as_bytes()).await {
-                SESSION_SEND_EX.increment();
-                // hangup if we can't send a response back
-                return Err(e);
-            }
+            Ok(Response::server_error("backend timeout"))
         }
     }
-
-    Ok(())
 }

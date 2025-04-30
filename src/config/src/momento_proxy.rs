@@ -22,6 +22,11 @@ impl Default for Protocol {
     }
 }
 
+// support for memcache flags is on by default
+fn flags() -> bool {
+    true
+}
+
 // struct definitions
 #[derive(Clone, Serialize, Default, Deserialize, Debug)]
 pub struct MomentoProxyConfig {
@@ -52,6 +57,8 @@ pub struct Cache {
     default_ttl: NonZeroU64,
     #[serde(default)]
     protocol: Protocol,
+    #[serde(default = "flags")]
+    flags: bool,
 }
 
 // implementation
@@ -83,6 +90,10 @@ impl Cache {
 
     pub fn protocol(&self) -> Protocol {
         self.protocol
+    }
+
+    pub fn flags(&self) -> bool {
+        self.flags
     }
 }
 

@@ -12,6 +12,7 @@ use protocol_common::Protocol;
 pub mod request;
 pub mod response;
 
+#[derive(Clone)]
 pub struct BinaryProtocol {
     max_value_size: u32,
     max_key_len: u16,

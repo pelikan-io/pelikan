@@ -394,6 +394,7 @@ async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Err
                 client_builder,
                 cache.cache_name(),
                 cache.protocol(),
+                cache.flags(),
             )
             .await;
         });

@@ -24,6 +24,12 @@ default_ttl = 900
 # the protocol can be "memcache", "memcache_binary", or "resp" (Redis). The default is memcache
 # protocol = "memcache"
 
+# For compatibility reasons, by default memcache flags are stored with the value. If you are
+# __certain__ you do not need this, you can opt-out and save 4 bytes per stored value. If any
+# clients rely on the flags, or if multiple instances of the proxy disagree on this setting,
+# you __will__ see weird errors and potentially have data corruption.
+# flags = true
+
 [[cache]]
 # interfaces listening on
 host = "0.0.0.0"
@@ -36,6 +42,12 @@ cache_name = "products"
 default_ttl = 1800
 # the protocol can be "memcache", "memcache_binary", or "resp" (Redis). The default is memcache
 protocol = "memcache_binary"
+
+# For compatibility reasons, by default memcache flags are stored with the value. If you are
+# __certain__ you do not need this, you can opt-out and save 4 bytes per stored value. If any
+# clients rely on the flags, or if multiple instances of the proxy disagree on this setting,
+# you __will__ see weird errors and potentially have data corruption.
+# flags = true
 
 [[cache]]
 # interfaces listening on

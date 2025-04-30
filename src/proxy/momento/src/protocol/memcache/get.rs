@@ -2,49 +2,50 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use protocol_memcache::GET_EX;
+use protocol_memcache::GET_KEY_HIT;
+use protocol_memcache::GET_KEY_MISS;
 use crate::klog::{klog_1, Status};
 use crate::{Error, *};
 use momento::cache::GetResponse;
-use pelikan_net::*;
-use protocol_memcache::*;
+use protocol_memcache::{Value, Response, Get};
 
 pub async fn get(
     client: &mut CacheClient,
     cache_name: &str,
-    socket: &mut tokio::net::TcpStream,
-    keys: &[Box<[u8]>],
-) -> Result<(), Error> {
+    request: &Get,
+    flags: bool,
+) -> Result<Response, Error> {
     // check if any of the keys are invalid before
     // sending the requests to the backend
-    for key in keys.iter() {
+    for key in request.keys().iter() {
         if std::str::from_utf8(key).is_err() {
             GET_EX.increment();
 
             // invalid key
-            let _ = socket.write_all(b"ERROR\r\n").await;
-            return Err(Error::from(ErrorKind::InvalidInput));
+            return Ok(Response::client_error("invalid key"));
         }
     }
 
-    let mut response_buf = Vec::new();
+    let mut values = Vec::new();
 
-    for key in keys {
+    for key in request.keys() {
         BACKEND_REQUEST.increment();
 
         // we don't have a strict guarantee this function was called with memcache
         // safe keys. This matters mostly for writing the response back to the client
         // in a protocol compliant way.
-        let key = std::str::from_utf8(key);
+        let str_key = std::str::from_utf8(key);
 
         // invalid keys will be treated as a miss
-        if key.is_err() {
+        if str_key.is_err() {
             continue;
         }
 
         // unwrap is safe now, rebind for convenience
-        let key = key.unwrap();
+        let str_key = str_key.unwrap();
 
-        match timeout(Duration::from_millis(200), client.get(cache_name, key)).await {
+        match timeout(Duration::from_millis(200), client.get(cache_name, str_key)).await {
             Ok(Ok(response)) => {
                 match response {
                     GetResponse::Hit { value } => {
@@ -52,20 +53,25 @@ pub async fn get(
 
                         let value: Vec<u8> = value.into();
 
-                        let length = value.len();
+                        if flags && value.len() < 5 {
+                            klog_1(&"get", &key, Status::Miss, 0);
+                        } else if flags {
+                            let flags: u32 = u32::from_be_bytes([value[0], value[1], value[2], value[3]]);
+                            let value: Vec<u8> = value[4..].into();
+                            let length = value.len();
 
-                        let item_header = format!("VALUE {key} 0 {length}\r\n");
+                            values.push(Value::new(key, flags, None, &value[4..]));
 
-                        klog_1(&"get", &key, Status::Hit, length);
+                            klog_1(&"get", &key, Status::Hit, length);
+                        } else {
+                            let length = value.len();
+                            values.push(Value::new(key, 0, None, &value));
 
-                        response_buf.extend_from_slice(item_header.as_bytes());
-                        response_buf.extend_from_slice(&value);
-                        response_buf.extend_from_slice(b"\r\n");
+                            klog_1(&"get", &key, Status::Hit, length);
+                        }
                     }
                     GetResponse::Miss => {
                         GET_KEY_MISS.increment();
-
-                        // we don't write anything for a miss
 
                         klog_1(&"get", &key, Status::Miss, 0);
                     }
@@ -90,14 +96,10 @@ pub async fn get(
             }
         }
     }
-    response_buf.extend_from_slice(b"END\r\n");
 
-    SESSION_SEND.increment();
-    SESSION_SEND_BYTE.add(response_buf.len() as _);
-    TCP_SEND_BYTE.add(response_buf.len() as _);
-    if let Err(e) = socket.write_all(&response_buf).await {
-        SESSION_SEND_EX.increment();
-        return Err(e);
+    if !values.is_empty() {
+        Ok(Response::values(values.into()))
+    } else {
+        Ok(Response::not_found(false))
     }
-    Ok(())
 }

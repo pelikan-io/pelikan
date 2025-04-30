@@ -3,5 +3,4 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 pub mod memcache;
-pub mod memcache_binary;
 pub mod resp;
