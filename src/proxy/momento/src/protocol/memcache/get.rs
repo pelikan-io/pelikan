@@ -18,34 +18,27 @@ pub async fn get(
 ) -> Result<Response, Error> {
     // check if any of the keys are invalid before
     // sending the requests to the backend
-    for key in request.keys().iter() {
-        if std::str::from_utf8(key).is_err() {
+    let keys = match request
+        .keys()
+        .iter()
+        .map(|key| std::str::from_utf8(key))
+        .collect::<Result<Vec<_>, _>>()
+    {
+        Ok(keys) => keys,
+        Err(_) => {
             GET_EX.increment();
 
             // invalid key
             return Ok(Response::client_error("invalid key"));
         }
-    }
+    };
 
     let mut values = Vec::new();
 
-    for key in request.keys() {
+    for key in keys {
         BACKEND_REQUEST.increment();
 
-        // we don't have a strict guarantee this function was called with memcache
-        // safe keys. This matters mostly for writing the response back to the client
-        // in a protocol compliant way.
-        let str_key = std::str::from_utf8(key);
-
-        // invalid keys will be treated as a miss
-        if str_key.is_err() {
-            continue;
-        }
-
-        // unwrap is safe now, rebind for convenience
-        let str_key = str_key.unwrap();
-
-        match timeout(Duration::from_millis(200), client.get(cache_name, str_key)).await {
+        match timeout(Duration::from_millis(200), client.get(cache_name, key)).await {
             Ok(Ok(response)) => match response {
                 GetResponse::Hit { value } => {
                     GET_KEY_HIT.increment();
@@ -60,12 +53,12 @@ pub async fn get(
                         let value: Vec<u8> = value[4..].into();
                         let length = value.len();
 
-                        values.push(Value::new(key, flags, None, &value));
+                        values.push(Value::new(key.as_bytes(), flags, None, &value));
 
                         klog_1(&"get", &key, Status::Hit, length);
                     } else {
                         let length = value.len();
-                        values.push(Value::new(key, 0, None, &value));
+                        values.push(Value::new(key.as_bytes(), 0, None, &value));
 
                         klog_1(&"get", &key, Status::Hit, length);
                     }
