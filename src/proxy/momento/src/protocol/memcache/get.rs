@@ -2,13 +2,13 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use protocol_memcache::GET_EX;
-use protocol_memcache::GET_KEY_HIT;
-use protocol_memcache::GET_KEY_MISS;
 use crate::klog::{klog_1, Status};
 use crate::{Error, *};
 use momento::cache::GetResponse;
-use protocol_memcache::{Value, Response, Get};
+use protocol_memcache::GET_EX;
+use protocol_memcache::GET_KEY_HIT;
+use protocol_memcache::GET_KEY_MISS;
+use protocol_memcache::{Get, Response, Value};
 
 pub async fn get(
     client: &mut CacheClient,
@@ -46,37 +46,36 @@ pub async fn get(
         let str_key = str_key.unwrap();
 
         match timeout(Duration::from_millis(200), client.get(cache_name, str_key)).await {
-            Ok(Ok(response)) => {
-                match response {
-                    GetResponse::Hit { value } => {
-                        GET_KEY_HIT.increment();
+            Ok(Ok(response)) => match response {
+                GetResponse::Hit { value } => {
+                    GET_KEY_HIT.increment();
 
-                        let value: Vec<u8> = value.into();
+                    let value: Vec<u8> = value.into();
 
-                        if flags && value.len() < 5 {
-                            klog_1(&"get", &key, Status::Miss, 0);
-                        } else if flags {
-                            let flags: u32 = u32::from_be_bytes([value[0], value[1], value[2], value[3]]);
-                            let value: Vec<u8> = value[4..].into();
-                            let length = value.len();
-
-                            values.push(Value::new(key, flags, None, &value));
-
-                            klog_1(&"get", &key, Status::Hit, length);
-                        } else {
-                            let length = value.len();
-                            values.push(Value::new(key, 0, None, &value));
-
-                            klog_1(&"get", &key, Status::Hit, length);
-                        }
-                    }
-                    GetResponse::Miss => {
-                        GET_KEY_MISS.increment();
-
+                    if flags && value.len() < 5 {
                         klog_1(&"get", &key, Status::Miss, 0);
+                    } else if flags {
+                        let flags: u32 =
+                            u32::from_be_bytes([value[0], value[1], value[2], value[3]]);
+                        let value: Vec<u8> = value[4..].into();
+                        let length = value.len();
+
+                        values.push(Value::new(key, flags, None, &value));
+
+                        klog_1(&"get", &key, Status::Hit, length);
+                    } else {
+                        let length = value.len();
+                        values.push(Value::new(key, 0, None, &value));
+
+                        klog_1(&"get", &key, Status::Hit, length);
                     }
                 }
-            }
+                GetResponse::Miss => {
+                    GET_KEY_MISS.increment();
+
+                    klog_1(&"get", &key, Status::Miss, 0);
+                }
+            },
             Ok(Err(e)) => {
                 // we got some error from the momento client
                 // log and incr stats and move on treating it

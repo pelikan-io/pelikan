@@ -17,7 +17,10 @@ pub(crate) async fn handle_memcache_client(
     socket: tokio::net::TcpStream,
     client: CacheClient,
     cache_name: String,
-    protocol: impl Protocol<protocol_memcache::Request, protocol_memcache::Response> + Clone + Send + 'static,
+    protocol: impl Protocol<protocol_memcache::Request, protocol_memcache::Response>
+        + Clone
+        + Send
+        + 'static,
     flags: bool,
 ) {
     debug!("accepted memcache binary client");

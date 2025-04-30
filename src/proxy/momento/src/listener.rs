@@ -33,12 +33,24 @@ pub(crate) async fn listener(
                 TCP_CONN_CURR.increment();
                 match protocol {
                     Protocol::MemcacheBinary => {
-                        crate::frontend::handle_memcache_client(socket, client, cache_name, protocol_memcache::BinaryProtocol::default(), flags)
-                            .await;
+                        crate::frontend::handle_memcache_client(
+                            socket,
+                            client,
+                            cache_name,
+                            protocol_memcache::BinaryProtocol::default(),
+                            flags,
+                        )
+                        .await;
                     }
                     Protocol::Memcache => {
-                        crate::frontend::handle_memcache_client(socket, client, cache_name, protocol_memcache::TextProtocol::default(), flags)
-                            .await;
+                        crate::frontend::handle_memcache_client(
+                            socket,
+                            client,
+                            cache_name,
+                            protocol_memcache::TextProtocol::default(),
+                            flags,
+                        )
+                        .await;
                     }
                     Protocol::Resp => {
                         crate::frontend::handle_resp_client(socket, client, cache_name).await;
