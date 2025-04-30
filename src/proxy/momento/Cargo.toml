@@ -17,6 +17,7 @@ clocksource = { workspace = true }
 common = { path = "../../common" }
 config = { path = "../../config" }
 crossbeam-channel = { workspace = true }
+futures = { workspace = true }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }

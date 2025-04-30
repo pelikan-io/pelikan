@@ -51,6 +51,7 @@ clap = "4.4.6"
 clocksource = "0.8.1"
 crossbeam-channel = "0.5.15"
 datatier = { path = "./src/storage/datatier", version = "0.1.0" }
+futures = "0.3.31"
 httparse = "1.8.0"
 libc = "0.2.149"
 log = "0.4.20"
