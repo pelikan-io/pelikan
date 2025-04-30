@@ -60,7 +60,7 @@ pub async fn get(
                             let value: Vec<u8> = value[4..].into();
                             let length = value.len();
 
-                            values.push(Value::new(key, flags, None, &value[4..]));
+                            values.push(Value::new(key, flags, None, &value));
 
                             klog_1(&"get", &key, Status::Hit, length);
                         } else {
