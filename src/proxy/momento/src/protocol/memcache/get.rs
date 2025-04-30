@@ -6,7 +6,6 @@ use crate::klog::{klog_1, Status};
 use crate::{Error, *};
 use futures::StreamExt;
 use momento::cache::GetResponse;
-use protocol_memcache::GET_EX;
 use protocol_memcache::GET_KEY_HIT;
 use protocol_memcache::GET_KEY_MISS;
 use protocol_memcache::{Get, Response, Value};
@@ -17,25 +16,8 @@ pub async fn get(
     request: &Get,
     flags: bool,
 ) -> Result<Response, Error> {
-    // check if any of the keys are invalid before
-    // sending the requests to the backend
-    let keys = match request
-        .keys()
-        .iter()
-        .map(|key| std::str::from_utf8(key))
-        .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(keys) => keys,
-        Err(_) => {
-            GET_EX.increment();
-
-            // invalid key
-            return Ok(Response::client_error("invalid key"));
-        }
-    };
-
     let mut tasks = futures::stream::FuturesOrdered::new();
-    for key in keys {
+    for key in request.keys() {
         BACKEND_REQUEST.increment();
 
         tasks.push_back(run_get(client, cache_name, flags, key));
@@ -50,7 +32,7 @@ pub async fn get(
     }
 }
 
-async fn run_get(client: &CacheClient, cache_name: &str, flags: bool, key: &str) -> Option<Value> {
+async fn run_get(client: &CacheClient, cache_name: &str, flags: bool, key: &[u8]) -> Option<Value> {
     match timeout(Duration::from_millis(200), client.get(cache_name, key)).await {
         Ok(Ok(response)) => match response {
             GetResponse::Hit { value } => {
@@ -67,12 +49,12 @@ async fn run_get(client: &CacheClient, cache_name: &str, flags: bool, key: &str)
                     let length = value.len();
 
                     klog_1(&"get", &key, Status::Hit, length);
-                    Some(Value::new(key.as_bytes(), flags, None, &value))
+                    Some(Value::new(key, flags, None, &value))
                 } else {
                     let length = value.len();
 
                     klog_1(&"get", &key, Status::Hit, length);
-                    Some(Value::new(key.as_bytes(), 0, None, &value))
+                    Some(Value::new(key, 0, None, &value))
                 }
             }
             GetResponse::Miss => {
