@@ -1,4 +1,4 @@
-use super::*;
+use super::{header::ResponseStatus, *};
 
 impl BinaryProtocol {
     pub(crate) fn parse_delete_response<'a>(

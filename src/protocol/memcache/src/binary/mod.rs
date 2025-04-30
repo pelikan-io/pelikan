@@ -4,12 +4,12 @@
 //! such as the concrete request and response types.
 
 use crate::binary::request::RequestHeader;
-use crate::binary::response::ResponseHeader;
 use crate::*;
 use protocol_common::BufMut;
 use protocol_common::Protocol;
-use response::MagicValue;
-use response::Opcode;
+use response::header::MagicValue;
+use response::header::Opcode;
+use response::header::ResponseHeader;
 
 pub mod request;
 pub mod response;

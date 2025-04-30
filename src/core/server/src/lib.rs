@@ -103,7 +103,7 @@ use logger::{Drain, Klog};
 use metriken::*;
 use pelikan_net::event::{Event, Source};
 use pelikan_net::*;
-use protocol_common::{Compose, Execute, Parse};
+use protocol_common::{Compose, Execute};
 use session::{Buf, ServerSession, Session};
 use slab::Slab;
 use std::io::{Error, ErrorKind, Result};

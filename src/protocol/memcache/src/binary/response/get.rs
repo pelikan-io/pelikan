@@ -1,3 +1,5 @@
+use crate::binary::response::header::ResponseStatus;
+
 use super::*;
 
 impl BinaryProtocol {
@@ -66,23 +68,30 @@ impl BinaryProtocol {
     ) -> std::result::Result<usize, std::io::Error> {
         match response {
             Response::Values(values) => {
-                buffer.put_slice(&[0x81, 0x00]);
-                if !request.key {
-                    buffer.put_slice(&[0x00, 0x00]);
+                const EXTRAS_LEN: u8 = 4;
+                let key_len = if !request.key {
+                    0
                 } else {
-                    buffer.put_u16(values.values[0].key().len() as u16);
+                    values.values[0].key().len() as u16
+                };
+                let total_body_len = EXTRAS_LEN as usize
+                    + key_len as usize
+                    + values.values[0].value().map(|v| v.len()).unwrap_or(0);
+
+                ResponseHeader {
+                    magic: MagicValue::Response,
+                    opcode: Opcode::Get,
+                    key_len: key_len as u16,
+                    extras_len: EXTRAS_LEN,
+                    data_type: 0x00,
+                    status: ResponseStatus::NoError,
+                    total_body_len: total_body_len as u32,
+                    opaque: request.opaque.unwrap_or(0),
+                    cas: values.values[0].cas.unwrap_or(0),
                 }
-                buffer.put_slice(&[0x04, 0x00, 0x00, 0x00]);
+                .write_to(buffer);
 
-                let mut total_body_len = values.values[0].value().map(|v| v.len()).unwrap_or(0) + 4;
-
-                if request.key {
-                    total_body_len += values.values[0].key().len();
-                }
-
-                buffer.put_u32(total_body_len as _);
-                buffer.put_u32(request.opaque.unwrap_or(0));
-                buffer.put_u64(values.values[0].cas.unwrap_or(0));
+                // EXTRAS_LEN
                 buffer.put_u32(values.values[0].flags);
 
                 if request.key {
@@ -96,11 +105,9 @@ impl BinaryProtocol {
                 Ok(24 + total_body_len)
             }
             Response::NotFound(_) => {
-                buffer.put_slice(&[
-                    0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ]);
-
+                ResponseStatus::KeyNotFound
+                    .as_empty_response(Opcode::Get)
+                    .write_to(buffer);
                 Ok(24)
             }
             _ => Err(std::io::Error::new(

@@ -1,4 +1,4 @@
-use super::*;
+use super::{header::ResponseStatus, *};
 
 impl BinaryProtocol {
     pub(crate) fn parse_set_response<'a>(
