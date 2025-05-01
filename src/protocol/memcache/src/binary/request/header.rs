@@ -83,10 +83,13 @@ impl RequestHeader {
         }
     }
 
+    /// Returns the total request length which is the header length plus the
+    /// request body length.
     pub fn request_len(&self) -> usize {
         24 + self.total_body_len as usize
     }
 
+    /// Create a header for a `get` request.
     pub fn get(key_len: u16) -> Self {
         let mut header = Self::with_opcode(Opcode::Get);
         header.key_len = key_len;
@@ -95,6 +98,8 @@ impl RequestHeader {
         header
     }
 
+    /// Try to create a header for a `set` request. Returns an error if the
+    /// key, value, and extras exceed the max request body size.
     pub fn set(key_len: u16, value_len: u32) -> Result<Self, std::io::Error> {
         const EXTRAS_LEN: u8 = 8;
 
@@ -115,6 +120,7 @@ impl RequestHeader {
         Ok(header)
     }
 
+    /// Create a header for a `delete` request.
     pub fn delete(key_len: u16) -> Self {
         let mut header = Self::with_opcode(Opcode::Delete);
         header.key_len = key_len;
