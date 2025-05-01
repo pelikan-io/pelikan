@@ -7,8 +7,6 @@ use crate::binary::request::RequestHeader;
 use crate::*;
 use protocol_common::BufMut;
 use protocol_common::Protocol;
-use response::header::MagicValue;
-use response::header::Opcode;
 use response::header::ResponseHeader;
 
 pub mod request;
@@ -45,15 +43,15 @@ impl BinaryProtocol {
         }
 
         match header.opcode {
-            0x00 => {
+            Opcode::Get => {
                 let (input, request) = self.parse_get_request(input, header)?;
                 Ok((input, Request::Get(request)))
             }
-            0x01 => {
+            Opcode::Set => {
                 let (input, request) = self.parse_set_request(input, header)?;
                 Ok((input, Request::Set(request)))
             }
-            0x04 => {
+            Opcode::Delete => {
                 let (input, request) = self.parse_delete_request(input, header)?;
                 Ok((input, Request::Delete(request)))
             }
@@ -207,3 +205,57 @@ pub(crate) fn is_key_valid(key: &[u8]) -> bool {
 
     true
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MagicValue {
+    Unknown(u8),
+    Request,
+    Response,
+}
+
+impl MagicValue {
+    pub(crate) fn from_u8(value: u8) -> Self {
+        match value {
+            0x80 => MagicValue::Request,
+            0x81 => MagicValue::Response,
+            other => MagicValue::Unknown(other),
+        }
+    }
+
+    pub(crate) fn to_u8(self) -> u8 {
+        match self {
+            MagicValue::Unknown(other) => other,
+            MagicValue::Request => 0x80,
+            MagicValue::Response => 0x81,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Opcode {
+    Unknown(u8),
+    Get,
+    Set,
+    Delete,
+}
+
+impl Opcode {
+    pub(crate) fn from_u8(value: u8) -> Self {
+        match value {
+            0x00 => Opcode::Get,
+            0x01 => Opcode::Set,
+            0x04 => Opcode::Delete,
+            other => Opcode::Unknown(other),
+        }
+    }
+
+    pub(crate) fn to_u8(self) -> u8 {
+        match self {
+            Opcode::Unknown(other) => other,
+            Opcode::Get => 0x00,
+            Opcode::Set => 0x01,
+            Opcode::Delete => 0x04,
+        }
+    }
+}
+

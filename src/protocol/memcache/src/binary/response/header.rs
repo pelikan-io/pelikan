@@ -1,3 +1,4 @@
+use crate::binary::{MagicValue, Opcode};
 use bytes::BufMut;
 use nom::{bytes::streaming::take, IResult};
 
@@ -57,59 +58,6 @@ impl ResponseHeader {
         buffer.put_u32(self.total_body_len);
         buffer.put_u32(self.opaque);
         buffer.put_u64(self.cas);
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum MagicValue {
-    Unknown(u8),
-    Request,
-    Response,
-}
-
-impl MagicValue {
-    pub(crate) fn from_u8(value: u8) -> Self {
-        match value {
-            0x80 => MagicValue::Request,
-            0x81 => MagicValue::Response,
-            other => MagicValue::Unknown(other),
-        }
-    }
-
-    pub(crate) fn to_u8(self) -> u8 {
-        match self {
-            MagicValue::Unknown(other) => other,
-            MagicValue::Request => 0x80,
-            MagicValue::Response => 0x81,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Opcode {
-    Unknown(u8),
-    Get,
-    Set,
-    Delete,
-}
-
-impl Opcode {
-    pub(crate) fn from_u8(value: u8) -> Self {
-        match value {
-            0x00 => Opcode::Get,
-            0x01 => Opcode::Set,
-            0x04 => Opcode::Delete,
-            other => Opcode::Unknown(other),
-        }
-    }
-
-    pub(crate) fn to_u8(self) -> u8 {
-        match self {
-            Opcode::Unknown(other) => other,
-            Opcode::Get => 0x00,
-            Opcode::Set => 0x01,
-            Opcode::Delete => 0x04,
-        }
     }
 }
 
