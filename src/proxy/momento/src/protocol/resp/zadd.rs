@@ -25,9 +25,24 @@ pub async fn zadd(
     update_method_metrics(&ZADD, &ZADD_EX, async move {
         let number_of_elements_added = req.members().len();
 
+        // Momento does not yet support some of these optional arguments, return an error if any are set
+        if req.optional_args().ch
+            || req.optional_args().xx
+            || req.optional_args().nx
+            || req.optional_args().gt
+            || req.optional_args().lt
+        {
+            klog_1(&"zadd", &req.key(), Status::ServerError, 0);
+            return Err(ProxyError::from(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Momento proxy does not support CH, XX, NX, GT, or LT optional arguments",
+            )));
+        }
+
         // If INCR is set, then ZADD should behave like ZINCRBY (as per the docs), which accepts only a single score-member pair
         if req.optional_args().incr {
             if req.members().len() != 1 {
+                klog_1(&"zadd", &req.key(), Status::ServerError, 0);
                 return Err(ProxyError::from(std::io::Error::new(
                     std::io::ErrorKind::Other,
                     "INCR option requires exactly one score-member pair",
@@ -47,7 +62,10 @@ pub async fn zadd(
                     value: (**member).into(),
                     score: float_score,
                 }),
-                Err(e) => return Err(ProxyError::from(e)),
+                Err(e) => {
+                    klog_1(&"zadd", &req.key(), Status::ServerError, 0);
+                    return Err(ProxyError::from(e));
+                }
             }
         }
 

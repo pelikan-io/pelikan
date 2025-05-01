@@ -22,11 +22,11 @@ pub struct SortedSetAdd {
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub struct SortedSetAddOptionalArguments {
-    nx: bool,
-    xx: bool,
-    gt: bool,
-    lt: bool,
-    ch: bool,
+    pub nx: bool,
+    pub xx: bool,
+    pub gt: bool,
+    pub lt: bool,
+    pub ch: bool,
     pub incr: bool,
 }
 
@@ -74,19 +74,6 @@ impl TryFrom<Message> for SortedSetAdd {
                     members.push(arg);
                 }
             }
-        }
-
-        // Momento does not yet support some of these optional arguments, return an error if any are set
-        if optional_args.ch
-            || optional_args.xx
-            || optional_args.nx
-            || optional_args.gt
-            || optional_args.lt
-        {
-            return Err(Error::new(
-                ErrorKind::Other,
-                "optional argument(s) not supported",
-            ));
         }
 
         // If INCR is set, then ZADD should behave like ZINCRBY (as per the docs), which accepts only a single score-member pair
@@ -259,6 +246,26 @@ mod tests {
 
         assert_eq!(
             parser
+                .parse(b"zadd z XX LT CH 123 abc 321 xyz\r\n")
+                .unwrap()
+                .into_inner(),
+            Request::SortedSetAdd(SortedSetAdd::new(
+                b"z",
+                &[
+                    ("123".as_bytes(), "abc".as_bytes()),
+                    ("321".as_bytes(), "xyz".as_bytes())
+                ],
+                SortedSetAddOptionalArguments {
+                    xx: true,
+                    lt: true,
+                    ch: true,
+                    ..Default::default()
+                }
+            ))
+        );
+
+        assert_eq!(
+            parser
                 .parse(b"*5\r\n$4\r\nZADD\r\n$1\r\nz\r\n$4\r\nINCR\r\n$3\r\n1.2\r\n$1\r\na\r\n")
                 .unwrap()
                 .into_inner(),
@@ -294,6 +301,23 @@ mod tests {
               &[("1.23".as_bytes(), "a".as_bytes()), ("23.4".as_bytes(), "b".as_bytes()), ("345".as_bytes(), "c".as_bytes())],
               SortedSetAddOptionalArguments::default()
           ))
-      );
+        );
+
+        assert_eq!(
+          parser
+              .parse(b"*9\r\n$4\r\nZADD\r\n$1\r\nz\r\n$2\r\nNX\r\n$2\r\nGT\r\n$2\r\nCH\r\n$3\r\n123\r\n$1\r\na\r\n$3\r\n321\r\n$1\r\nb\r\n")
+              .unwrap()
+              .into_inner(),
+          Request::SortedSetAdd(SortedSetAdd::new(
+              b"z",
+              &[("123".as_bytes(), "a".as_bytes()), ("321".as_bytes(), "b".as_bytes())],
+              SortedSetAddOptionalArguments {
+                  nx: true,
+                  gt: true,
+                  ch: true,
+                  ..Default::default()
+              }
+          ))
+        );
     }
 }
