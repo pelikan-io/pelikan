@@ -125,16 +125,11 @@ impl BinaryProtocol {
 
         let klen = request.keys[0].len() as u16;
 
-        buffer.put_slice(&[0x80, 0x00]);
-        buffer.put_u16(klen);
-        buffer.put_slice(&[0x00, 0x00, 0x00, 0x00]);
-        buffer.put_u32(klen as _);
-        buffer.put_slice(&[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ]);
+        let header = RequestHeader::get(klen);
+        header.write_to(buffer);
         buffer.put_slice(&request.keys[0]);
 
-        Ok(24 + klen as usize)
+        Ok(header.request_len())
     }
 }
 

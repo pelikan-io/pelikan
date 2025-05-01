@@ -68,4 +68,58 @@ impl RequestHeader {
         buffer.put_u32(self.opaque);
         buffer.put_u64(self.cas);
     }
+
+    fn with_opcode(opcode: Opcode) -> Self {
+        Self {
+            magic: MagicValue::Request,
+            opcode,
+            key_len: 0,
+            extras_len: 0,
+            data_type: 0,
+            _reserved: 0,
+            total_body_len: 0,
+            opaque: 0,
+            cas: 0,
+        }
+    }
+
+    pub fn request_len(&self) -> usize {
+        24 + self.total_body_len as usize
+    }
+
+    pub fn get(key_len: u16) -> Self {
+        let mut header = Self::with_opcode(Opcode::Get);
+        header.key_len = key_len;
+        header.total_body_len = key_len as u32;
+
+        header
+    }
+
+    pub fn set(key_len: u16, value_len: u32) -> Result<Self, std::io::Error> {
+        const EXTRAS_LEN: u8 = 8;
+
+        let total_body_len: u32 = (key_len as u64 + value_len as u64 + EXTRAS_LEN as u64)
+            .try_into()
+            .map_err(|_e| {
+                std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "request body too large for binary protocol",
+                )
+            })?;
+
+        let mut header = Self::with_opcode(Opcode::Set);
+        header.key_len = key_len;
+        header.extras_len = EXTRAS_LEN;
+        header.total_body_len = total_body_len;
+
+        Ok(header)
+    }
+
+    pub fn delete(key_len: u16) -> Self {
+        let mut header = Self::with_opcode(Opcode::Delete);
+        header.key_len = key_len;
+        header.total_body_len = key_len as u32;
+
+        header
+    }
 }

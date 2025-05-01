@@ -110,34 +110,27 @@ impl BinaryProtocol {
         request: &Set,
         buffer: &mut dyn BufMut,
     ) -> std::result::Result<usize, std::io::Error> {
-        if request.key.len() > u64::MAX as _ {
+        if request.key.len() > u16::MAX as _ {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Other,
                 "request key too large for binary protocol",
             ));
         }
 
-        let total_body_len: u32 = (request.key.len() + request.value.len() + 8)
-            .try_into()
-            .map_err(|_e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "request body too large for binary protocol",
-                )
-            })?;
+        if request.value.len() > u32::MAX as _ {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "request value too large for binary protocol",
+            ));
+        }
 
-        buffer.put_slice(&[0x80, 0x01]);
-        buffer.put_u16(request.key.len() as _);
-        buffer.put_slice(&[0x00, 0x00, 0x00, 0x00]);
-        buffer.put_u32(total_body_len);
-        buffer.put_slice(&[
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        ]);
+        let header = RequestHeader::set(request.key.len() as _, request.value.len() as _)?;
+        header.write_to(buffer);
         buffer.put_u32(request.flags);
         buffer.put_i32(request.ttl.get().unwrap_or(0));
         buffer.put_slice(&request.key);
         buffer.put_slice(&request.value);
 
-        Ok(24 + total_body_len as usize)
+        Ok(header.request_len())
     }
 }
