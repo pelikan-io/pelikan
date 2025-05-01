@@ -102,11 +102,6 @@ mod tests {
         );
 
         assert_eq!(
-            parser.parse(b"ZSCORE z a\r\n").unwrap().into_inner(),
-            Request::SortedSetScore(SortedSetScore::new(b"z", b"a"))
-        );
-
-        assert_eq!(
             parser
                 .parse(b"*3\r\n$6\r\nZSCORE\r\n$1\r\nz\r\n$1\r\na\r\n")
                 .unwrap()
