@@ -100,26 +100,22 @@ async fn update_method_metrics<T, E>(
 fn parse_sorted_set_score(score: &[u8]) -> Result<f64, std::io::Error> {
     // Momento calls cannot accept f64::INFINITY, so using f64::MAX instead
     if score == "-inf".as_bytes() {
-        return Ok(f64::MIN);
+        Ok(f64::MIN)
     } else if score == "+inf".as_bytes() {
-        return Ok(f64::MAX);
+        Ok(f64::MAX)
+    } else if let Some(float) = std::str::from_utf8(score)
+        .map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::Other, "score string is not valid utf8")
+        })?
+        .parse::<f64>()
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "score string is not a f64"))
+        .map(Some)?
+    {
+        return Ok(float);
     } else {
-        if let Some(float) = std::str::from_utf8(&score)
-            .map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::Other, "score string is not valid utf8")
-            })?
-            .parse::<f64>()
-            .map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::Other, "score string is not a f64")
-            })
-            .map(Some)?
-        {
-            return Ok(float);
-        } else {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "score string is not a valid f64",
-            ));
-        }
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "score string is not a valid f64",
+        ));
     }
 }

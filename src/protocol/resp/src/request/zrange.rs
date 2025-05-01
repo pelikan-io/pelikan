@@ -53,7 +53,7 @@ impl StartStopValue {
             if let Ok(Some(integer_start)) = take_bulk_string_as_i64(&mut value_for_int_conversion)
             {
                 // Extracted the value as an integer that has no "(" or has a "+" or "-" to denote signage
-                return Ok(StartStopValue::Inclusive(integer_start));
+                Ok(StartStopValue::Inclusive(integer_start))
             } else {
                 // Otherwise, the value may contain a "(" in front of a number
                 let string_start =
@@ -76,9 +76,9 @@ impl StartStopValue {
                 let inclusive_symbol = "[".as_bytes(); // Used only with BYLEX which Momento does not yet support
 
                 if string_start[0] == positive_infinity[0] {
-                    return Ok(StartStopValue::PositiveInfinity);
+                    Ok(StartStopValue::PositiveInfinity)
                 } else if string_start[0] == negative_infinity[0] {
-                    return Ok(StartStopValue::NegativeInfinity);
+                    Ok(StartStopValue::NegativeInfinity)
                 } else if string_start[0] == exclusive_symbol[0] {
                     // Extract the value without the "(", and try to convert it to an integer
                     let without_symbol = Message::BulkString(BulkString::new(&string_start[1..]));
@@ -99,10 +99,10 @@ impl StartStopValue {
                 }
             }
         } else {
-            return Err(Error::new(
+            Err(Error::new(
                 ErrorKind::Other,
                 "malformed command, range boundary value is none",
-            ));
+            ))
         }
     }
 }
@@ -232,12 +232,12 @@ impl TryFrom<Message> for SortedSetRange {
                         ));
                     };
 
-                return Ok(Self {
+                Ok(Self {
                     key,
                     reversed: optional_args.reversed.unwrap_or(false),
                     with_scores: optional_args.with_scores.unwrap_or(false),
                     args: MomentoSortedSetFetchArgs::ByRank(start, stop),
-                });
+                })
             }
             // If LIMIT offset count is present but BYSCORE is not, it is an invalid request.
             SortedSetRangeOptionalArguments {
@@ -245,12 +245,10 @@ impl TryFrom<Message> for SortedSetRange {
                 count: Some(_),
                 by_score: None,
                 ..
-            } => {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    "malformed command, BYSCORE must be present with LIMIT offset count",
-                ))
-            }
+            } => Err(Error::new(
+                ErrorKind::Other,
+                "malformed command, BYSCORE must be present with LIMIT offset count",
+            )),
             // BYSCORE is present
             SortedSetRangeOptionalArguments {
                 by_score: Some(_), ..
@@ -272,7 +270,7 @@ impl TryFrom<Message> for SortedSetRange {
                     ));
                 };
 
-                return Ok(Self {
+                Ok(Self {
                     key,
                     reversed: optional_args.reversed.unwrap_or(false),
                     with_scores: optional_args.with_scores.unwrap_or(false),
@@ -282,14 +280,12 @@ impl TryFrom<Message> for SortedSetRange {
                         optional_args.offset,
                         optional_args.count,
                     ),
-                });
+                })
             }
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    "malformed command, invalid optional arguments",
-                ))
-            }
+            _ => Err(Error::new(
+                ErrorKind::Other,
+                "malformed command, invalid optional arguments",
+            )),
         }
     }
 }
