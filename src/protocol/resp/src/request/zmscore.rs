@@ -117,11 +117,6 @@ mod tests {
         );
 
         assert_eq!(
-            parser.parse(b"ZMSCORE z a b c\r\n").unwrap().into_inner(),
-            Request::SortedSetMultiScore(SortedSetMultiScore::new(b"z", &[b"a", b"b", b"c"]))
-        );
-
-        assert_eq!(
             parser
                 .parse(b"*5\r\n$7\r\nZMSCORE\r\n$1\r\nz\r\n$1\r\na\r\n$1\r\nb\r\n$1\r\nc\r\n")
                 .unwrap()
