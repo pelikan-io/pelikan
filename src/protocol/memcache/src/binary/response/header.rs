@@ -66,6 +66,7 @@ pub enum MagicValue {
     Request,
     Response,
 }
+
 impl MagicValue {
     pub(crate) fn from_u8(value: u8) -> Self {
         match value {
@@ -75,9 +76,9 @@ impl MagicValue {
         }
     }
 
-    pub(crate) fn to_u8(&self) -> u8 {
+    pub(crate) fn to_u8(self) -> u8 {
         match self {
-            MagicValue::Unknown(other) => *other,
+            MagicValue::Unknown(other) => other,
             MagicValue::Request => 0x80,
             MagicValue::Response => 0x81,
         }
@@ -91,6 +92,7 @@ pub enum Opcode {
     Set,
     Delete,
 }
+
 impl Opcode {
     pub(crate) fn from_u8(value: u8) -> Self {
         match value {
@@ -101,9 +103,9 @@ impl Opcode {
         }
     }
 
-    pub(crate) fn to_u8(&self) -> u8 {
+    pub(crate) fn to_u8(self) -> u8 {
         match self {
-            Opcode::Unknown(other) => *other,
+            Opcode::Unknown(other) => other,
             Opcode::Get => 0x00,
             Opcode::Set => 0x01,
             Opcode::Delete => 0x04,
@@ -131,6 +133,7 @@ pub enum ResponseStatus {
     Busy,
     TemporaryFailure,
 }
+
 impl ResponseStatus {
     pub fn from_u16(value: u16) -> Self {
         match value {
@@ -154,9 +157,9 @@ impl ResponseStatus {
         }
     }
 
-    pub fn to_u16(&self) -> u16 {
+    pub fn to_u16(self) -> u16 {
         match self {
-            ResponseStatus::Unknown(other) => *other,
+            ResponseStatus::Unknown(other) => other,
             ResponseStatus::NoError => 0x0000,
             ResponseStatus::KeyNotFound => 0x0001,
             ResponseStatus::KeyExists => 0x0002,

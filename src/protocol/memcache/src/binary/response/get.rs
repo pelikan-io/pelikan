@@ -81,7 +81,7 @@ impl BinaryProtocol {
                 ResponseHeader {
                     magic: MagicValue::Response,
                     opcode: Opcode::Get,
-                    key_len: key_len as u16,
+                    key_len,
                     extras_len: EXTRAS_LEN,
                     data_type: 0x00,
                     status: ResponseStatus::NoError,
@@ -118,27 +118,27 @@ impl BinaryProtocol {
                 Ok(server_error.write_binary_response(Opcode::Get, buffer))
             }
             Response::Stored(_stored) => Ok(response::ServerError {
-                inner: format!("unknown response: STORED"),
+                inner: "unknown response: STORED".to_string(),
             }
             .write_binary_response(Opcode::Get, buffer)),
             Response::NotStored(_not_stored) => Ok(response::ServerError {
-                inner: format!("unknown response: NOT_STORED"),
+                inner: "unknown response: NOT_STORED".to_string(),
             }
             .write_binary_response(Opcode::Get, buffer)),
             Response::Exists(_exists) => Ok(response::ServerError {
-                inner: format!("unknown response: EXISTS"),
+                inner: "unknown response: EXISTS".to_string(),
             }
             .write_binary_response(Opcode::Get, buffer)),
             Response::Numeric(_numeric) => Ok(response::ServerError {
-                inner: format!("unknown response: NUMERIC"),
+                inner: "unknown response: NUMERIC".to_string(),
             }
             .write_binary_response(Opcode::Get, buffer)),
             Response::Deleted(_deleted) => Ok(response::ServerError {
-                inner: format!("unknown response: DELETED"),
+                inner: "unknown response: DELETED".to_string(),
             }
             .write_binary_response(Opcode::Get, buffer)),
             Response::Hangup => Ok(response::ServerError {
-                inner: format!("HANGUP"),
+                inner: "HANGUP".to_string(),
             }
             .write_binary_response(Opcode::Get, buffer)),
         }
