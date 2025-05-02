@@ -93,6 +93,7 @@ impl BinaryProtocol {
                 noreply: false,
                 ttl,
                 value: value.to_owned().into_boxed_slice(),
+                opaque: Some(header.opaque),
             },
         ))
     }

@@ -37,31 +37,54 @@ impl BinaryProtocol {
 
     fn _compose_set_response(
         &self,
-        _request: &Set,
+        request: &Set,
         response: &Response,
         buffer: &mut dyn BufMut,
     ) -> std::result::Result<usize, std::io::Error> {
         match response {
             Response::Stored(_) => {
-                buffer.put_slice(&[
-                    0x81, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ]);
+                ResponseHeader {
+                    magic: MagicValue::Response,
+                    opcode: Opcode::Set,
+                    key_len: 0,
+                    extras_len: 0,
+                    data_type: 0x00,
+                    status: ResponseStatus::NoError,
+                    total_body_len: 0,
+                    opaque: request.opaque.unwrap_or(0),
+                    cas: 0,
+                }
+                .write_to(buffer);
+
+                Ok(24)
             }
             Response::NotStored(_) => {
-                buffer.put_slice(&[
-                    0x81, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                ]);
-            }
-            _ => {
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "unexpected response",
-                ));
-            }
-        }
+                ResponseHeader {
+                    magic: MagicValue::Response,
+                    opcode: Opcode::Set,
+                    key_len: 0,
+                    extras_len: 0,
+                    data_type: 0x00,
+                    status: ResponseStatus::ItemNotStored,
+                    total_body_len: 0,
+                    opaque: request.opaque.unwrap_or(0),
+                    cas: 0,
+                }
+                .write_to(buffer);
 
-        Ok(24)
+                Ok(24)
+            }
+            Response::Error(error) => Ok(error.write_binary_response(Opcode::Get, buffer)),
+            Response::ClientError(client_error) => {
+                Ok(client_error.write_binary_response(Opcode::Get, buffer))
+            }
+            Response::ServerError(server_error) => {
+                Ok(server_error.write_binary_response(Opcode::Get, buffer))
+            }
+            other => Ok(response::ServerError {
+                inner: format!("unknown response: {other}"),
+            }
+            .write_binary_response(Opcode::Get, buffer))
+        }
     }
 }

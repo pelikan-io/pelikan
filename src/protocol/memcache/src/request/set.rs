@@ -11,6 +11,7 @@ pub struct Set {
     pub(crate) flags: u32,
     pub(crate) ttl: Ttl,
     pub(crate) noreply: bool,
+    pub(crate) opaque: Option<u32>,
 }
 
 impl Set {

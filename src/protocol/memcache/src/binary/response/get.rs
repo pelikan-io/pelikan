@@ -117,30 +117,10 @@ impl BinaryProtocol {
             Response::ServerError(server_error) => {
                 Ok(server_error.write_binary_response(Opcode::Get, buffer))
             }
-            Response::Stored(_stored) => Ok(response::ServerError {
-                inner: "unknown response: STORED".to_string(),
+            other => Ok(response::ServerError {
+                inner: format!("unknown response: {other}"),
             }
-            .write_binary_response(Opcode::Get, buffer)),
-            Response::NotStored(_not_stored) => Ok(response::ServerError {
-                inner: "unknown response: NOT_STORED".to_string(),
-            }
-            .write_binary_response(Opcode::Get, buffer)),
-            Response::Exists(_exists) => Ok(response::ServerError {
-                inner: "unknown response: EXISTS".to_string(),
-            }
-            .write_binary_response(Opcode::Get, buffer)),
-            Response::Numeric(_numeric) => Ok(response::ServerError {
-                inner: "unknown response: NUMERIC".to_string(),
-            }
-            .write_binary_response(Opcode::Get, buffer)),
-            Response::Deleted(_deleted) => Ok(response::ServerError {
-                inner: "unknown response: DELETED".to_string(),
-            }
-            .write_binary_response(Opcode::Get, buffer)),
-            Response::Hangup => Ok(response::ServerError {
-                inner: "HANGUP".to_string(),
-            }
-            .write_binary_response(Opcode::Get, buffer)),
+            .write_binary_response(Opcode::Get, buffer))
         }
     }
 }

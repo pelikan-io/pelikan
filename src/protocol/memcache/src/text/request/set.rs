@@ -58,6 +58,7 @@ impl TextProtocol {
                 ttl,
                 flags,
                 noreply,
+                opaque: None,
             },
         ))
     }

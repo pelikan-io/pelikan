@@ -156,6 +156,7 @@ impl Request {
             flags,
             ttl,
             noreply,
+            opaque: None,
         })
     }
 }
