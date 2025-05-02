@@ -12,7 +12,6 @@ use std::io::Read;
 #[serde(rename_all = "snake_case")]
 pub enum Protocol {
     Memcache,
-    MemcacheBinary,
     Resp,
 }
 
