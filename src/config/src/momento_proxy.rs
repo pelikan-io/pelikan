@@ -2,6 +2,7 @@ use crate::{Admin, AdminConfig, Debug, DebugConfig, Klog, KlogConfig};
 use core::num::NonZeroU64;
 use std::net::AddrParseError;
 use std::net::SocketAddr;
+use std::num::NonZeroUsize;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -54,10 +55,16 @@ pub struct Cache {
     port: String,
     cache_name: String,
     default_ttl: NonZeroU64,
+    #[serde(default = "four")]
+    connection_count: NonZeroUsize,
     #[serde(default)]
     protocol: Protocol,
     #[serde(default = "flags")]
     flags: bool,
+}
+
+const fn four() -> NonZeroUsize {
+    NonZeroUsize::new(4).expect("4 is nonzero")
 }
 
 // implementation
@@ -85,6 +92,10 @@ impl Cache {
     /// The default TTL (in seconds) for
     pub fn default_ttl(&self) -> Duration {
         Duration::from_secs(self.default_ttl.get())
+    }
+
+    pub fn connection_count(&self) -> usize {
+        self.connection_count.get()
     }
 
     pub fn protocol(&self) -> Protocol {

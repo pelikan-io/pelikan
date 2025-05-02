@@ -241,23 +241,8 @@ async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Err
     }
     let auth_token =
         std::env::var("MOMENTO_AUTHENTICATION").expect("MOMENTO_AUTHENTICATION must be set");
-    let connection_count = std::env::var("MOMENTO_CONNECTIONS_PER_CACHE")
-        .unwrap_or_else(|_| "4".to_string())
-        .parse()
-        .expect("MOMENTO_CONNECTIONS_PER_CACHE must be an integer");
     let credential_provider = CredentialProvider::from_string(auth_token).unwrap_or_else(|e| {
         eprintln!("failed to initialize credential provider. error: {e}");
-        std::process::exit(1);
-    });
-    let client_builder = CacheClient::builder()
-        .default_ttl(DEFAULT_TTL)
-        .configuration(configurations::Laptop::latest())
-        .credential_provider(credential_provider)
-        .with_num_connections(connection_count);
-
-    // Validate client can build early
-    client_builder.clone().build().unwrap_or_else(|e| {
-        eprintln!("could not create cache client: {}", e);
         std::process::exit(1);
     });
 
@@ -268,7 +253,6 @@ async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Err
 
     for i in 0..config.caches().len() {
         let config = config.clone();
-        let client_builder = client_builder.clone();
 
         let cache = config.caches().get(i).unwrap().clone();
         let addr = match cache.socket_addr() {
@@ -282,6 +266,12 @@ async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Err
                 std::process::exit(1);
             }
         };
+
+        let client_builder = CacheClient::builder()
+            .default_ttl(DEFAULT_TTL)
+            .configuration(configurations::Laptop::latest())
+            .credential_provider(credential_provider.clone())
+            .with_num_connections(cache.connection_count());
 
         let tcp_listener = match std::net::TcpListener::bind(addr) {
             Ok(v) => {
