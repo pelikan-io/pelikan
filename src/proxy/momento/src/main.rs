@@ -20,6 +20,7 @@ use protocol_admin::*;
 use session::*;
 use std::borrow::{Borrow, BorrowMut};
 use std::io::{Error, ErrorKind};
+use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::net::tcp::OwnedWriteHalf;
@@ -223,10 +224,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .expect("failed to launch tokio runtime");
 
-    runtime.block_on(spawn(config))
+    // spawn the proxy metrics
+    let proxy_metrics = runtime.block_on(async {
+        ProxyMetricsBuilder::new("http://otel-collector:4317")
+            .build()
+            .await
+    });
+
+    runtime.block_on(spawn(config, proxy_metrics))
 }
 
-async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Error>> {
+async fn spawn(
+    config: MomentoProxyConfig,
+    proxy_metrics: Arc<impl ProxyMetricsApi>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let admin_addr = config
         .admin()
         .socket_addr()
@@ -297,6 +308,7 @@ async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Err
             }
         };
 
+        let proxy_metrics = proxy_metrics.clone();
         tokio::spawn(async move {
             info!(
                 "starting proxy frontend listener for cache `{}` on: {}",
@@ -311,6 +323,7 @@ async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Err
                 cache.cache_name(),
                 cache.protocol(),
                 cache.flags(),
+                proxy_metrics,
             )
             .await;
         });

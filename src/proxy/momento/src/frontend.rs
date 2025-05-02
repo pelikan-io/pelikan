@@ -18,6 +18,7 @@ pub(crate) async fn handle_memcache_client(
     client: CacheClient,
     cache_name: String,
     flags: bool,
+    proxy_metrics: Arc<impl ProxyMetricsApi>,
 ) {
     debug!("accepted memcache client, waiting for first byte to detect text or binary");
 
@@ -38,6 +39,7 @@ pub(crate) async fn handle_memcache_client(
                         cache_name,
                         protocol_memcache::BinaryProtocol::default(),
                         flags,
+                        proxy_metrics,
                     )
                     .await;
                     return;
@@ -48,6 +50,7 @@ pub(crate) async fn handle_memcache_client(
                         cache_name,
                         protocol_memcache::TextProtocol::default(),
                         flags,
+                        proxy_metrics,
                     )
                     .await;
                     return;
@@ -75,6 +78,7 @@ pub(crate) async fn handle_memcache_client_concrete(
         + Send
         + 'static,
     flags: bool,
+    proxy_metrics: Arc<impl ProxyMetricsApi>,
 ) {
     debug!("accepted memcache binary client");
 
@@ -201,9 +205,16 @@ pub(crate) async fn handle_memcache_client_concrete(
 
                     let sequence = sequence.fetch_add(1, Ordering::Relaxed);
 
+                    let proxy_metrics = proxy_metrics.clone();
                     tokio::spawn(async move {
                         handle_memcache_request(
-                            sender, client, cache_name, sequence, request, flags,
+                            sender,
+                            client,
+                            cache_name,
+                            sequence,
+                            request,
+                            flags,
+                            proxy_metrics,
                         )
                         .await;
                     });
@@ -250,11 +261,31 @@ async fn handle_memcache_request(
     sequence: u64,
     request: protocol_memcache::Request,
     flags: bool,
+    proxy_metrics: Arc<impl ProxyMetricsApi>,
 ) {
+    proxy_metrics.increment_total_requests();
     let result = match request {
-        memcache::Request::Delete(ref r) => memcache::delete(&mut client, &cache_name, r).await,
-        memcache::Request::Get(ref r) => memcache::get(&mut client, &cache_name, r, flags).await,
-        memcache::Request::Set(ref r) => memcache::set(&mut client, &cache_name, r, flags).await,
+        memcache::Request::Delete(ref r) => {
+            with_rpc_call_guard(
+                proxy_metrics.begin_delete(),
+                memcache::delete(&mut client, &cache_name, r),
+            )
+            .await
+        }
+        memcache::Request::Get(ref r) => {
+            with_rpc_call_guard(
+                proxy_metrics.begin_get(),
+                memcache::get(&mut client, &cache_name, r, flags),
+            )
+            .await
+        }
+        memcache::Request::Set(ref r) => {
+            with_rpc_call_guard(
+                proxy_metrics.begin_set(),
+                memcache::set(&mut client, &cache_name, r, flags),
+            )
+            .await
+        }
         _ => {
             debug!("unsupported command: {}", request);
             Err(Error::new(ErrorKind::Other, "unsupported"))

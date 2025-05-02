@@ -1,0 +1,34 @@
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4317:4317"
+      - "9464:9464"
+    volumes:
+      - ./otel-collector-config.yaml:/otel-collector-config.yaml
+    command: ["--config", "/otel-collector-config.yaml"]
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yaml:/etc/prometheus/prometheus.yml
+    command:
+      [
+        "--enable-feature=native-histograms",
+        "--config.file=/etc/prometheus/prometheus.yml",
+      ]
+    depends_on:
+      - otel-collector
+  momento-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "9999:9999"
+      - "11211:11211"
+    environment:
+      MOMENTO_AUTHENTICATION: $MOMENTO_API_KEY
+    depends_on:
+      - otel-collector

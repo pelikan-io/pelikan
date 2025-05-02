@@ -75,3 +75,14 @@ pub static RU_NVCSW: Counter = Counter::new();
 
 #[metric(name = "ru_nivcsw")]
 pub static RU_NIVCSW: Counter = Counter::new();
+
+mod builder;
+mod connection;
+mod proxy;
+mod rpc;
+pub mod util;
+
+pub use builder::ProxyMetricsBuilder;
+pub use connection::ConnectionGuard;
+pub use proxy::{ProxyMetrics, ProxyMetricsApi};
+pub use rpc::{with_rpc_call_guard, RpcCallGuard, RpcMetrics};

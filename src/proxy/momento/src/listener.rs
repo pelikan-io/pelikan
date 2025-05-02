@@ -13,6 +13,7 @@ pub(crate) async fn listener(
     cache_name: String,
     protocol: Protocol,
     flags: bool,
+    proxy_metrics: Arc<impl ProxyMetricsApi>,
 ) {
     let client = client_builder.clone().build().unwrap_or_else(|e| {
         // Note: this will not happen since we validated the client build in the main thread already
@@ -29,12 +30,21 @@ pub(crate) async fn listener(
             let cache_name = cache_name.clone();
 
             // spawn a task for managing requests for the client
+            let proxy_metrics = proxy_metrics.clone();
             tokio::spawn(async move {
                 TCP_CONN_CURR.increment();
+                let _connection_metric = proxy_metrics.begin_connection();
+
                 match protocol {
                     Protocol::Memcache => {
-                        crate::frontend::handle_memcache_client(socket, client, cache_name, flags)
-                            .await;
+                        crate::frontend::handle_memcache_client(
+                            socket,
+                            client,
+                            cache_name,
+                            flags,
+                            proxy_metrics,
+                        )
+                        .await;
                     }
                     Protocol::Resp => {
                         crate::frontend::handle_resp_client(socket, client, cache_name).await;

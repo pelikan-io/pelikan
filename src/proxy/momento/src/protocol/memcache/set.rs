@@ -14,7 +14,6 @@ pub async fn set(
     flags: bool,
 ) -> Result<Response, Error> {
     SET.increment();
-
     if request.value().is_empty() {
         SET_EX.increment();
         return Ok(Response::client_error("empty values not supported"));

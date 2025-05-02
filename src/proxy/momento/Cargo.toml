@@ -30,3 +30,4 @@ session = { path = "../../session" }
 storage-types = { path = "../../storage/types" }
 tokio = { version = "1.43.1", features = ["full"] }
 thiserror = { workspace = true }
+goodmetrics = "7.1.1"
