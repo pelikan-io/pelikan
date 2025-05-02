@@ -4,7 +4,9 @@
 
 use crate::klog::{klog_1, Status};
 use crate::*;
+
 use momento::cache::GetResponse;
+use protocol_memcache::{GET, GET_EX, GET_KEY, GET_KEY_HIT, GET_KEY_MISS};
 
 use super::update_method_metrics;
 

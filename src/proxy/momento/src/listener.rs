@@ -32,10 +32,6 @@ pub(crate) async fn listener(
             tokio::spawn(async move {
                 TCP_CONN_CURR.increment();
                 match protocol {
-                    Protocol::MemcacheBinary => {
-                        crate::frontend::handle_memcache_client(socket, client, cache_name, flags)
-                            .await;
-                    }
                     Protocol::Memcache => {
                         crate::frontend::handle_memcache_client(socket, client, cache_name, flags)
                             .await;

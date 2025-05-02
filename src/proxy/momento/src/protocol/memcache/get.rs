@@ -6,7 +6,7 @@ use crate::klog::{klog_1, Status};
 use crate::{Error, *};
 use futures::StreamExt;
 use momento::cache::GetResponse;
-use protocol_memcache::{Get, Response, Value};
+use protocol_memcache::*;
 
 pub async fn get(
     client: &CacheClient,
@@ -20,8 +20,8 @@ pub async fn get(
 
         tasks.push_back(run_get(client, cache_name, flags, key));
     }
-    let values: Vec<Option<Value>> = tasks.collect().await;
-    let values: Vec<Value> = values.into_iter().flatten().collect();
+    let values: Vec<Option<protocol_memcache::Value>> = tasks.collect().await;
+    let values: Vec<protocol_memcache::Value> = values.into_iter().flatten().collect();
 
     if !values.is_empty() {
         Ok(Response::values(values.into()))
@@ -30,7 +30,7 @@ pub async fn get(
     }
 }
 
-async fn run_get(client: &CacheClient, cache_name: &str, flags: bool, key: &[u8]) -> Option<Value> {
+async fn run_get(client: &CacheClient, cache_name: &str, flags: bool, key: &[u8]) -> Option<protocol_memcache::Value> {
     match timeout(Duration::from_millis(200), client.get(cache_name, key)).await {
         Ok(Ok(response)) => match response {
             GetResponse::Hit { value } => {
@@ -47,12 +47,12 @@ async fn run_get(client: &CacheClient, cache_name: &str, flags: bool, key: &[u8]
                     let length = value.len();
 
                     klog_1(&"get", &key, Status::Hit, length);
-                    Some(Value::new(key, flags, None, &value))
+                    Some(protocol_memcache::Value::new(key, flags, None, &value))
                 } else {
                     let length = value.len();
 
                     klog_1(&"get", &key, Status::Hit, length);
-                    Some(Value::new(key, 0, None, &value))
+                    Some(protocol_memcache::Value::new(key, 0, None, &value))
                 }
             }
             GetResponse::Miss => {

@@ -1,9 +1,5 @@
 use metriken::*;
 
-mod request;
-
-pub use request::*;
-
 pub static PERCENTILES: &[(&str, f64)] = &[
     ("p25", 25.0),
     ("p50", 50.0),

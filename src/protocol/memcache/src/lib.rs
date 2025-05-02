@@ -36,7 +36,7 @@ pub enum MemcacheError {
 }
 
 #[cfg(feature = "metrics")]
-mod metrics;
+pub mod metrics;
 
 #[cfg(feature = "metrics")]
 pub use metrics::*;
