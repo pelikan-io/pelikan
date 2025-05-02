@@ -17,6 +17,59 @@ pub(crate) async fn handle_memcache_client(
     socket: tokio::net::TcpStream,
     client: CacheClient,
     cache_name: String,
+    flags: bool,
+) {
+    debug!("accepted memcache client, waiting for first byte to detect text or binary");
+
+    let mut buf = [0];
+
+    loop {
+        match socket.peek(&mut buf).await {
+            Ok(0) => {
+                // client hangup
+                return;
+            }
+            Ok(_) => {
+                // check which protocol we use
+                if buf[0] == 0x80 {
+                    handle_memcache_client_concrete(
+                        socket,
+                        client,
+                        cache_name,
+                        protocol_memcache::BinaryProtocol::default(),
+                        flags,
+                    )
+                    .await;
+                    return;
+                } else {
+                    handle_memcache_client_concrete(
+                        socket,
+                        client,
+                        cache_name,
+                        protocol_memcache::TextProtocol::default(),
+                        flags,
+                    )
+                    .await;
+                    return;
+                };
+            }
+            Err(e) => {
+                if e.kind() == ErrorKind::WouldBlock {
+                    // spurious wakeup
+                    continue;
+                } else {
+                    // some unknown error
+                    return;
+                }
+            }
+        }
+    }
+}
+
+pub(crate) async fn handle_memcache_client_concrete(
+    socket: tokio::net::TcpStream,
+    client: CacheClient,
+    cache_name: String,
     protocol: impl Protocol<protocol_memcache::Request, protocol_memcache::Response>
         + Clone
         + Send

@@ -7,9 +7,9 @@ use std::time::Duration;
 use momento::CacheClient;
 use protocol_resp::Set;
 
-use crate::*;
 use crate::error::{ProxyError, ProxyResult};
 use crate::klog::{klog_set, Status};
+use crate::*;
 
 use super::update_method_metrics;
 
