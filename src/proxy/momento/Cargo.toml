@@ -24,7 +24,7 @@ metriken = { workspace = true }
 momento = "0.50.4"
 pelikan-net = { workspace = true, features = ["metrics"] }
 protocol-admin = { path = "../../protocol/admin" }
-protocol-memcache = { path = "../../protocol/memcache" }
+protocol-memcache = { path = "../../protocol/memcache", default-features = false }
 protocol-resp = { path = "../../protocol/resp" }
 session = { path = "../../session" }
 storage-types = { path = "../../storage/types" }

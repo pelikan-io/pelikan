@@ -5,7 +5,6 @@
 use crate::klog::{klog_1, Status};
 use crate::*;
 use momento::cache::GetResponse;
-use protocol_memcache::*;
 
 use super::update_method_metrics;
 

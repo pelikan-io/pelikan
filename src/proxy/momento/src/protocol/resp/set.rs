@@ -5,9 +5,9 @@
 use std::time::Duration;
 
 use momento::CacheClient;
-use protocol_memcache::{SET, SET_EX, SET_STORED};
 use protocol_resp::Set;
 
+use crate::*;
 use crate::error::{ProxyError, ProxyResult};
 use crate::klog::{klog_set, Status};
 

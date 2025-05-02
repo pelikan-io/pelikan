@@ -6,8 +6,6 @@ use crate::klog::{klog_1, Status};
 use crate::{Error, *};
 use futures::StreamExt;
 use momento::cache::GetResponse;
-use protocol_memcache::GET_KEY_HIT;
-use protocol_memcache::GET_KEY_MISS;
 use protocol_memcache::{Get, Response, Value};
 
 pub async fn get(
@@ -23,7 +21,7 @@ pub async fn get(
         tasks.push_back(run_get(client, cache_name, flags, key));
     }
     let values: Vec<Option<Value>> = tasks.collect().await;
-    let values: Vec<Value> = values.into_iter().filter_map(|v| v).collect();
+    let values: Vec<Value> = values.into_iter().flatten().collect();
 
     if !values.is_empty() {
         Ok(Response::values(values.into()))
