@@ -60,7 +60,7 @@ impl Compose for BulkString {
             buf.put_slice(header.as_bytes());
             buf.put_slice(value);
             buf.put_slice(b"\r\n");
-            header.as_bytes().len() + value.len() + 2
+            header.len() + value.len() + 2
         } else {
             // A null bulk string is serialized as `$-1\r\n`.
             buf.put_slice(b"$-1\r\n");

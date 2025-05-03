@@ -6,20 +6,21 @@ use crate::*;
 use config::proxy::BackendConfig;
 use config::proxy::FrontendConfig;
 use config::proxy::ListenerConfig;
+use protocol_common::Protocol;
 use std::thread::JoinHandle;
 
 pub struct ProcessBuilder<
-    BackendParser,
+    BackendProto,
     BackendRequest,
     BackendResponse,
-    FrontendParser,
+    FrontendProto,
     FrontendRequest,
     FrontendResponse,
 > {
     admin: AdminBuilder,
-    backend: BackendBuilder<BackendParser, BackendRequest, BackendResponse>,
+    backend: BackendBuilder<BackendProto, BackendRequest, BackendResponse>,
     frontend: FrontendBuilder<
-        FrontendParser,
+        FrontendProto,
         FrontendRequest,
         FrontendResponse,
         BackendRequest,
@@ -30,26 +31,26 @@ pub struct ProcessBuilder<
 }
 
 impl<
-        BackendParser,
+        BackendProto,
         BackendRequest,
         BackendResponse,
-        FrontendParser,
+        FrontendProto,
         FrontendRequest,
         FrontendResponse,
     >
     ProcessBuilder<
-        BackendParser,
+        BackendProto,
         BackendRequest,
         BackendResponse,
-        FrontendParser,
+        FrontendProto,
         FrontendRequest,
         FrontendResponse,
     >
 where
-    BackendParser: 'static + Parse<BackendResponse> + Clone + Send,
+    BackendProto: 'static + Protocol<BackendRequest, BackendResponse> + Clone + Send,
     BackendRequest: 'static + Send + Compose + From<FrontendRequest> + Compose,
     BackendResponse: 'static + Compose + Send,
-    FrontendParser: 'static + Parse<FrontendRequest> + Clone + Send,
+    FrontendProto: 'static + Protocol<FrontendRequest, FrontendResponse> + Clone + Send,
     FrontendRequest: 'static + Send,
     FrontendResponse: 'static + Compose + Send,
     FrontendResponse: From<BackendResponse> + Compose,
@@ -57,12 +58,12 @@ where
     pub fn new<T: AdminConfig + FrontendConfig + BackendConfig + TlsConfig + ListenerConfig>(
         config: &T,
         log_drain: Box<dyn Drain>,
-        backend_parser: BackendParser,
-        frontend_parser: FrontendParser,
+        backend_protocol: BackendProto,
+        frontend_protocol: FrontendProto,
     ) -> Result<Self> {
         let admin = AdminBuilder::new(config)?;
-        let backend = BackendBuilder::new(config, backend_parser, 1)?;
-        let frontend = FrontendBuilder::new(config, frontend_parser, 1)?;
+        let backend = BackendBuilder::new(config, backend_protocol, 1)?;
+        let frontend = FrontendBuilder::new(config, frontend_protocol, 1)?;
         let listener = ListenerBuilder::new(config)?;
 
         Ok(Self {

@@ -14,7 +14,7 @@ pub enum OwnedValue {
     U64(u64),
 }
 
-impl<'a> Value<'a> {
+impl Value<'_> {
     pub fn to_owned(&self) -> OwnedValue {
         match self {
             Self::Bytes(v) => OwnedValue::Bytes(v.to_vec().into_boxed_slice()),
@@ -62,7 +62,7 @@ impl<'a> From<&'a Vec<u8>> for Value<'a> {
     }
 }
 
-impl<'a> Value<'a> {
+impl Value<'_> {
     #[allow(clippy::len_without_is_empty)]
     pub fn len(&self) -> usize {
         match self {
@@ -72,7 +72,7 @@ impl<'a> Value<'a> {
     }
 }
 
-impl<'a, const N: usize> PartialEq<&[u8; N]> for Value<'a> {
+impl<const N: usize> PartialEq<&[u8; N]> for Value<'_> {
     fn eq(&self, rhs: &&[u8; N]) -> bool {
         match self {
             Value::Bytes(v) => v == *rhs,
@@ -81,7 +81,7 @@ impl<'a, const N: usize> PartialEq<&[u8; N]> for Value<'a> {
     }
 }
 
-impl<'a, const N: usize> PartialEq<[u8; N]> for Value<'a> {
+impl<const N: usize> PartialEq<[u8; N]> for Value<'_> {
     fn eq(&self, rhs: &[u8; N]) -> bool {
         match self {
             Value::Bytes(v) => v == rhs,
@@ -90,7 +90,7 @@ impl<'a, const N: usize> PartialEq<[u8; N]> for Value<'a> {
     }
 }
 
-impl<'a> PartialEq<[u8]> for Value<'a> {
+impl PartialEq<[u8]> for Value<'_> {
     fn eq(&self, rhs: &[u8]) -> bool {
         match self {
             Value::Bytes(v) => *v == rhs,
@@ -99,7 +99,7 @@ impl<'a> PartialEq<[u8]> for Value<'a> {
     }
 }
 
-impl<'a> PartialEq<u64> for Value<'a> {
+impl PartialEq<u64> for Value<'_> {
     fn eq(&self, rhs: &u64) -> bool {
         match self {
             Value::Bytes(_) => false,
@@ -108,7 +108,7 @@ impl<'a> PartialEq<u64> for Value<'a> {
     }
 }
 
-impl<'a> core::fmt::Debug for Value<'a> {
+impl core::fmt::Debug for Value<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         match &self {
             Value::Bytes(v) => write!(f, "{v:?}"),

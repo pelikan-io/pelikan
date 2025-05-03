@@ -23,7 +23,7 @@ impl Compose for Integer {
     fn compose(&self, buf: &mut dyn BufMut) -> usize {
         let data = format!(":{}\r\n", self.inner);
         buf.put_slice(data.as_bytes());
-        data.as_bytes().len()
+        data.len()
     }
 }
 

@@ -188,6 +188,6 @@ const RESP_NIL: &str = "$-1\r\n";
 const RESP_OK: &str = "+OK\r\n";
 
 fn bulk_string(str: &str) -> String {
-    let length = str.as_bytes().len();
+    let length = str.len();
     format!("${length}\r\n{str}\r\n")
 }

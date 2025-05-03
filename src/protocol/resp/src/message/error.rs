@@ -14,7 +14,7 @@ impl Compose for Error {
         buf.put_slice(b"-");
         buf.put_slice(self.inner.as_bytes());
         buf.put_slice(b"\r\n");
-        self.inner.as_bytes().len() + 3
+        self.inner.len() + 3
     }
 }
 

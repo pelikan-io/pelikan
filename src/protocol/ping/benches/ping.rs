@@ -14,7 +14,7 @@ const BUFFER_SIZE: usize = 16 * KB;
 const DURATION: u64 = 30; // seconds
 
 fn ping(c: &mut Criterion) {
-    let parser = RequestParser::new();
+    let protocol = PingProtocol::default();
 
     let mut group = c.benchmark_group("ping");
     group.measurement_time(Duration::from_secs(DURATION));
@@ -26,7 +26,7 @@ fn ping(c: &mut Criterion) {
 
     group.bench_function("parse", |b| {
         b.iter(|| {
-            let _ = parser.parse(&buffer);
+            let _ = protocol.parse_request(&buffer);
         })
     });
 }

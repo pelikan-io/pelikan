@@ -8,15 +8,14 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use protocol_common::Parse;
 use protocol_thrift::*;
 
 const MAX_LEN: usize = 1024;
 
-const PARSER: MessageParser = MessageParser::new(MAX_LEN);
-
 fuzz_target!(|data: &[u8]| {
-    if let Ok(message) = PARSER.parse(data) {
+    let protocol = Protocol::new(MAX_LEN);
+
+    if let Ok(message) = protocol.parse_request(data) {
         let consumed = message.consumed();
         let message = message.into_inner();
 

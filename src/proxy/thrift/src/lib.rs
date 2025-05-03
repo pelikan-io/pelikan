@@ -9,11 +9,11 @@ use proxy::{Process, ProcessBuilder};
 
 const MAX_SIZE: usize = 16 * 1024 * 1024; // 16MB
 
-type BackendParser = MessageParser;
+type BackendParser = Protocol;
 type BackendRequest = Message;
 type BackendResponse = Message;
 
-type FrontendParser = MessageParser;
+type FrontendParser = Protocol;
 type FrontendRequest = Message;
 type FrontendResponse = Message;
 
@@ -38,8 +38,8 @@ impl Thriftproxy {
         common::metrics::init();
 
         // initialize parsers
-        let request_parser = MessageParser::new(MAX_SIZE);
-        let response_parser = MessageParser::new(MAX_SIZE);
+        let request_parser = Protocol::new(MAX_SIZE);
+        let response_parser = Protocol::new(MAX_SIZE);
 
         // initialize process
         let process_builder = ProcessBuilder::<

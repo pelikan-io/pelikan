@@ -3,6 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use protocol_common::Protocol;
 
 /// A basic session to represent the client side of a framed session, meaning
 /// that is is used by a client to talk to a server.
@@ -14,36 +15,36 @@ use super::*;
 /// towards the latency. For example, if the client sleeps between filling the
 /// session buffer and receiving a message from the session, that time is
 /// counted towards the latency.
-pub struct ClientSession<Parser, Tx, Rx> {
+pub struct ClientSession<Proto, Tx, Rx> {
     // the actual session
     session: Session,
     // a parser which produces messages from the session buffer
-    parser: Parser,
+    parser: Proto,
     // a queue of time and message pairs that are awaiting responses
     pending: VecDeque<(Instant, Tx)>,
     // a marker for the received message type
     _rx: PhantomData<Rx>,
 }
 
-impl<Parser, Tx, Rx> Debug for ClientSession<Parser, Tx, Rx> {
+impl<Proto, Tx, Rx> Debug for ClientSession<Proto, Tx, Rx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         write!(f, "{:?}", self.session)
     }
 }
 
-impl<Parser, Tx, Rx> AsRawFd for ClientSession<Parser, Tx, Rx> {
+impl<Proto, Tx, Rx> AsRawFd for ClientSession<Proto, Tx, Rx> {
     fn as_raw_fd(&self) -> i32 {
         self.session.as_raw_fd()
     }
 }
 
-impl<Parser, Tx, Rx> ClientSession<Parser, Tx, Rx>
+impl<Proto, Tx, Rx> ClientSession<Proto, Tx, Rx>
 where
     Tx: Compose,
-    Parser: Parse<Rx>,
+    Proto: Protocol<Tx, Rx>,
 {
-    /// Create a new `ClientSession` from a `Session` and a `Parser`.
-    pub fn new(session: Session, parser: Parser) -> Self {
+    /// Create a new `ClientSession` from a `Session` and a `Proto`.
+    pub fn new(session: Session, parser: Proto) -> Self {
         Self {
             session,
             parser,
@@ -72,10 +73,17 @@ where
     /// read() of the underlying session.
     pub fn receive(&mut self) -> Result<(Tx, Rx)> {
         let src: &[u8] = self.session.borrow();
-        match self.parser.parse(src) {
+
+        let (_timestamp, request) = self
+            .pending
+            .front()
+            .ok_or_else(|| Error::from(ErrorKind::InvalidInput))?;
+
+        match self.parser.parse_response(request, src) {
             Ok(res) => {
                 SESSION_RECV.increment();
                 let now = Instant::now();
+
                 let (timestamp, request) = self
                     .pending
                     .pop_front()

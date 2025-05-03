@@ -3,6 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
+use protocol_common::Protocol;
 
 /// A basic session to represent the server side of a framed session, meaning
 /// that is is used by a server to talk to a client.
@@ -34,25 +35,25 @@ pub struct ServerSession<Parser, Tx, Rx> {
     _tx: PhantomData<Tx>,
 }
 
-impl<Parser, Tx, Rx> AsRawFd for ServerSession<Parser, Tx, Rx> {
+impl<Proto, Tx, Rx> AsRawFd for ServerSession<Proto, Tx, Rx> {
     fn as_raw_fd(&self) -> i32 {
         self.session.as_raw_fd()
     }
 }
 
-impl<Parser, Tx, Rx> Debug for ServerSession<Parser, Tx, Rx> {
+impl<Proto, Tx, Rx> Debug for ServerSession<Proto, Tx, Rx> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         write!(f, "{:?}", self.session)
     }
 }
 
-impl<Parser, Tx, Rx> ServerSession<Parser, Tx, Rx>
+impl<Proto, Tx, Rx> ServerSession<Proto, Tx, Rx>
 where
     Tx: Compose,
-    Parser: Parse<Rx>,
+    Proto: Protocol<Rx, Tx>,
 {
     // Create a new `ServerSession` from a `Session` and a `Parser`
-    pub fn new(session: Session, parser: Parser) -> Self {
+    pub fn new(session: Session, parser: Proto) -> Self {
         Self {
             session,
             parser,
@@ -72,7 +73,7 @@ where
     /// Attempt to receive a single message from the current session buffer.
     pub fn receive(&mut self) -> Result<Rx> {
         let src: &[u8] = self.session.borrow();
-        match self.parser.parse(src) {
+        match self.parser.parse_request(src) {
             Ok(res) => {
                 self.pending.push_back(self.timestamp);
                 let consumed = res.consumed();

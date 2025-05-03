@@ -22,6 +22,11 @@ impl Default for Protocol {
     }
 }
 
+// support for memcache flags is on by default
+fn flags() -> bool {
+    true
+}
+
 // struct definitions
 #[derive(Clone, Serialize, Default, Deserialize, Debug)]
 pub struct MomentoProxyConfig {
@@ -54,6 +59,8 @@ pub struct Cache {
     connection_count: NonZeroUsize,
     #[serde(default)]
     protocol: Protocol,
+    #[serde(default = "flags")]
+    flags: bool,
 }
 
 const fn four() -> NonZeroUsize {
@@ -93,6 +100,10 @@ impl Cache {
 
     pub fn protocol(&self) -> Protocol {
         self.protocol
+    }
+
+    pub fn flags(&self) -> bool {
+        self.flags
     }
 }
 

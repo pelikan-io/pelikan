@@ -42,6 +42,24 @@ pub enum Response {
     Hangup,
 }
 
+impl std::fmt::Display for Response {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        match self {
+            Self::Error(_) => write!(f, "ERROR"),
+            Self::ClientError(_) => write!(f, "CLIENT_ERROR"),
+            Self::ServerError(_) => write!(f, "SERVER_ERROR"),
+            Self::Stored(_) => write!(f, "STORED"),
+            Self::NotStored(_) => write!(f, "NOT_STORED"),
+            Self::Exists(_) => write!(f, "EXISTS"),
+            Self::NotFound(_) => write!(f, "NOT_FOUND"),
+            Self::Values(_) => write!(f, "VALUES"),
+            Self::Numeric(_) => write!(f, "NUMERIC"),
+            Self::Deleted(_) => write!(f, "DELETED"),
+            Self::Hangup => write!(f, "HANGUP"),
+        }
+    }
+}
+
 impl Response {
     pub fn error() -> Self {
         Self::Error(Error {})
@@ -77,6 +95,12 @@ impl Response {
 
     pub fn values(values: Box<[Value]>) -> Self {
         Self::Values(Values { values })
+    }
+
+    pub fn found(key: &[u8], flags: u32, cas: Option<u64>, data: &[u8]) -> Self {
+        Self::Values(Values {
+            values: vec![Value::new(key, flags, cas, data)].into(),
+        })
     }
 
     pub fn hangup() -> Self {

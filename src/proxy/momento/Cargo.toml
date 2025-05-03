@@ -11,10 +11,13 @@ license = { workspace = true }
 
 [dependencies]
 backtrace = { workspace = true }
+bytes = { workspace = true }
 clap = { workspace = true }
 clocksource = { workspace = true }
 common = { path = "../../common" }
 config = { path = "../../config" }
+crossbeam-channel = { workspace = true }
+futures = { workspace = true }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }

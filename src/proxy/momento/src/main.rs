@@ -12,16 +12,17 @@ use core::num::NonZeroUsize;
 use core::sync::atomic::{AtomicUsize, Ordering};
 use core::time::Duration;
 use logger::configure_logging;
-use logger::Drain;
 use metriken::*;
 use momento::cache::{configurations, CollectionTtl};
 use momento::*;
-use pelikan_net::TCP_RECV_BYTE;
+use pelikan_net::{TCP_RECV_BYTE, TCP_SEND_BYTE};
 use protocol_admin::*;
 use session::*;
 use std::borrow::{Borrow, BorrowMut};
 use std::io::{Error, ErrorKind};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::tcp::OwnedReadHalf;
+use tokio::net::tcp::OwnedWriteHalf;
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio::time::timeout;
@@ -39,7 +40,10 @@ mod error;
 mod frontend;
 mod klog;
 mod listener;
+mod metrics;
 mod protocol;
+
+pub use metrics::*;
 
 // NOTES:
 //
@@ -72,82 +76,6 @@ const COLLECTION_TTL: CollectionTtl = CollectionTtl::new(None, false);
 
 // we interpret TTLs the same way memcached would
 pub const TIME_TYPE: TimeType = TimeType::Memcache;
-
-pub static PERCENTILES: &[(&str, f64)] = &[
-    ("p25", 25.0),
-    ("p50", 50.0),
-    ("p75", 75.0),
-    ("p90", 90.0),
-    ("p99", 99.0),
-    ("p999", 99.9),
-    ("p9999", 99.99),
-];
-
-#[metric(name = "admin_request_parse")]
-pub static ADMIN_REQUEST_PARSE: Counter = Counter::new();
-
-#[metric(name = "admin_response_compose")]
-pub static ADMIN_RESPONSE_COMPOSE: Counter = Counter::new();
-
-#[metric(name = "backend_request")]
-pub static BACKEND_REQUEST: Counter = Counter::new();
-
-#[metric(name = "backend_ex")]
-pub static BACKEND_EX: Counter = Counter::new();
-
-#[metric(name = "backend_ex_rate_limited")]
-pub static BACKEND_EX_RATE_LIMITED: Counter = Counter::new();
-
-#[metric(name = "backend_ex_timeout")]
-pub static BACKEND_EX_TIMEOUT: Counter = Counter::new();
-
-#[metric(name = "ru_utime")]
-pub static RU_UTIME: Counter = Counter::new();
-
-#[metric(name = "ru_stime")]
-pub static RU_STIME: Counter = Counter::new();
-
-#[metric(name = "ru_maxrss")]
-pub static RU_MAXRSS: Gauge = Gauge::new();
-
-#[metric(name = "ru_ixrss")]
-pub static RU_IXRSS: Gauge = Gauge::new();
-
-#[metric(name = "ru_idrss")]
-pub static RU_IDRSS: Gauge = Gauge::new();
-
-#[metric(name = "ru_isrss")]
-pub static RU_ISRSS: Gauge = Gauge::new();
-
-#[metric(name = "ru_minflt")]
-pub static RU_MINFLT: Counter = Counter::new();
-
-#[metric(name = "ru_majflt")]
-pub static RU_MAJFLT: Counter = Counter::new();
-
-#[metric(name = "ru_nswap")]
-pub static RU_NSWAP: Counter = Counter::new();
-
-#[metric(name = "ru_inblock")]
-pub static RU_INBLOCK: Counter = Counter::new();
-
-#[metric(name = "ru_oublock")]
-pub static RU_OUBLOCK: Counter = Counter::new();
-
-#[metric(name = "ru_msgsnd")]
-pub static RU_MSGSND: Counter = Counter::new();
-
-#[metric(name = "ru_msgrcv")]
-pub static RU_MSGRCV: Counter = Counter::new();
-
-#[metric(name = "ru_nsignals")]
-pub static RU_NSIGNALS: Counter = Counter::new();
-
-#[metric(name = "ru_nvcsw")]
-pub static RU_NVCSW: Counter = Counter::new();
-
-#[metric(name = "ru_nivcsw")]
-pub static RU_NIVCSW: Counter = Counter::new();
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // custom panic hook to terminate whole process after unwinding
@@ -200,7 +128,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // initialize logging
-    let mut log_drain = configure_logging(&config);
+    let mut log = configure_logging(&config);
 
     // validate config parameters
     for cache in config.caches() {
@@ -212,14 +140,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .unwrap_or(u64::MAX);
         let limit = u64::MAX / 1000;
         if ttl > limit {
-            error!("default ttl of {ttl} for cache `{name}` is greater than {limit}");
-            let _ = log_drain.flush();
+            eprintln!("default ttl of {ttl} for cache `{name}` is greater than {limit}");
             std::process::exit(1);
         }
 
         if let Err(e) = cache.socket_addr() {
-            error!("listen address for cache `{name}` is not valid: {}", e);
-            let _ = log_drain.flush();
+            eprintln!("listen address for cache `{name}` is not valid: {}", e);
             std::process::exit(1);
         }
     }
@@ -248,7 +174,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             } else if any.downcast_ref::<AtomicHistogram>().is_some()
                 || any.downcast_ref::<RwLockHistogram>().is_some()
             {
-                for (label, _) in PERCENTILES {
+                for (label, _) in metrics::PERCENTILES {
                     let name = format!("{}_{}", metric.name(), label);
                     metrics.push(format!("{name:<31} percentile"));
                 }
@@ -264,6 +190,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(0);
     }
 
+    // initialize async runtime
+    let admin_runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(1)
+        .thread_name("pelikan_admin")
+        .build()
+        .expect("failed to launch async runtime");
+
     let mut runtime = Builder::new_multi_thread();
 
     runtime.thread_name_fn(|| {
@@ -276,18 +210,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         runtime.worker_threads(threads);
     }
 
+    // spawn logging thread
+    admin_runtime.spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            let _ = log.flush();
+        }
+    });
+
     let runtime = runtime
         .enable_all()
         .build()
         .expect("failed to launch tokio runtime");
 
-    runtime.block_on(spawn(config, log_drain))
+    runtime.block_on(spawn(config))
 }
 
-async fn spawn(
-    config: MomentoProxyConfig,
-    mut log_drain: Box<dyn Drain>,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Error>> {
     let admin_addr = config
         .admin()
         .socket_addr()
@@ -308,8 +247,7 @@ async fn spawn(
     });
 
     if config.caches().is_empty() {
-        error!("no caches specified in the config");
-        let _ = log_drain.flush();
+        eprintln!("no caches specified in the config");
         std::process::exit(1);
     }
 
@@ -320,12 +258,11 @@ async fn spawn(
         let addr = match cache.socket_addr() {
             Ok(v) => v,
             Err(e) => {
-                error!(
+                eprintln!(
                     "bad listen address for cache `{}`: {}",
                     cache.cache_name(),
                     e
                 );
-                let _ = log_drain.flush();
                 std::process::exit(1);
             }
         };
@@ -339,25 +276,23 @@ async fn spawn(
         let tcp_listener = match std::net::TcpListener::bind(addr) {
             Ok(v) => {
                 if let Err(e) = v.set_nonblocking(true) {
-                    error!(
+                    eprintln!(
                         "could not set tcp listener for cache `{}` on address `{}` as non-blocking: {}",
                         cache.cache_name(),
                         addr,
                         e
                     );
-                    let _ = log_drain.flush();
                     std::process::exit(1);
                 }
                 v
             }
             Err(e) => {
-                error!(
+                eprintln!(
                     "could not bind tcp listener for cache `{}` on address `{}`: {}",
                     cache.cache_name(),
                     addr,
                     e
                 );
-                let _ = log_drain.flush();
                 std::process::exit(1);
             }
         };
@@ -375,12 +310,13 @@ async fn spawn(
                 client_builder,
                 cache.cache_name(),
                 cache.protocol(),
+                cache.flags(),
             )
             .await;
         });
     }
 
-    admin::admin(log_drain, admin_listener).await;
+    admin::admin(admin_listener).await;
     Ok(())
 }
 
@@ -417,6 +353,73 @@ async fn do_read(
         Err(e) => {
             SESSION_RECV.increment();
             SESSION_RECV_EX.increment();
+            // we has some other error reading from the socket,
+            // return an error so the connection can be closed
+            Err(e)
+        }
+    }
+}
+
+async fn do_read2(socket: &mut OwnedReadHalf, buf: &mut Buffer) -> Result<NonZeroUsize, Error> {
+    match socket.read(buf.borrow_mut()).await {
+        Ok(0) => {
+            SESSION_RECV.increment();
+            // zero length reads mean we got a HUP. close it
+            Err(Error::from(ErrorKind::ConnectionReset))
+        }
+        Ok(n) => {
+            SESSION_RECV.increment();
+            SESSION_RECV_BYTE.add(n as _);
+            TCP_RECV_BYTE.add(n as _);
+
+            // non-zero means we have some data, mark the buffer as
+            // having additional content
+            unsafe {
+                buf.advance_mut(n);
+            }
+
+            // if the buffer is low on space, we will grow the
+            // buffer
+            if buf.remaining_mut() * 2 < INITIAL_BUFFER_SIZE {
+                buf.reserve(INITIAL_BUFFER_SIZE);
+            }
+
+            // SAFETY: we have already checked that the number of bytes read was
+            // greater than zero, so this unchecked conversion is safe
+            Ok(unsafe { NonZeroUsize::new_unchecked(n) })
+        }
+        Err(e) => {
+            SESSION_RECV.increment();
+            SESSION_RECV_EX.increment();
+            // we has some other error reading from the socket,
+            // return an error so the connection can be closed
+            Err(e)
+        }
+    }
+}
+
+async fn do_write2(socket: &mut OwnedWriteHalf, buf: &mut Buffer) -> Result<NonZeroUsize, Error> {
+    match socket.write(buf.chunk()).await {
+        Ok(0) => {
+            SESSION_SEND.increment();
+            // zero length reads mean we got a HUP. close it
+            Err(Error::from(ErrorKind::ConnectionReset))
+        }
+        Ok(n) => {
+            SESSION_SEND.increment();
+            SESSION_SEND_BYTE.add(n as _);
+            TCP_SEND_BYTE.add(n as _);
+
+            // NOTE: buffer will automatically compact
+            buf.advance(n);
+
+            // // SAFETY: we have already checked that the number of bytes read was
+            // // greater than zero, so this unchecked conversion is safe
+            Ok(unsafe { NonZeroUsize::new_unchecked(n) })
+        }
+        Err(e) => {
+            SESSION_SEND.increment();
+            SESSION_SEND_EX.increment();
             // we has some other error reading from the socket,
             // return an error so the connection can be closed
             Err(e)

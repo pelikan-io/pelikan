@@ -4,6 +4,7 @@
 
 use crate::*;
 use libc::c_int;
+use protocol_common::Protocol;
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
 use std::thread::JoinHandle;
@@ -15,9 +16,9 @@ pub struct ProcessBuilder<Parser, Request, Response, Storage> {
     workers: WorkersBuilder<Parser, Request, Response, Storage>,
 }
 
-impl<Parser, Request, Response, Storage> ProcessBuilder<Parser, Request, Response, Storage>
+impl<P, Request, Response, Storage> ProcessBuilder<P, Request, Response, Storage>
 where
-    Parser: 'static + Parse<Request> + Clone + Send,
+    P: 'static + Protocol<Request, Response> + Clone + Send,
     Request: 'static + Klog + Klog<Response = Response> + Send,
     Response: 'static + Compose + Send,
     Storage: 'static + Execute<Request, Response> + EntryStore + Send,
@@ -25,12 +26,12 @@ where
     pub fn new<T: AdminConfig + ServerConfig + TlsConfig + WorkerConfig>(
         config: &T,
         log_drain: Box<dyn Drain>,
-        parser: Parser,
+        protocol: P,
         storage: Storage,
     ) -> Result<Self> {
         let admin = AdminBuilder::new(config)?;
         let listener = ListenerBuilder::new(config)?;
-        let workers = WorkersBuilder::new(config, parser, storage)?;
+        let workers = WorkersBuilder::new(config, protocol, storage)?;
 
         Ok(Self {
             admin,

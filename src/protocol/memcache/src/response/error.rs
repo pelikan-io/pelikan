@@ -2,9 +2,13 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+use crate::binary::response::header::ResponseStatus;
+use crate::binary::Opcode;
+
 use super::*;
 
-const MSG: &[u8] = b"ERROR\r\n";
+const BINARY_MESSAGE: &[u8] = b"ERROR";
+const TEXT_MESSAGE: &[u8] = b"ERROR\r\n";
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Error {}
@@ -25,14 +29,22 @@ impl Error {
     }
 
     pub fn len(&self) -> usize {
-        MSG.len()
+        TEXT_MESSAGE.len()
+    }
+
+    pub fn write_binary_response(&self, opcode: Opcode, buffer: &mut dyn BufMut) -> usize {
+        let mut header = ResponseStatus::InternalError.as_empty_response(opcode);
+        header.total_body_len = BINARY_MESSAGE.len() as u32;
+        header.write_to(buffer);
+        buffer.put_slice(BINARY_MESSAGE);
+        24 + BINARY_MESSAGE.len()
     }
 }
 
 impl Compose for Error {
     fn compose(&self, session: &mut dyn BufMut) -> usize {
-        session.put_slice(MSG);
-        MSG.len()
+        session.put_slice(TEXT_MESSAGE);
+        TEXT_MESSAGE.len()
     }
 }
 

@@ -48,3 +48,24 @@ impl<T> ParseOk<T> {
 pub trait Parse<T> {
     fn parse(&self, buffer: &[u8]) -> Result<ParseOk<T>, std::io::Error>;
 }
+
+pub trait Protocol<Request, Response> {
+    fn parse_request(&self, buffer: &[u8]) -> Result<ParseOk<Request>, std::io::Error>;
+    fn compose_request(
+        &self,
+        request: &Request,
+        buffer: &mut dyn BufMut,
+    ) -> Result<usize, std::io::Error>;
+
+    fn parse_response(
+        &self,
+        request: &Request,
+        buffer: &[u8],
+    ) -> Result<ParseOk<Response>, std::io::Error>;
+    fn compose_response(
+        &self,
+        request: &Request,
+        response: &Response,
+        buffer: &mut dyn BufMut,
+    ) -> Result<usize, std::io::Error>;
+}

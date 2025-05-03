@@ -21,10 +21,10 @@ impl Values {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Value {
-    key: Box<[u8]>,
-    flags: u32,
-    cas: Option<u64>,
-    data: Option<Box<[u8]>>,
+    pub(crate) key: Box<[u8]>,
+    pub(crate) flags: u32,
+    pub(crate) cas: Option<u64>,
+    pub(crate) data: Option<Box<[u8]>>,
 }
 
 impl Value {

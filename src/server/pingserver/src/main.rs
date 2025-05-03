@@ -5,7 +5,7 @@ use config::{Config, Engine};
 
 use entrystore::Noop;
 use logger::{configure_logging, Drain};
-use protocol_ping::{Request, RequestParser, Response};
+use protocol_ping::{PingProtocol, Request, Response};
 use server::{ProcessBuilder, PERCENTILES};
 
 use backtrace::Backtrace;
@@ -15,7 +15,7 @@ use metriken::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
-type Parser = RequestParser;
+type Protocol = PingProtocol;
 type Storage = Noop;
 
 mod config;
@@ -121,11 +121,11 @@ fn main() {
             let storage = Storage::new();
 
             // initialize parser
-            let parser = Parser::new();
+            let protocol = Protocol::default();
 
             // initialize process
-            let process_builder = ProcessBuilder::<Parser, Request, Response, Storage>::new(
-                &config, log, parser, storage,
+            let process_builder = ProcessBuilder::<Protocol, Request, Response, Storage>::new(
+                &config, log, protocol, storage,
             )
             .expect("failed to initialize process");
 

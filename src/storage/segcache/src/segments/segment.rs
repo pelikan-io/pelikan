@@ -725,7 +725,7 @@ impl<'a> std::fmt::Debug for Segment<'a> {
 }
 
 #[cfg(not(feature = "magic"))]
-impl<'a> std::fmt::Debug for Segment<'a> {
+impl std::fmt::Debug for Segment<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         f.debug_struct("Segment")
             .field("header", &self.header)

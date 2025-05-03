@@ -151,7 +151,7 @@ pub struct Admin {
     /// The actual poll instantance
     poll: Poll,
     /// The sessions which have been opened
-    sessions: Slab<ServerSession<AdminRequestParser, AdminResponse, AdminRequest>>,
+    sessions: Slab<ServerSession<AdminProtocol, AdminResponse, AdminRequest>>,
     /// A queue for receiving signals from the parent thread
     signal_queue_rx: Receiver<Signal>,
     /// A set of queues for sending signals to sibling threads
@@ -170,7 +170,7 @@ pub struct AdminBuilder {
     listener: pelikan_net::Listener,
     nevent: usize,
     poll: Poll,
-    sessions: Slab<ServerSession<AdminRequestParser, AdminResponse, AdminRequest>>,
+    sessions: Slab<ServerSession<AdminProtocol, AdminResponse, AdminRequest>>,
     timeout: Duration,
     version: String,
     waker: Arc<Waker>,
@@ -319,7 +319,7 @@ impl Admin {
         match self
             .listener
             .accept()
-            .map(|v| ServerSession::new(Session::from(v), AdminRequestParser::default()))
+            .map(|v| ServerSession::new(Session::from(v), AdminProtocol::default()))
         {
             Ok(mut session) => {
                 let s = self.sessions.vacant_entry();

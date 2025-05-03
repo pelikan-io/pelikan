@@ -35,82 +35,13 @@ impl Add {
     }
 }
 
-impl RequestParser {
-    // this is to be called after parsing the command, so we do not match the verb
-    pub fn parse_add<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Add> {
-        // we can use the set parser here and convert the request
-        match self.parse_set_no_stats(input) {
-            Ok((input, request)) => {
-                ADD.increment();
-                Ok((
-                    input,
-                    Add {
-                        key: request.key,
-                        value: request.value,
-                        ttl: request.ttl,
-                        flags: request.flags,
-                        noreply: request.noreply,
-                    },
-                ))
-            }
-            Err(e) => {
-                if !e.is_incomplete() {
-                    ADD.increment();
-                    ADD_EX.increment();
-                }
-                Err(e)
-            }
-        }
-    }
-}
-
-impl Compose for Add {
-    fn compose(&self, session: &mut dyn BufMut) -> usize {
-        let verb = b"add ";
-        let flags = format!(" {}", self.flags).into_bytes();
-        let ttl = format!(" {}", self.ttl.get().unwrap_or(0)).into_bytes();
-        let vlen = format!(" {}", self.value.len()).into_bytes();
-        let header_end = if self.noreply {
-            " noreply\r\n".as_bytes()
-        } else {
-            "\r\n".as_bytes()
-        };
-
-        let size = verb.len()
-            + self.key.len()
-            + flags.len()
-            + ttl.len()
-            + vlen.len()
-            + header_end.len()
-            + self.value.len()
-            + CRLF.len();
-
-        session.put_slice(verb);
-        session.put_slice(&self.key);
-        session.put_slice(&flags);
-        session.put_slice(&ttl);
-        session.put_slice(&vlen);
-        session.put_slice(header_end);
-        session.put_slice(&self.value);
-        session.put_slice(CRLF);
-
-        size
-    }
-}
-
 impl Klog for Add {
     type Response = Response;
 
     fn klog(&self, response: &Self::Response) {
         let (code, len) = match response {
-            Response::Stored(ref res) => {
-                ADD_STORED.increment();
-                (STORED, res.len())
-            }
-            Response::NotStored(ref res) => {
-                ADD_NOT_STORED.increment();
-                (NOT_STORED, res.len())
-            }
+            Response::Stored(ref res) => (STORED, res.len()),
+            Response::NotStored(ref res) => (NOT_STORED, res.len()),
             _ => {
                 return;
             }
@@ -123,46 +54,6 @@ impl Klog for Add {
             self.value().len(),
             code,
             len
-        );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse() {
-        let parser = RequestParser::new();
-
-        // basic add command
-        assert_eq!(
-            parser.parse_request(b"add 0 0 0 1\r\n0\r\n"),
-            Ok((
-                &b""[..],
-                Request::Add(Add {
-                    key: b"0".to_vec().into_boxed_slice(),
-                    value: b"0".to_vec().into_boxed_slice(),
-                    flags: 0,
-                    ttl: Ttl::none(),
-                    noreply: false,
-                })
-            ))
-        );
-
-        // noreply
-        assert_eq!(
-            parser.parse_request(b"add 0 0 0 1 noreply\r\n0\r\n"),
-            Ok((
-                &b""[..],
-                Request::Add(Add {
-                    key: b"0".to_vec().into_boxed_slice(),
-                    value: b"0".to_vec().into_boxed_slice(),
-                    flags: 0,
-                    ttl: Ttl::none(),
-                    noreply: true,
-                })
-            ))
         );
     }
 }

@@ -11,7 +11,7 @@ use crate::*;
 use common::bytes::SliceExtension;
 use metriken::*;
 
-use std::io::{Error, ErrorKind, Result};
+use std::io::{Error, ErrorKind};
 
 // TODO(bmartin): see TODO for protocol::data::Request, this is cleaner here
 // since the variants are simple, but better to take the same approach in both
@@ -25,16 +25,15 @@ pub enum AdminRequest {
 }
 
 #[derive(Default, Copy, Clone)]
-pub struct AdminRequestParser {}
-
-impl AdminRequestParser {
-    pub fn new() -> Self {
-        Self {}
-    }
+pub struct AdminProtocol {
+    _unused: (),
 }
 
-impl Parse<AdminRequest> for AdminRequestParser {
-    fn parse(&self, buffer: &[u8]) -> Result<ParseOk<AdminRequest>> {
+impl Protocol<AdminRequest, AdminResponse> for AdminProtocol {
+    fn parse_request(
+        &self,
+        buffer: &[u8],
+    ) -> std::result::Result<protocol_common::ParseOk<admin::AdminRequest>, std::io::Error> {
         // check if we got a CRLF
         if let Some(command_end) = buffer
             .windows(CRLF.len())
@@ -71,6 +70,40 @@ impl Parse<AdminRequest> for AdminRequestParser {
             Err(Error::from(ErrorKind::WouldBlock))
         }
     }
+
+    fn compose_request(
+        &self,
+        request: &admin::AdminRequest,
+        buffer: &mut dyn protocol_common::BufMut,
+    ) -> std::result::Result<usize, std::io::Error> {
+        let cmd = match request {
+            AdminRequest::FlushAll => "flush_all\r\n",
+            AdminRequest::Stats => "stats\r\n",
+            AdminRequest::Version => "version\r\n",
+            AdminRequest::Quit => "quit\r\n",
+        };
+
+        buffer.put_slice(cmd.as_bytes());
+
+        Ok(cmd.len())
+    }
+
+    fn parse_response(
+        &self,
+        _: &admin::AdminRequest,
+        _: &[u8],
+    ) -> std::result::Result<protocol_common::ParseOk<admin::AdminResponse>, std::io::Error> {
+        todo!("this is not implemented yet")
+    }
+
+    fn compose_response(
+        &self,
+        _request: &admin::AdminRequest,
+        response: &admin::AdminResponse,
+        buffer: &mut dyn protocol_common::BufMut,
+    ) -> std::result::Result<usize, std::io::Error> {
+        Ok(response.compose(buffer))
+    }
 }
 
 pub struct Version {
@@ -83,7 +116,7 @@ impl Compose for Version {
         buf.put_slice(self.version.as_bytes());
         buf.put_slice(b"\r\n");
 
-        10 + self.version.as_bytes().len()
+        10 + self.version.len()
     }
 }
 
@@ -166,11 +199,11 @@ mod tests {
 
     #[test]
     fn parse_incomplete() {
-        let parser = AdminRequestParser::new();
+        let protocol = AdminProtocol::default();
 
         let buffers: Vec<&[u8]> = vec![b"", b"stats", b"stats\r"];
         for buffer in buffers.iter() {
-            if let Err(e) = parser.parse(buffer) {
+            if let Err(e) = protocol.parse_request(buffer) {
                 assert_eq!(e.kind(), ErrorKind::WouldBlock);
             } else {
                 panic!("parser should not have returned a request");
@@ -180,62 +213,62 @@ mod tests {
 
     #[test]
     fn parse_flush_all() {
-        let parser = AdminRequestParser::new();
+        let protocol = AdminProtocol::default();
 
-        let parsed = parser.parse(b"flush_all\r\n");
+        let parsed = protocol.parse_request(b"flush_all\r\n");
         assert!(parsed.is_ok());
         assert_eq!(parsed.unwrap().into_inner(), AdminRequest::FlushAll);
     }
 
     #[test]
     fn parse_quit() {
-        let parser = AdminRequestParser::new();
+        let protocol = AdminProtocol::default();
 
-        let parsed = parser.parse(b"quit\r\n");
+        let parsed = protocol.parse_request(b"quit\r\n");
         assert!(parsed.is_ok());
         assert_eq!(parsed.unwrap().into_inner(), AdminRequest::Quit);
     }
 
     #[test]
     fn parse_stats() {
-        let parser = AdminRequestParser::new();
+        let protocol = AdminProtocol::default();
 
-        let parsed = parser.parse(b"stats\r\n");
+        let parsed = protocol.parse_request(b"stats\r\n");
         assert!(parsed.is_ok());
         assert_eq!(parsed.unwrap().into_inner(), AdminRequest::Stats);
     }
 
     #[test]
     fn parse_version() {
-        let parser = AdminRequestParser::new();
+        let protocol = AdminProtocol::default();
 
-        let parsed = parser.parse(b"version\r\n");
+        let parsed = protocol.parse_request(b"version\r\n");
         assert!(parsed.is_ok());
         assert_eq!(parsed.unwrap().into_inner(), AdminRequest::Version);
     }
 
     #[test]
     fn parse_commands_with_whitespace_leading_or_trailing() {
-        let parser = AdminRequestParser::new();
+        let protocol = AdminProtocol::default();
 
-        let parsed = parser.parse(b"version  \r\n");
+        let parsed = protocol.parse_request(b"version  \r\n");
         assert!(parsed.is_ok());
         assert_eq!(parsed.unwrap().into_inner(), AdminRequest::Version);
 
-        let parsed = parser.parse(b"  version\r\n");
+        let parsed = protocol.parse_request(b"  version\r\n");
         assert!(parsed.is_ok());
         assert_eq!(parsed.unwrap().into_inner(), AdminRequest::Version);
 
-        let parsed = parser.parse(b"  quit  \r\n");
+        let parsed = protocol.parse_request(b"  quit  \r\n");
         assert!(parsed.is_ok());
         assert_eq!(parsed.unwrap().into_inner(), AdminRequest::Quit);
     }
 
     #[test]
     fn parse_ignores_after_crlf() {
-        let parser = AdminRequestParser::new();
+        let protocol = AdminProtocol::default();
 
-        let parsed = parser.parse(b"flush_all\r\nstats");
+        let parsed = protocol.parse_request(b"flush_all\r\nstats");
         assert!(parsed.is_ok());
         assert_eq!(parsed.unwrap().into_inner(), AdminRequest::FlushAll);
     }

@@ -5,7 +5,7 @@
 //! Defines the `Ping` storage interface and implements the wire protocol.
 
 mod storage;
-mod wire;
+pub(crate) mod wire;
 
 pub use storage::PingStorage;
-pub use wire::{Request, RequestParser, Response, ResponseParser};
+pub use wire::{Request, Response, ResponseParser};

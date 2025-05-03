@@ -4,17 +4,17 @@
 
 use super::*;
 
-pub struct MultiWorkerBuilder<Parser, Request, Response> {
+pub struct MultiWorkerBuilder<Proto, Request, Response> {
     nevent: usize,
-    parser: Parser,
+    protocol: Proto,
     poll: Poll,
-    sessions: Slab<ServerSession<Parser, Response, Request>>,
+    sessions: Slab<ServerSession<Proto, Response, Request>>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Parser, Request, Response> MultiWorkerBuilder<Parser, Request, Response> {
-    pub fn new<T: WorkerConfig>(config: &T, parser: Parser) -> Result<Self> {
+impl<Proto, Request, Response> MultiWorkerBuilder<Proto, Request, Response> {
+    pub fn new<T: WorkerConfig>(config: &T, protocol: Proto) -> Result<Self> {
         let config = config.worker();
 
         let poll = Poll::new()?;
@@ -28,7 +28,7 @@ impl<Parser, Request, Response> MultiWorkerBuilder<Parser, Request, Response> {
 
         Ok(Self {
             nevent,
-            parser,
+            protocol,
             poll,
             sessions: Slab::new(),
             timeout,
@@ -45,11 +45,11 @@ impl<Parser, Request, Response> MultiWorkerBuilder<Parser, Request, Response> {
         data_queue: Queues<(Request, Token), (Request, Response, Token)>,
         session_queue: Queues<Session, Session>,
         signal_queue: Queues<(), Signal>,
-    ) -> MultiWorker<Parser, Request, Response> {
+    ) -> MultiWorker<Proto, Request, Response> {
         MultiWorker {
             data_queue,
             nevent: self.nevent,
-            parser: self.parser,
+            protocol: self.protocol,
             poll: self.poll,
             session_queue,
             sessions: self.sessions,
@@ -60,21 +60,21 @@ impl<Parser, Request, Response> MultiWorkerBuilder<Parser, Request, Response> {
     }
 }
 
-pub struct MultiWorker<Parser, Request, Response> {
+pub struct MultiWorker<Proto, Request, Response> {
     data_queue: Queues<(Request, Token), (Request, Response, Token)>,
     nevent: usize,
-    parser: Parser,
+    protocol: Proto,
     poll: Poll,
     session_queue: Queues<Session, Session>,
-    sessions: Slab<ServerSession<Parser, Response, Request>>,
+    sessions: Slab<ServerSession<Proto, Response, Request>>,
     signal_queue: Queues<(), Signal>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Parser, Request, Response> MultiWorker<Parser, Request, Response>
+impl<Proto, Request, Response> MultiWorker<Proto, Request, Response>
 where
-    Parser: Parse<Request> + Clone,
+    Proto: Protocol<Request, Response> + Clone,
     Request: Klog + Klog<Response = Response>,
     Response: Compose,
 {
@@ -160,7 +160,7 @@ where
                                 .register(self.poll.registry(), Token(s.key()), interest)
                                 .is_ok()
                             {
-                                s.insert(ServerSession::new(session, self.parser.clone()));
+                                s.insert(ServerSession::new(session, self.protocol.clone()));
                             } else {
                                 let _ = self.session_queue.try_send_any(session);
                             }

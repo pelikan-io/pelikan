@@ -98,8 +98,6 @@ impl Buffer {
 
         // if the buffer is oversized, shrink to the target size
         if self.cap > self.target_size {
-            trace!("shrinking buffer");
-
             SESSION_BUFFER_BYTE.sub((self.cap - self.target_size) as _);
 
             let layout = Layout::array::<u8>(self.cap).unwrap();
@@ -146,7 +144,7 @@ impl Buffer {
         let target = if self.write_offset > MB {
             (1 + (self.write_offset / MB)) * MB
         } else {
-            self.write_offset.next_power_of_two()
+            (self.write_offset + 1).next_power_of_two()
         };
 
         SESSION_BUFFER_BYTE.sub((self.cap - target) as _);
@@ -422,26 +420,26 @@ mod tests {
         assert_eq!(buffer.remaining(), 31);
         assert_eq!(buffer.remaining_mut(), 24);
 
-        // partial consume, remaining drops to best fitting power of two
+        // partial consume, remaining drops to next power of two
         buffer.advance(15);
         assert_eq!(buffer.remaining(), 16);
-        assert_eq!(buffer.remaining_mut(), 0);
+        assert_eq!(buffer.remaining_mut(), 16);
 
-        // from here on, buffer will not shrink below target capacity and will
-        // not compact
+        // from here on, buffer will not shrink below target capacity * 2 until
+        // the last byte is consumed
 
         // partial consume, since the buffer is the target size already, there
         // will be no compaction
         buffer.advance(1);
         assert_eq!(buffer.remaining(), 15);
-        assert_eq!(buffer.remaining_mut(), 0);
+        assert_eq!(buffer.remaining_mut(), 16);
 
         // consume all but the final byte
         // partial consume, len decrease
         // length = 1, size = 16, capacity = 15
         buffer.advance(14);
         assert_eq!(buffer.remaining(), 1);
-        assert_eq!(buffer.remaining_mut(), 0);
+        assert_eq!(buffer.remaining_mut(), 16);
 
         // on the final advance, all bytes are consumed and the entire buffer
         // is now clear

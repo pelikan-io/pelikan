@@ -31,7 +31,7 @@ impl Compose for Array {
         if let Some(values) = &self.inner {
             let header = format!("*{}\r\n", values.len());
             session.put_slice(header.as_bytes());
-            len += header.as_bytes().len();
+            len += header.len();
             for value in values {
                 len += value.compose(session);
             }

@@ -4,6 +4,7 @@
 
 use super::map_result;
 use crate::*;
+use protocol_common::Protocol;
 use session::ClientSession;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -50,22 +51,22 @@ pub static BACKEND_EVENT_TOTAL: Counter = Counter::new();
 )]
 pub static BACKEND_EVENT_WRITE: Counter = Counter::new();
 
-pub struct BackendWorkerBuilder<Parser, Request, Response> {
+pub struct BackendWorkerBuilder<Proto, Request, Response> {
     free_queue: VecDeque<Token>,
     nevent: usize,
-    parser: Parser,
+    protocol: Proto,
     poll: Poll,
-    sessions: Slab<ClientSession<Parser, Request, Response>>,
+    sessions: Slab<ClientSession<Proto, Request, Response>>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Parser, Request, Response> BackendWorkerBuilder<Parser, Request, Response>
+impl<Proto, Request, Response> BackendWorkerBuilder<Proto, Request, Response>
 where
-    Parser: Clone + Parse<Response>,
+    Proto: Clone + Protocol<Request, Response>,
     Request: Compose,
 {
-    pub fn new<T: BackendConfig>(config: &T, parser: Parser) -> Result<Self> {
+    pub fn new<T: BackendConfig>(config: &T, protocol: Proto) -> Result<Self> {
         let config = config.backend();
 
         let poll = Poll::new()?;
@@ -82,7 +83,7 @@ where
 
         for endpoint in config.socket_addrs()? {
             let stream = TcpStream::connect(endpoint)?;
-            let mut session = ClientSession::new(Session::from(stream), parser.clone());
+            let mut session = ClientSession::new(Session::from(stream), protocol.clone());
             let s = sessions.vacant_entry();
             let interest = session.interest();
             session
@@ -95,7 +96,7 @@ where
         Ok(Self {
             free_queue,
             nevent,
-            parser,
+            protocol,
             poll,
             sessions,
             timeout,
@@ -111,13 +112,13 @@ where
         self,
         data_queue: Queues<(Request, Response, Token), (Request, Token)>,
         signal_queue: Queues<(), Signal>,
-    ) -> BackendWorker<Parser, Request, Response> {
+    ) -> BackendWorker<Proto, Request, Response> {
         BackendWorker {
             backlog: VecDeque::new(),
             data_queue,
             free_queue: self.free_queue,
             nevent: self.nevent,
-            parser: self.parser,
+            protocol: self.protocol,
             pending: HashMap::new(),
             poll: self.poll,
             sessions: self.sessions,
@@ -128,23 +129,23 @@ where
     }
 }
 
-pub struct BackendWorker<Parser, Request, Response> {
+pub struct BackendWorker<Proto, Request, Response> {
     backlog: VecDeque<(Request, Token)>,
     data_queue: Queues<(Request, Response, Token), (Request, Token)>,
     free_queue: VecDeque<Token>,
     nevent: usize,
-    parser: Parser,
+    protocol: Proto,
     pending: HashMap<Token, Token>,
     poll: Poll,
-    sessions: Slab<ClientSession<Parser, Request, Response>>,
+    sessions: Slab<ClientSession<Proto, Request, Response>>,
     signal_queue: Queues<(), Signal>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Parser, Request, Response> BackendWorker<Parser, Request, Response>
+impl<Proto, Request, Response> BackendWorker<Proto, Request, Response>
 where
-    Parser: Parse<Response> + Clone,
+    Proto: Protocol<Request, Response> + Clone,
     Request: Compose,
 {
     /// Return the `Session` to the `Listener` to handle flush/close
@@ -288,24 +289,24 @@ where
     }
 }
 
-pub struct BackendBuilder<Parser, Request, Response> {
-    builders: Vec<BackendWorkerBuilder<Parser, Request, Response>>,
+pub struct BackendBuilder<Proto, Request, Response> {
+    builders: Vec<BackendWorkerBuilder<Proto, Request, Response>>,
 }
 
-impl<BackendParser, BackendRequest, BackendResponse>
-    BackendBuilder<BackendParser, BackendRequest, BackendResponse>
+impl<BackendProto, BackendRequest, BackendResponse>
+    BackendBuilder<BackendProto, BackendRequest, BackendResponse>
 where
-    BackendParser: Parse<BackendResponse> + Clone,
+    BackendProto: Protocol<BackendRequest, BackendResponse> + Clone,
     BackendRequest: Compose,
 {
     pub fn new<T: BackendConfig>(
         config: &T,
-        parser: BackendParser,
+        protocol: BackendProto,
         threads: usize,
     ) -> Result<Self> {
         let mut builders = Vec::new();
         for _ in 0..threads {
-            builders.push(BackendWorkerBuilder::new(config, parser.clone())?);
+            builders.push(BackendWorkerBuilder::new(config, protocol.clone())?);
         }
         Ok(Self { builders })
     }
@@ -321,7 +322,7 @@ where
             Queues<(BackendRequest, BackendResponse, Token), (BackendRequest, Token)>,
         >,
         mut signal_queues: Vec<Queues<(), Signal>>,
-    ) -> Vec<BackendWorker<BackendParser, BackendRequest, BackendResponse>> {
+    ) -> Vec<BackendWorker<BackendProto, BackendRequest, BackendResponse>> {
         self.builders
             .drain(..)
             .map(|b| b.build(data_queues.pop().unwrap(), signal_queues.pop().unwrap()))

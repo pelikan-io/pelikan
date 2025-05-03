@@ -14,10 +14,8 @@ pub static ADMIN_CONN_ACCEPT: Counter = Counter::new();
 #[metric(name = "admin_conn_close")]
 pub static ADMIN_CONN_CLOSE: Counter = Counter::new();
 
-pub(crate) async fn admin(mut log_drain: Box<dyn logger::Drain>, admin_listener: TcpListener) {
+pub(crate) async fn admin(admin_listener: TcpListener) {
     loop {
-        let _ = log_drain.flush();
-
         // accept a new client
         if let Ok(Ok((socket, _))) =
             timeout(Duration::from_millis(1), admin_listener.accept()).await
@@ -84,13 +82,13 @@ async fn handle_admin_client(mut socket: tokio::net::TcpStream) {
     let mut buf = Buffer::new(INITIAL_BUFFER_SIZE);
 
     // initialize the request parser
-    let parser = AdminRequestParser::new();
+    let parser = AdminProtocol::default();
     loop {
         if do_read(&mut socket, &mut buf).await.is_err() {
             break;
         }
 
-        match parser.parse(buf.borrow()) {
+        match parser.parse_request(buf.borrow()) {
             Ok(request) => {
                 ADMIN_REQUEST_PARSE.increment();
 
@@ -98,7 +96,7 @@ async fn handle_admin_client(mut socket: tokio::net::TcpStream) {
                 let request = request.into_inner();
 
                 match request {
-                    AdminRequest::Stats { .. } => {
+                    AdminRequest::Stats => {
                         ADMIN_RESPONSE_COMPOSE.increment();
 
                         if stats_response(&mut socket).await.is_err() {

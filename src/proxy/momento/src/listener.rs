@@ -12,6 +12,7 @@ pub(crate) async fn listener(
     client_builder: CacheClientBuilder<ReadyToBuild>,
     cache_name: String,
     protocol: Protocol,
+    flags: bool,
 ) {
     let client = client_builder.clone().build().unwrap_or_else(|e| {
         // Note: this will not happen since we validated the client build in the main thread already
@@ -32,7 +33,8 @@ pub(crate) async fn listener(
                 TCP_CONN_CURR.increment();
                 match protocol {
                     Protocol::Memcache => {
-                        crate::frontend::handle_memcache_client(socket, client, cache_name).await;
+                        crate::frontend::handle_memcache_client(socket, client, cache_name, flags)
+                            .await;
                     }
                     Protocol::Resp => {
                         crate::frontend::handle_resp_client(socket, client, cache_name).await;

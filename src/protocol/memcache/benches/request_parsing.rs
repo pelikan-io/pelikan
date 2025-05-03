@@ -6,7 +6,6 @@
 
 use core::time::Duration;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use protocol_common::Parse;
 
 use protocol_memcache::*;
 
@@ -16,7 +15,7 @@ const BUFFER_SIZE: usize = 16 * KB;
 const DURATION: u64 = 30; // seconds
 
 fn get(c: &mut Criterion) {
-    let parser = RequestParser::new();
+    let protocol = TextProtocol::new();
 
     let mut group = c.benchmark_group("get");
     group.measurement_time(Duration::from_secs(DURATION));
@@ -28,13 +27,13 @@ fn get(c: &mut Criterion) {
 
     group.bench_function("1b", |b| {
         b.iter(|| {
-            let _ = parser.parse(&buffer);
+            let _ = protocol.parse_request(&buffer);
         })
     });
 }
 
 fn set(c: &mut Criterion) {
-    let parser = RequestParser::new();
+    let protocol = TextProtocol::new();
 
     let mut group = c.benchmark_group("set");
     group.measurement_time(Duration::from_secs(DURATION));
@@ -46,7 +45,7 @@ fn set(c: &mut Criterion) {
 
     group.bench_function("1b/1b", |b| {
         b.iter(|| {
-            let _ = parser.parse(&buffer);
+            let _ = protocol.parse_request(&buffer);
         })
     });
 
@@ -56,7 +55,7 @@ fn set(c: &mut Criterion) {
 
     group.bench_function("1b/10b", |b| {
         b.iter(|| {
-            let _ = parser.parse(&buffer);
+            let _ = protocol.parse_request(&buffer);
         })
     });
 
@@ -66,7 +65,7 @@ fn set(c: &mut Criterion) {
 
     group.bench_function("1b/100b", |b| {
         b.iter(|| {
-            let _ = parser.parse(&buffer);
+            let _ = protocol.parse_request(&buffer);
         })
     });
 }

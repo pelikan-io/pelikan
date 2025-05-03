@@ -60,7 +60,7 @@ impl<'a> ParseError<'a> {
     }
 }
 
-impl<'a> fmt::Debug for ParseError<'a> {
+impl fmt::Debug for ParseError<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Incomplete => f.write_str("Incomplete"),

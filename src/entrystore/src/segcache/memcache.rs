@@ -16,8 +16,13 @@ use std::time::Duration;
 impl Execute<Request, Response> for Seg {
     fn execute(&mut self, request: &Request) -> Response {
         match request {
-            Request::Get(get) => self.get(get),
-            Request::Gets(gets) => self.gets(gets),
+            Request::Get(get) => {
+                if get.cas() {
+                    self.gets(get)
+                } else {
+                    self.get(get)
+                }
+            }
             Request::Set(set) => self.set(set),
             Request::Add(add) => self.add(add),
             Request::Replace(replace) => self.replace(replace),
@@ -60,7 +65,7 @@ impl Storage for Seg {
         Values::new(values.into_boxed_slice()).into()
     }
 
-    fn gets(&mut self, get: &Gets) -> Response {
+    fn gets(&mut self, get: &Get) -> Response {
         let mut values = Vec::with_capacity(get.keys().len());
         for key in get.keys().iter() {
             if let Some(item) = self.data.get(key) {

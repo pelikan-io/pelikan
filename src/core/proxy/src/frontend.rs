@@ -4,6 +4,7 @@
 
 use super::map_result;
 use crate::*;
+use protocol_common::Protocol;
 
 #[metric(
     name = "frontend_event_depth",
@@ -48,32 +49,32 @@ pub static FRONTEND_EVENT_TOTAL: Counter = Counter::new();
 pub static FRONTEND_EVENT_WRITE: Counter = Counter::new();
 
 pub struct FrontendWorkerBuilder<
-    FrontendParser,
+    FrontendProto,
     FrontendRequest,
     FrontendResponse,
     BackendRequest,
     BackendResponse,
 > {
     nevent: usize,
-    parser: FrontendParser,
+    protocol: FrontendProto,
     poll: Poll,
-    sessions: Slab<ServerSession<FrontendParser, FrontendResponse, FrontendRequest>>,
+    sessions: Slab<ServerSession<FrontendProto, FrontendResponse, FrontendRequest>>,
     timeout: Duration,
     waker: Arc<Waker>,
     _backend_request: PhantomData<BackendRequest>,
     _backend_response: PhantomData<BackendResponse>,
 }
 
-impl<FrontendParser, FrontendRequest, FrontendResponse, BackendRequest, BackendResponse>
+impl<FrontendProto, FrontendRequest, FrontendResponse, BackendRequest, BackendResponse>
     FrontendWorkerBuilder<
-        FrontendParser,
+        FrontendProto,
         FrontendRequest,
         FrontendResponse,
         BackendRequest,
         BackendResponse,
     >
 {
-    pub fn new<T: FrontendConfig>(config: &T, parser: FrontendParser) -> Result<Self> {
+    pub fn new<T: FrontendConfig>(config: &T, protocol: FrontendProto) -> Result<Self> {
         let config = config.frontend();
 
         let poll = Poll::new()?;
@@ -87,7 +88,7 @@ impl<FrontendParser, FrontendRequest, FrontendResponse, BackendRequest, BackendR
 
         Ok(Self {
             nevent,
-            parser,
+            protocol,
             poll,
             sessions: Slab::new(),
             timeout,
@@ -107,7 +108,7 @@ impl<FrontendParser, FrontendRequest, FrontendResponse, BackendRequest, BackendR
         session_queue: Queues<Session, Session>,
         signal_queue: Queues<(), Signal>,
     ) -> FrontendWorker<
-        FrontendParser,
+        FrontendProto,
         FrontendRequest,
         FrontendResponse,
         BackendRequest,
@@ -116,7 +117,7 @@ impl<FrontendParser, FrontendRequest, FrontendResponse, BackendRequest, BackendR
         FrontendWorker {
             data_queue,
             nevent: self.nevent,
-            parser: self.parser,
+            protocol: self.protocol,
             poll: self.poll,
             session_queue,
             sessions: self.sessions,
@@ -128,7 +129,7 @@ impl<FrontendParser, FrontendRequest, FrontendResponse, BackendRequest, BackendR
 }
 
 pub struct FrontendWorker<
-    FrontendParser,
+    FrontendProto,
     FrontendRequest,
     FrontendResponse,
     BackendRequest,
@@ -136,25 +137,25 @@ pub struct FrontendWorker<
 > {
     data_queue: Queues<(BackendRequest, Token), (BackendRequest, BackendResponse, Token)>,
     nevent: usize,
-    parser: FrontendParser,
+    protocol: FrontendProto,
     poll: Poll,
     session_queue: Queues<Session, Session>,
-    sessions: Slab<ServerSession<FrontendParser, FrontendResponse, FrontendRequest>>,
+    sessions: Slab<ServerSession<FrontendProto, FrontendResponse, FrontendRequest>>,
     signal_queue: Queues<(), Signal>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<FrontendParser, FrontendRequest, FrontendResponse, BackendRequest, BackendResponse>
+impl<FrontendProto, FrontendRequest, FrontendResponse, BackendRequest, BackendResponse>
     FrontendWorker<
-        FrontendParser,
+        FrontendProto,
         FrontendRequest,
         FrontendResponse,
         BackendRequest,
         BackendResponse,
     >
 where
-    FrontendParser: Parse<FrontendRequest> + Clone,
+    FrontendProto: Protocol<FrontendRequest, FrontendResponse> + Clone,
     FrontendResponse: Compose,
     FrontendResponse: From<BackendResponse>,
     BackendRequest: From<FrontendRequest>,
@@ -243,7 +244,7 @@ where
                                 .register(self.poll.registry(), Token(s.key()), interest)
                                 .is_ok()
                             {
-                                s.insert(ServerSession::new(session, self.parser.clone()));
+                                s.insert(ServerSession::new(session, self.protocol.clone()));
                             } else {
                                 let _ = self.session_queue.try_send_any(session);
                             }
@@ -349,16 +350,16 @@ pub struct FrontendBuilder<
     >,
 }
 
-impl<FrontendParser, FrontendRequest, FrontendResponse, BackendRequest, BackendResponse>
+impl<FrontendProto, FrontendRequest, FrontendResponse, BackendRequest, BackendResponse>
     FrontendBuilder<
-        FrontendParser,
+        FrontendProto,
         FrontendRequest,
         FrontendResponse,
         BackendRequest,
         BackendResponse,
     >
 where
-    FrontendParser: Parse<FrontendRequest> + Clone,
+    FrontendProto: Protocol<FrontendRequest, FrontendResponse> + Clone,
     FrontendResponse: Compose,
     FrontendResponse: From<BackendResponse>,
     BackendRequest: From<FrontendRequest>,
@@ -366,12 +367,12 @@ where
 {
     pub fn new<T: FrontendConfig>(
         config: &T,
-        parser: FrontendParser,
+        protocol: FrontendProto,
         threads: usize,
     ) -> Result<Self> {
         let mut builders = Vec::new();
         for _ in 0..threads {
-            builders.push(FrontendWorkerBuilder::new(config, parser.clone())?);
+            builders.push(FrontendWorkerBuilder::new(config, protocol.clone())?);
         }
         Ok(Self { builders })
     }
@@ -390,7 +391,7 @@ where
         mut signal_queues: Vec<Queues<(), Signal>>,
     ) -> Vec<
         FrontendWorker<
-            FrontendParser,
+            FrontendProto,
             FrontendRequest,
             FrontendResponse,
             BackendRequest,

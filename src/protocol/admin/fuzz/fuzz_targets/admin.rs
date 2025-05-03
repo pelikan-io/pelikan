@@ -10,8 +10,7 @@ use libfuzzer_sys::fuzz_target;
 
 use protocol_admin::*;
 
-const PARSER: AdminRequestParser = AdminRequestParser {};
-
 fuzz_target!(|data: &[u8]| {
-    let _ = PARSER.parse(data);
+    let protocol = AdminProtocol::default();
+    let _ = protocol.parse_request(data);
 });
