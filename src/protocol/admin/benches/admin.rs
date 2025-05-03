@@ -13,7 +13,7 @@ const BUFFER_SIZE: usize = 16 * KB;
 const DURATION: u64 = 30; // seconds
 
 fn version(c: &mut Criterion) {
-    let protocol = AdminProtocol::new();
+    let protocol = AdminProtocol::default();
 
     let mut group = c.benchmark_group("version");
     group.measurement_time(Duration::from_secs(DURATION));
