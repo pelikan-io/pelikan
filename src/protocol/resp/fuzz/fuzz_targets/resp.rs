@@ -9,14 +9,13 @@
 use libfuzzer_sys::fuzz_target;
 
 use protocol_resp::*;
-use protocol_common::Parse;
 
 // TODO(bmartin): we should be able to do some validation like we do in the
 // memcache protocol fuzzing. For now, this just makes sure the parser will
 // not panic on unanticipated inputs.
 
 fuzz_target!(|data: &[u8]| {
-    let parser = RequestParser::new();
+    let protocol = Protocol::default();
 
-    let _ = parser.parse(data);
+    let _ = protocol.parse_request(data);
 });

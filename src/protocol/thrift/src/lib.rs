@@ -9,6 +9,8 @@ use protocol_common::BufMut;
 use protocol_common::Compose;
 use protocol_common::ParseOk;
 
+pub use protocol_common::Protocol as ProtocolTrait;
+
 const THRIFT_HEADER_LEN: usize = std::mem::size_of::<u32>();
 
 // Stats
