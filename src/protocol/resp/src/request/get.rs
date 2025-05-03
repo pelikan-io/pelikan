@@ -34,7 +34,7 @@ impl TryFrom<Message> for Get {
 
                 let key = key.inner.unwrap();
 
-                if key.len() == 0 {
+                if key.is_empty() {
                     return Err(Error::new(ErrorKind::Other, "malformed command"));
                 }
 

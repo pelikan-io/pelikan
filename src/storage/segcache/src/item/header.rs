@@ -107,7 +107,7 @@ impl Into<u8> for ValueType {
 // struct is always taken from an aligned pointer cast. This can potentially
 // result in UB when fields are referenced. Fields that require access by
 // reference must be strategically placed to ensure alignment and avoid UB.
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct ItemHeader {
     #[cfg(feature = "magic")]
     magic: u32,
@@ -167,11 +167,7 @@ impl ItemHeader {
 
     pub(super) fn value_type(&self) -> Option<ValueType> {
         if self.is_typed() {
-            if let Ok(t) = ValueType::try_from((self.len >> TYPE_SHIFT) as u8) {
-                Some(t)
-            } else {
-                None
-            }
+            ValueType::try_from((self.len >> TYPE_SHIFT) as u8).ok()
         } else {
             None
         }

@@ -77,8 +77,7 @@ async fn update_method_metrics<T, E>(
     future: impl Future<Output = Result<T, E>>,
 ) -> Result<T, E> {
     count.increment();
-    future.await.map_err(|e| {
+    future.await.inspect_err(|_| {
         count_ex.increment();
-        e
     })
 }

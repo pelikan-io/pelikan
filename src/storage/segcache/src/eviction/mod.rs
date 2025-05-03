@@ -93,7 +93,7 @@ impl Eviction {
             Policy::None | Policy::Random | Policy::RandomFifo | Policy::Merge { .. } => {
                 return;
             }
-            Policy::Fifo { .. } => {
+            Policy::Fifo => {
                 ids.sort_by(|a, b| {
                     Self::compare_fifo(
                         &headers[a.get() as usize - 1],
@@ -101,7 +101,7 @@ impl Eviction {
                     )
                 });
             }
-            Policy::Cte { .. } => {
+            Policy::Cte => {
                 ids.sort_by(|a, b| {
                     Self::compare_cte(
                         &headers[a.get() as usize - 1],
@@ -109,7 +109,7 @@ impl Eviction {
                     )
                 });
             }
-            Policy::Util { .. } => {
+            Policy::Util => {
                 ids.sort_by(|a, b| {
                     Self::compare_util(
                         &headers[a.get() as usize - 1],

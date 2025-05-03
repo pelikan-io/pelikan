@@ -104,7 +104,7 @@ impl<'a> EscapedStr<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for EscapedStr<'a> {
+impl std::fmt::Display for EscapedStr<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         for inbyte in self.inner.iter() {
             for outbyte in std::ascii::escape_default(*inbyte) {

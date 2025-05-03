@@ -302,7 +302,7 @@ pub struct ArrayParser<'a, 'p> {
     remaining: usize,
 }
 
-impl<'a, 'p> ArrayParser<'a, 'p> {
+impl<'a> ArrayParser<'a, '_> {
     pub fn remaining(&self) -> usize {
         self.remaining
     }
@@ -462,7 +462,7 @@ mod tests {
         fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result;
     }
 
-    impl<'a, T> TestFmt for &'a T
+    impl<T> TestFmt for &T
     where
         T: TestFmt + ?Sized,
     {
