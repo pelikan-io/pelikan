@@ -135,6 +135,7 @@ mod tests {
                     flags: 0,
                     ttl: Ttl::none(),
                     noreply: false,
+                    opaque: None,
                 })
             ))
         );
@@ -150,6 +151,7 @@ mod tests {
                     flags: 0,
                     ttl: Ttl::none(),
                     noreply: true,
+                    opaque: None,
                 })
             ))
         );

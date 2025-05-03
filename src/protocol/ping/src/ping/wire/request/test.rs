@@ -9,17 +9,17 @@ use std::io::ErrorKind;
 
 #[test]
 fn ping() {
-    let parser = RequestParser::new();
+    let protocol = PingProtocol::default();
 
-    assert!(parser.parse(b"ping\r\n").is_ok());
-    assert!(parser.parse(b"PING\r\n").is_ok());
+    assert!(protocol.parse_request(b"ping\r\n").is_ok());
+    assert!(protocol.parse_request(b"PING\r\n").is_ok());
 }
 
 #[test]
 fn incomplete() {
-    let parser = RequestParser::new();
+    let protocol = PingProtocol::default();
 
-    if let Err(e) = parser.parse(b"ping") {
+    if let Err(e) = protocol.parse_request(b"ping") {
         if e.kind() != ErrorKind::WouldBlock {
             panic!("invalid parse result");
         }
@@ -30,17 +30,17 @@ fn incomplete() {
 
 #[test]
 fn trailing_whitespace() {
-    let parser = RequestParser::new();
+    let protocol = PingProtocol::default();
 
-    assert!(parser.parse(b"ping \r\n").is_ok())
+    assert!(protocol.parse_request(b"ping \r\n").is_ok())
 }
 
 #[test]
 fn unknown() {
-    let parser = RequestParser::new();
+    let protocol = PingProtocol::default();
 
     for request in &["unknown\r\n"] {
-        if let Err(e) = parser.parse(request.as_bytes()) {
+        if let Err(e) = protocol.parse_request(request.as_bytes()) {
             if e.kind() != ErrorKind::InvalidInput {
                 panic!("invalid parse result");
             }
@@ -52,7 +52,7 @@ fn unknown() {
 
 #[test]
 fn pipelined() {
-    let parser = RequestParser::new();
+    let protocol = PingProtocol::default();
 
-    assert!(parser.parse(b"ping\r\nping\r\n").is_ok());
+    assert!(protocol.parse_request(b"ping\r\nping\r\n").is_ok());
 }
