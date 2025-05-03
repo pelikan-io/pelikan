@@ -431,15 +431,18 @@ impl FileBackedMemory {
         };
 
         // create a new file with read and write access
-        #[cfg(target_os = "linux")]
-        let mut file = OpenOptions::new()
-            .create_new(false)
-            .custom_flags(libc::O_DIRECT)
-            .read(true)
-            .write(true)
-            .open(path)?;
+        // #[cfg(target_os = "linux")]
+        // let mut file = OpenOptions::new()
+        //     .create_new(false)
+        //     .custom_flags(libc::O_DIRECT)
+        //     .read(true)
+        //     .write(true)
+        //     .open(path)?;
 
-        #[cfg(not(target_os = "linux"))]
+        // #[cfg(not(target_os = "linux"))]
+
+        // TODO(brian): this needs to be fixed
+
         let mut file = OpenOptions::new()
             .create_new(false)
             .read(true)
@@ -554,15 +557,18 @@ impl FileBackedMemory {
         };
 
         // create a new file with read and write access
-        #[cfg(target_os = "linux")]
-        let mut file = OpenOptions::new()
-            .create_new(true)
-            .custom_flags(libc::O_DIRECT)
-            .read(true)
-            .write(true)
-            .open(path)?;
+        // #[cfg(target_os = "linux")]
+        // let mut file = OpenOptions::new()
+        //     .create_new(true)
+        //     .custom_flags(libc::O_DIRECT)
+        //     .read(true)
+        //     .write(true)
+        //     .open(path)?;
 
-        #[cfg(not(target_os = "linux"))]
+        // #[cfg(not(target_os = "linux"))]
+
+        // TODO(brian): this needs to be fixed
+
         let mut file = OpenOptions::new()
             .create_new(true)
             .read(true)
