@@ -13,8 +13,8 @@ mod util;
 
 pub mod parse;
 
-pub use protocol_common::*;
 pub use protocol_common::Protocol as ProtocolTrait;
+pub use protocol_common::*;
 
 pub(crate) use crate::util::*;
 

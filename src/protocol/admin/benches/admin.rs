@@ -13,7 +13,7 @@ const BUFFER_SIZE: usize = 16 * KB;
 const DURATION: u64 = 30; // seconds
 
 fn version(c: &mut Criterion) {
-    let parser = AdminRequestParser::new();
+    let protocol = AdminProtocol::new();
 
     let mut group = c.benchmark_group("version");
     group.measurement_time(Duration::from_secs(DURATION));
@@ -25,7 +25,7 @@ fn version(c: &mut Criterion) {
 
     group.bench_function("parse", |b| {
         b.iter(|| {
-            let _ = parser.parse(&buffer);
+            let _ = protocol.parse_request(&buffer);
         })
     });
 }
