@@ -77,7 +77,7 @@ impl BinaryProtocol {
             other => Ok(response::ServerError {
                 inner: format!("unknown response: {other}"),
             }
-            .write_binary_response(Opcode::Get, buffer))
+            .write_binary_response(Opcode::Get, buffer)),
         }
     }
 }

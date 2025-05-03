@@ -30,7 +30,12 @@ pub async fn get(
     }
 }
 
-async fn run_get(client: &CacheClient, cache_name: &str, flags: bool, key: &[u8]) -> Option<protocol_memcache::Value> {
+async fn run_get(
+    client: &CacheClient,
+    cache_name: &str,
+    flags: bool,
+    key: &[u8],
+) -> Option<protocol_memcache::Value> {
     match timeout(Duration::from_millis(200), client.get(cache_name, key)).await {
         Ok(Ok(response)) => match response {
             GetResponse::Hit { value } => {

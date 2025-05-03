@@ -1,5 +1,5 @@
-use crate::binary::Opcode;
 use crate::binary::MagicValue;
+use crate::binary::Opcode;
 use bytes::BufMut;
 use nom::{bytes::streaming::take, IResult};
 
