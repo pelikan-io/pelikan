@@ -76,27 +76,33 @@ impl Protocol<AdminRequest, AdminResponse> for AdminProtocol {
         request: &admin::AdminRequest,
         buffer: &mut dyn protocol_common::BufMut,
     ) -> std::result::Result<usize, std::io::Error> {
-        todo!()
-        // match request {
-        //     AdminRequest::Version => {
-        //         Self::Version(Version { version })
-        //     }
-        // }
+        let cmd = match request {
+            AdminRequest::FlushAll => "flush_all\r\n",
+            AdminRequest::Stats => "stats\r\n",
+            AdminRequest::Version => "version\r\n",
+            AdminRequest::Quit => "quit\r\n",
+        };
+
+        buffer.put_slice(cmd.as_bytes());
+
+        Ok(cmd.len())
     }
+
     fn parse_response(
         &self,
         _: &admin::AdminRequest,
         _: &[u8],
     ) -> std::result::Result<protocol_common::ParseOk<admin::AdminResponse>, std::io::Error> {
-        todo!()
+        todo!("this is not implemented yet")
     }
+
     fn compose_response(
         &self,
-        _: &admin::AdminRequest,
-        _: &admin::AdminResponse,
-        _: &mut dyn protocol_common::BufMut,
+        _request: &admin::AdminRequest,
+        response: &admin::AdminResponse,
+        buffer: &mut dyn protocol_common::BufMut,
     ) -> std::result::Result<usize, std::io::Error> {
-        todo!()
+        Ok(response.compose(buffer))
     }
 }
 

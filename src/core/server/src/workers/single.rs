@@ -5,19 +5,19 @@
 use super::*;
 use std::collections::VecDeque;
 
-pub struct SingleWorkerBuilder<Parser, Request, Response, Storage> {
+pub struct SingleWorkerBuilder<Proto, Request, Response, Storage> {
     nevent: usize,
-    parser: Parser,
+    protocol: Proto,
     pending: VecDeque<Token>,
     poll: Poll,
-    sessions: Slab<ServerSession<Parser, Response, Request>>,
+    sessions: Slab<ServerSession<Proto, Response, Request>>,
     storage: Storage,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Parser, Request, Response, Storage> SingleWorkerBuilder<Parser, Request, Response, Storage> {
-    pub fn new<T: WorkerConfig>(config: &T, parser: Parser, storage: Storage) -> Result<Self> {
+impl<Proto, Request, Response, Storage> SingleWorkerBuilder<Proto, Request, Response, Storage> {
+    pub fn new<T: WorkerConfig>(config: &T, protocol: Proto, storage: Storage) -> Result<Self> {
         let config = config.worker();
 
         let poll = Poll::new()?;
@@ -31,7 +31,7 @@ impl<Parser, Request, Response, Storage> SingleWorkerBuilder<Parser, Request, Re
 
         Ok(Self {
             nevent,
-            parser,
+            protocol,
             pending: VecDeque::new(),
             poll,
             sessions: Slab::new(),
@@ -49,10 +49,10 @@ impl<Parser, Request, Response, Storage> SingleWorkerBuilder<Parser, Request, Re
         self,
         session_queue: Queues<Session, Session>,
         signal_queue: Queues<(), Signal>,
-    ) -> SingleWorker<Parser, Request, Response, Storage> {
+    ) -> SingleWorker<Proto, Request, Response, Storage> {
         SingleWorker {
             nevent: self.nevent,
-            parser: self.parser,
+            protocol: self.protocol,
             pending: self.pending,
             poll: self.poll,
             session_queue,
@@ -65,22 +65,22 @@ impl<Parser, Request, Response, Storage> SingleWorkerBuilder<Parser, Request, Re
     }
 }
 
-pub struct SingleWorker<P, Request, Response, Storage> {
+pub struct SingleWorker<Proto, Request, Response, Storage> {
     nevent: usize,
-    parser: P,
+    protocol: Proto,
     pending: VecDeque<Token>,
     poll: Poll,
     session_queue: Queues<Session, Session>,
-    sessions: Slab<ServerSession<P, Response, Request>>,
+    sessions: Slab<ServerSession<Proto, Response, Request>>,
     signal_queue: Queues<(), Signal>,
     storage: Storage,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<P, Request, Response, Storage> SingleWorker<P, Request, Response, Storage>
+impl<Proto, Request, Response, Storage> SingleWorker<Proto, Request, Response, Storage>
 where
-    P: Protocol<Request, Response> + Clone,
+    Proto: Protocol<Request, Response> + Clone,
     Request: Klog + Klog<Response = Response>,
     Response: Compose,
     Storage: EntryStore + Execute<Request, Response>,
@@ -231,7 +231,7 @@ where
                                 .register(self.poll.registry(), Token(s.key()), interest)
                                 .is_ok()
                             {
-                                s.insert(ServerSession::new(session, self.parser.clone()));
+                                s.insert(ServerSession::new(session, self.protocol.clone()));
                             } else {
                                 let _ = self.session_queue.try_send_any(session);
                             }

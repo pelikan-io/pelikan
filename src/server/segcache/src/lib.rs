@@ -34,7 +34,7 @@ impl Segcache {
         let storage = Storage::new(&config)?;
 
         // initialize parser
-        let protocol = TextProtocol::new()
+        let protocol = Protocol::new()
             .max_value_size(config.seg().segment_size() as usize)
             .time_type(config.time().time_type());
 

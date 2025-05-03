@@ -9,7 +9,7 @@ use std::fs::{File, OpenOptions};
 use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
-#[cfg(os = "linux")]
+#[cfg(target_os = "linux")]
 use std::os::unix::fs::OpenOptionsExt;
 
 use memmap2::{MmapMut, MmapOptions};
@@ -80,7 +80,7 @@ impl Datapool for Memory {
 
 // NOTE: make sure this is a whole number of pages and that all fields which are
 // accessed are properly aligned to avoid undefined behavior.
-#[repr(packed)]
+#[repr(C, packed)]
 pub struct Header {
     checksum: [u8; 32],
     magic: [u8; 8],
@@ -431,7 +431,7 @@ impl FileBackedMemory {
         };
 
         // create a new file with read and write access
-        #[cfg(os = "linux")]
+        #[cfg(target_os = "linux")]
         let mut file = OpenOptions::new()
             .create_new(false)
             .custom_flags(libc::O_DIRECT)
@@ -439,7 +439,7 @@ impl FileBackedMemory {
             .write(true)
             .open(path)?;
 
-        #[cfg(not(os = "linux"))]
+        #[cfg(not(target_os = "linux"))]
         let mut file = OpenOptions::new()
             .create_new(false)
             .read(true)
@@ -554,7 +554,7 @@ impl FileBackedMemory {
         };
 
         // create a new file with read and write access
-        #[cfg(os = "linux")]
+        #[cfg(target_os = "linux")]
         let mut file = OpenOptions::new()
             .create_new(true)
             .custom_flags(libc::O_DIRECT)
@@ -562,7 +562,7 @@ impl FileBackedMemory {
             .write(true)
             .open(path)?;
 
-        #[cfg(not(os = "linux"))]
+        #[cfg(not(target_os = "linux"))]
         let mut file = OpenOptions::new()
             .create_new(true)
             .read(true)

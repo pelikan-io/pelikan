@@ -77,9 +77,9 @@ pub enum Workers<Parser, Request, Response, Storage> {
     },
 }
 
-impl<P, Request, Response, Storage> Workers<P, Request, Response, Storage>
+impl<Proto, Request, Response, Storage> Workers<Proto, Request, Response, Storage>
 where
-    P: 'static + Protocol<Request, Response> + Clone + Send,
+    Proto: 'static + Protocol<Request, Response> + Clone + Send,
     Request: 'static + Klog + Klog<Response = Response> + Send,
     Response: 'static + Compose + Send,
     Storage: 'static + EntryStore + Execute<Request, Response> + Send,
@@ -116,23 +116,23 @@ where
     }
 }
 
-pub enum WorkersBuilder<P, Request, Response, Storage> {
+pub enum WorkersBuilder<Proto, Request, Response, Storage> {
     Single {
-        worker: SingleWorkerBuilder<P, Request, Response, Storage>,
+        worker: SingleWorkerBuilder<Proto, Request, Response, Storage>,
     },
     Multi {
-        workers: Vec<MultiWorkerBuilder<P, Request, Response>>,
+        workers: Vec<MultiWorkerBuilder<Proto, Request, Response>>,
         storage: StorageWorkerBuilder<Request, Response, Storage>,
     },
 }
 
-impl<P, Request, Response, Storage> WorkersBuilder<P, Request, Response, Storage>
+impl<Proto, Request, Response, Storage> WorkersBuilder<Proto, Request, Response, Storage>
 where
-    P: Protocol<Request, Response> + Clone,
+    Proto: Protocol<Request, Response> + Clone,
     Response: Compose,
     Storage: Execute<Request, Response> + EntryStore,
 {
-    pub fn new<T: WorkerConfig>(config: &T, protocol: P, storage: Storage) -> Result<Self> {
+    pub fn new<T: WorkerConfig>(config: &T, protocol: Proto, storage: Storage) -> Result<Self> {
         let threads = config.worker().threads();
 
         if threads > 1 {
@@ -183,7 +183,7 @@ where
         self,
         session_queues: Vec<Queues<Session, Session>>,
         signal_queues: Vec<Queues<(), Signal>>,
-    ) -> Workers<P, Request, Response, Storage> {
+    ) -> Workers<Proto, Request, Response, Storage> {
         let mut signal_queues = signal_queues;
         let mut session_queues = session_queues;
         match self {

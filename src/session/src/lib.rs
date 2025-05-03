@@ -7,11 +7,6 @@
 //! communication and provides abstractions for request/response oriented
 //! client/server communications.
 
-// pub use buffer::*;
-
-#[macro_use]
-extern crate log;
-
 mod buffer;
 mod client;
 mod server;
