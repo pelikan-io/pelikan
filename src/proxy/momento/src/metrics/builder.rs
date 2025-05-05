@@ -35,17 +35,14 @@ impl ProxyMetricsBuilder {
         ).expect("connect to otel-collector");
 
         let otlp_downstream = OpenTelemetryDownstream::new(channel, None);
-        tokio::spawn(async move {
-            otlp_downstream.send_batches_forever(batch_receiver).await;
-        });
+        tokio::spawn(otlp_downstream.send_batches_forever(batch_receiver));
 
         // Set up the OpenTelemetry batcher
-        tokio::spawn(async move {
-            gauge_factory
-                .clone()
-                .report_gauges_forever(self.batch_interval, batch_sender, OpentelemetryBatcher)
-                .await;
-        });
+        tokio::spawn(gauge_factory.clone().report_gauges_forever(
+            self.batch_interval,
+            batch_sender,
+            OpentelemetryBatcher,
+        ));
 
         let metrics = ProxyMetrics {
             total_requests: proxy_sum_gauge(gauge_factory, "total_requests"),
