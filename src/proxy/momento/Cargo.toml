@@ -21,7 +21,7 @@ futures = { workspace = true }
 libc = { workspace = true }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-momento = "0.50.4"
+momento = "0.51.0"
 pelikan-net = { workspace = true, features = ["metrics"] }
 protocol-admin = { path = "../../protocol/admin" }
 protocol-memcache = { path = "../../protocol/memcache" }
