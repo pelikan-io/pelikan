@@ -417,6 +417,15 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::SortedSetAdd(r) => {
                     resp::zadd(&mut client, &cache_name, &mut response_buf, r).await?
                 }
+                resp::Request::SortedSetReverseRank(r) => {
+                    resp::zrevrank(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::SortedSetCount(r) => {
+                    resp::zcount(&mut client, &cache_name, &mut response_buf, r).await?
+                }
+                resp::Request::SortedSetUnionStore(r) => {
+                    resp::zunionstore(&mut client, &cache_name, &mut response_buf, r).await?
+                }
                 _ => return Err(ProxyError::UnsupportedCommand(request.command())),
             }
 
