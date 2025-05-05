@@ -3,7 +3,7 @@ use goodmetrics::SumHandle;
 
 use super::{RpcCallGuard, RpcMetrics};
 
-pub trait ProxyMetricsApi: Send + Sync + 'static {
+pub trait ProxyMetrics: Send + Sync + 'static {
     fn increment_total_requests(&self);
     fn begin_connection(&self) -> ConnectionGuard;
     fn begin_get(&self) -> RpcCallGuard;
@@ -12,7 +12,7 @@ pub trait ProxyMetricsApi: Send + Sync + 'static {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProxyMetrics {
+pub struct DefaultProxyMetrics {
     pub(crate) total_requests: SumHandle,
     pub(crate) get: RpcMetrics,
     pub(crate) set: RpcMetrics,
@@ -20,7 +20,7 @@ pub struct ProxyMetrics {
     pub(crate) current_connections: SumHandle,
 }
 
-impl ProxyMetricsApi for ProxyMetrics {
+impl ProxyMetrics for DefaultProxyMetrics {
     fn begin_connection(&self) -> ConnectionGuard {
         ConnectionGuard::new(self.current_connections.clone())
     }

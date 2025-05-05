@@ -236,7 +236,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn spawn(
     config: MomentoProxyConfig,
-    proxy_metrics: Arc<impl ProxyMetricsApi>,
+    proxy_metrics: Arc<impl ProxyMetrics>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let admin_addr = config
         .admin()

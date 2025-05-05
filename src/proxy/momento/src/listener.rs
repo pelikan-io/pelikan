@@ -13,7 +13,7 @@ pub(crate) async fn listener(
     cache_name: String,
     protocol: Protocol,
     flags: bool,
-    proxy_metrics: Arc<impl ProxyMetricsApi>,
+    proxy_metrics: Arc<impl ProxyMetrics>,
 ) {
     let client = client_builder.clone().build().unwrap_or_else(|e| {
         // Note: this will not happen since we validated the client build in the main thread already

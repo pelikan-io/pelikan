@@ -18,7 +18,7 @@ pub(crate) async fn handle_memcache_client(
     client: CacheClient,
     cache_name: String,
     flags: bool,
-    proxy_metrics: Arc<impl ProxyMetricsApi>,
+    proxy_metrics: Arc<impl ProxyMetrics>,
 ) {
     debug!("accepted memcache client, waiting for first byte to detect text or binary");
 
@@ -78,7 +78,7 @@ pub(crate) async fn handle_memcache_client_concrete(
         + Send
         + 'static,
     flags: bool,
-    proxy_metrics: Arc<impl ProxyMetricsApi>,
+    proxy_metrics: Arc<impl ProxyMetrics>,
 ) {
     debug!("accepted memcache binary client");
 
@@ -261,7 +261,7 @@ async fn handle_memcache_request(
     sequence: u64,
     request: protocol_memcache::Request,
     flags: bool,
-    proxy_metrics: Arc<impl ProxyMetricsApi>,
+    proxy_metrics: Arc<impl ProxyMetrics>,
 ) {
     proxy_metrics.increment_total_requests();
     let result = match request {

@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-use super::{proxy::ProxyMetrics, util::proxy_sum_gauge, RpcMetrics};
+use super::{proxy::DefaultProxyMetrics, util::proxy_sum_gauge, RpcMetrics};
 
 pub struct ProxyMetricsBuilder {
     otel_endpoint: String,
@@ -23,7 +23,7 @@ impl ProxyMetricsBuilder {
         }
     }
 
-    pub async fn build(self) -> Arc<ProxyMetrics> {
+    pub async fn build(self) -> Arc<DefaultProxyMetrics> {
         let (batch_sender, batch_receiver) = mpsc::channel(self.batch_capacity);
         let gauge_factory = default_gauge_factory();
 
@@ -44,7 +44,7 @@ impl ProxyMetricsBuilder {
             OpentelemetryBatcher,
         ));
 
-        let metrics = ProxyMetrics {
+        let metrics = DefaultProxyMetrics {
             total_requests: proxy_sum_gauge(gauge_factory, "total_requests"),
             get: RpcMetrics::new(gauge_factory, "get"),
             set: RpcMetrics::new(gauge_factory, "set"),
