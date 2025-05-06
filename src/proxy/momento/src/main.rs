@@ -20,7 +20,6 @@ use protocol_admin::*;
 use session::*;
 use std::borrow::{Borrow, BorrowMut};
 use std::io::{Error, ErrorKind};
-use std::sync::Arc;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::OwnedReadHalf;
 use tokio::net::tcp::OwnedWriteHalf;
@@ -236,7 +235,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn spawn(
     config: MomentoProxyConfig,
-    proxy_metrics: Arc<impl ProxyMetrics>,
+    proxy_metrics: impl ProxyMetrics,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let admin_addr = config
         .admin()

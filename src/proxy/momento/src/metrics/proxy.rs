@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use super::ConnectionGuard;
 use goodmetrics::SumHandle;
 
 use super::{RpcCallGuard, RpcMetrics};
 
-pub trait ProxyMetrics: Send + Sync + 'static {
+pub trait ProxyMetrics: Clone + Send + Sync + 'static {
     fn increment_total_requests(&self);
     fn begin_connection(&self) -> ConnectionGuard;
     fn begin_get(&self) -> RpcCallGuard;
@@ -39,5 +41,27 @@ impl ProxyMetrics for DefaultProxyMetrics {
 
     fn begin_delete(&self) -> RpcCallGuard {
         self.delete.record_api_call()
+    }
+}
+
+impl ProxyMetrics for Arc<DefaultProxyMetrics> {
+    fn begin_connection(&self) -> ConnectionGuard {
+        self.as_ref().begin_connection()
+    }
+
+    fn increment_total_requests(&self) {
+        self.as_ref().increment_total_requests()
+    }
+
+    fn begin_get(&self) -> RpcCallGuard {
+        self.as_ref().begin_get()
+    }
+
+    fn begin_set(&self) -> RpcCallGuard {
+        self.as_ref().begin_set()
+    }
+
+    fn begin_delete(&self) -> RpcCallGuard {
+        self.as_ref().begin_delete()
     }
 }
