@@ -49,6 +49,7 @@ impl ProxyMetricsBuilder {
             get: RpcMetrics::new(gauge_factory, "get"),
             set: RpcMetrics::new(gauge_factory, "set"),
             delete: RpcMetrics::new(gauge_factory, "delete"),
+            unimplemented: RpcMetrics::new(gauge_factory, "unimplemented"),
             current_connections: proxy_sum_gauge(gauge_factory, "current_connections"),
         };
 

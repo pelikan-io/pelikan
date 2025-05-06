@@ -288,7 +288,10 @@ async fn handle_memcache_request(
         }
         _ => {
             debug!("unsupported command: {}", request);
-            Err(Error::new(ErrorKind::Other, "unsupported"))
+            with_rpc_call_guard(proxy_metrics.begin_unimplemented(), async {
+                Err(Error::new(ErrorKind::Other, "unsupported"))
+            })
+            .await
         }
     };
 
