@@ -263,7 +263,6 @@ async fn handle_memcache_request(
     flags: bool,
     proxy_metrics: impl ProxyMetrics,
 ) {
-    proxy_metrics.increment_total_requests();
     let result = match request {
         memcache::Request::Delete(ref r) => {
             with_rpc_call_guard(

@@ -45,7 +45,6 @@ impl ProxyMetricsBuilder {
         ));
 
         let metrics = DefaultProxyMetrics {
-            total_requests: proxy_sum_gauge(gauge_factory, "total_requests"),
             get: RpcMetrics::new(gauge_factory, "get"),
             set: RpcMetrics::new(gauge_factory, "set"),
             delete: RpcMetrics::new(gauge_factory, "delete"),
