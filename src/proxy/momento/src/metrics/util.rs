@@ -4,26 +4,25 @@ pub fn proxy_sum_gauge(g: &GaugeFactory, name: &'static str) -> SumHandle {
     g.dimensioned_gauge_sum("momento_proxy", name, Default::default())
 }
 
-pub fn proxy_request_ok_gauge(g: &GaugeFactory, rpc: &'static str) -> SumHandle {
-    g.dimensioned_gauge_sum(
-        "momento_proxy",
-        "momento_request",
-        GaugeDimensions::new([("rpc", rpc), ("result", "ok")]),
-    )
-}
-
-pub fn proxy_request_error_gauge(g: &GaugeFactory, rpc: &'static str) -> SumHandle {
-    g.dimensioned_gauge_sum(
-        "momento_proxy",
-        "momento_request",
-        GaugeDimensions::new([("rpc", rpc), ("result", "error")]),
-    )
-}
-
-pub fn proxy_request_latency_gauge(g: &GaugeFactory, rpc: &'static str) -> HistogramHandle {
-    g.dimensioned_gauge_histogram(
+fn proxy_request_latency_histogram(
+    gauge_factory: &GaugeFactory,
+    rpc: &'static str,
+    result: &'static str,
+) -> HistogramHandle {
+    gauge_factory.dimensioned_gauge_histogram(
         "momento_proxy",
         "latency",
-        GaugeDimensions::new([("rpc", rpc)]),
+        GaugeDimensions::new([("rpc", rpc), ("result", result)]),
     )
+}
+
+pub fn proxy_request_latency_ok_histogram(g: &GaugeFactory, rpc: &'static str) -> HistogramHandle {
+    proxy_request_latency_histogram(g, rpc, "ok")
+}
+
+pub fn proxy_request_latency_error_histogram(
+    gauge_factory: &GaugeFactory,
+    rpc: &'static str,
+) -> HistogramHandle {
+    proxy_request_latency_histogram(gauge_factory, rpc, "error")
 }
