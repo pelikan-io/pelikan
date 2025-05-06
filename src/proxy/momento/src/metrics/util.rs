@@ -26,3 +26,10 @@ pub fn proxy_request_latency_error_histogram(
 ) -> HistogramHandle {
     proxy_request_latency_histogram(gauge_factory, rpc, "error")
 }
+
+pub fn proxy_request_latency_timeout_histogram(
+    gauge_factory: &GaugeFactory,
+    rpc: &'static str,
+) -> HistogramHandle {
+    proxy_request_latency_histogram(gauge_factory, rpc, "timeout")
+}
