@@ -224,11 +224,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("failed to launch tokio runtime");
 
     // spawn the proxy metrics
-    let proxy_metrics = runtime.block_on(async {
-        ProxyMetricsBuilder::new("http://otel-collector:4317")
-            .build()
-            .await
-    });
+    let proxy_metrics = runtime.block_on(async { ProxyMetricsBuilder::new().build().await });
 
     runtime.block_on(spawn(config, proxy_metrics))
 }
