@@ -223,10 +223,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build()
         .expect("failed to launch tokio runtime");
 
-    runtime.block_on(spawn(config))
+    // spawn the proxy metrics
+    let proxy_metrics = runtime.block_on(async { ProxyMetricsBuilder::new().build().await });
+
+    runtime.block_on(spawn(config, proxy_metrics))
 }
 
-async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Error>> {
+async fn spawn(
+    config: MomentoProxyConfig,
+    proxy_metrics: impl ProxyMetrics,
+) -> Result<(), Box<dyn std::error::Error>> {
     let admin_addr = config
         .admin()
         .socket_addr()
@@ -297,6 +303,7 @@ async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Err
             }
         };
 
+        let proxy_metrics = proxy_metrics.clone();
         tokio::spawn(async move {
             info!(
                 "starting proxy frontend listener for cache `{}` on: {}",
@@ -311,6 +318,7 @@ async fn spawn(config: MomentoProxyConfig) -> Result<(), Box<dyn std::error::Err
                 cache.cache_name(),
                 cache.protocol(),
                 cache.flags(),
+                proxy_metrics,
             )
             .await;
         });
