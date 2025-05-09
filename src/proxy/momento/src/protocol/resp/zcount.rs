@@ -14,7 +14,7 @@ use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
 use crate::ProxyError;
 
-use super::{parse_score_boundary_as_float, update_method_metrics};
+use super::update_method_metrics;
 
 pub async fn zcount(
     client: &mut CacheClient,
@@ -23,19 +23,24 @@ pub async fn zcount(
     req: &SortedSetCount,
 ) -> ProxyResult {
     update_method_metrics(&ZCOUNT, &ZCOUNT_EX, async move {
-        let (min_score, min_score_inclusive) = parse_score_boundary_as_float(req.min_score())?;
-        let (max_score, max_score_inclusive) = parse_score_boundary_as_float(req.max_score())?;
+        let min_score = match (req.min_score(), req.min_score_exclusive()) {
+            (f64::NEG_INFINITY, _) => None,
+            (f64::INFINITY, _) => Some(f64::MAX), // Momento does not accept +inf, but accepts max f64
+            (score, true) => Some(score + 1.0),
+            (score, false) => Some(score),
+        };
+
+        let max_score = match (req.max_score(), req.max_score_exclusive()) {
+            (f64::INFINITY, _) => None,
+            (f64::NEG_INFINITY, _) => Some(f64::MIN), // Momento does not accept -inf, but accepts min f64
+            (score, true) => Some(score - 1.0),
+            (score, false) => Some(score),
+        };
+
         let request = SortedSetLengthByScoreRequest::new(cache_name, req.key())
-            .min_score(if min_score_inclusive {
-                min_score
-            } else {
-                min_score + 1.0
-            })
-            .max_score(if max_score_inclusive {
-                max_score
-            } else {
-                max_score - 1.0
-            });
+            .min_score(min_score)
+            .max_score(max_score);
+
         let response =
             match time::timeout(Duration::from_millis(200), client.send_request(request)).await {
                 Ok(Ok(r)) => r,

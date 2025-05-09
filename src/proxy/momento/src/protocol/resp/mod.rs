@@ -133,8 +133,8 @@ fn parse_score_boundary_as_float(value: &[u8]) -> Result<(f64, bool), ProxyError
         return Ok((f64::NEG_INFINITY, false));
     }
 
-    // Otherwise, split apart '(' and the value if present
-    let (inclusive_symbol, number) = if value[0] == b'(' {
+    // Otherwise, split apart exclusive symbol '(' and the value if present
+    let (exclusive_symbol, number) = if value[0] == b'(' {
         (true, &value[1..])
     } else {
         (false, value)
@@ -155,7 +155,7 @@ fn parse_score_boundary_as_float(value: &[u8]) -> Result<(f64, bool), ProxyError
             ))
         })?;
 
-    if inclusive_symbol {
+    if exclusive_symbol {
         Ok((score, true))
     } else {
         Ok((score, false))
