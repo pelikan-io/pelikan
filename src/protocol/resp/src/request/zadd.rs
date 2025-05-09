@@ -13,7 +13,7 @@ pub static ZADD: Counter = Counter::new();
 #[metric(name = "zadd_ex")]
 pub static ZADD_EX: Counter = Counter::new();
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct SortedSetAdd {
     key: Arc<[u8]>,
     members: Box<[ScoreMemberPair]>,
@@ -90,7 +90,10 @@ impl TryFrom<Message> for SortedSetAdd {
         }
         let mut verified_score_member_pairs = Vec::with_capacity(members.len() / 2);
         for i in (0..members.len()).step_by(2) {
-            verified_score_member_pairs.push((members[i].clone(), members[i + 1].clone()));
+            verified_score_member_pairs.push((
+                parse_sorted_set_score(&members[i].clone())?,
+                members[i + 1].clone(),
+            ));
         }
 
         Ok(Self {
@@ -104,12 +107,12 @@ impl TryFrom<Message> for SortedSetAdd {
 impl SortedSetAdd {
     pub fn new(
         key: &[u8],
-        members: &[(&[u8], &[u8])],
+        members: &[(f64, &[u8])],
         optional_args: SortedSetAddOptionalArguments,
     ) -> Self {
         let mut data = Vec::with_capacity(members.len());
         for (score, member) in members.iter() {
-            data.push(((*score).into(), (*member).into()));
+            data.push((*score, (*member).into()));
         }
         Self {
             key: key.into(),
@@ -161,7 +164,9 @@ impl From<&SortedSetAdd> for Message {
 
         // Then add the score-member pairs
         for (score, member) in value.members() {
-            vals.push(Message::BulkString(BulkString::new(score)));
+            vals.push(Message::BulkString(BulkString::new(
+                score.to_string().as_bytes(),
+            )));
             vals.push(Message::BulkString(BulkString::new(member)));
         }
 
@@ -190,9 +195,9 @@ mod tests {
             Request::SortedSetAdd(SortedSetAdd::new(
                 b"z",
                 &[
-                    ("1".as_bytes(), "a".as_bytes()),
-                    ("2".as_bytes(), "b".as_bytes()),
-                    ("3".as_bytes(), "c".as_bytes())
+                    (1.0, "a".as_bytes()),
+                    (2.0, "b".as_bytes()),
+                    (3.0, "c".as_bytes())
                 ],
                 SortedSetAddOptionalArguments::default()
             ))
@@ -206,9 +211,9 @@ mod tests {
             Request::SortedSetAdd(SortedSetAdd::new(
                 b"z",
                 &[
-                    ("1.23".as_bytes(), "a".as_bytes()),
-                    ("2.34".as_bytes(), "b".as_bytes()),
-                    ("3.45".as_bytes(), "c".as_bytes())
+                    (1.23, "a".as_bytes()),
+                    (2.34, "b".as_bytes()),
+                    (3.45, "c".as_bytes())
                 ],
                 SortedSetAddOptionalArguments::default()
             ))
@@ -222,8 +227,8 @@ mod tests {
             Request::SortedSetAdd(SortedSetAdd::new(
                 b"z",
                 &[
-                    ("-inf".as_bytes(), "abc".as_bytes()),
-                    ("+inf".as_bytes(), "xyz".as_bytes())
+                    (f64::NEG_INFINITY, "abc".as_bytes()),
+                    (f64::INFINITY, "xyz".as_bytes())
                 ],
                 SortedSetAddOptionalArguments::default()
             ))
@@ -236,7 +241,7 @@ mod tests {
                 .into_inner(),
             Request::SortedSetAdd(SortedSetAdd::new(
                 b"z",
-                &[("123".as_bytes(), "abc".as_bytes())],
+                &[(123.0, "abc".as_bytes())],
                 SortedSetAddOptionalArguments {
                     incr: true,
                     ..Default::default()
@@ -251,10 +256,7 @@ mod tests {
                 .into_inner(),
             Request::SortedSetAdd(SortedSetAdd::new(
                 b"z",
-                &[
-                    ("123".as_bytes(), "abc".as_bytes()),
-                    ("321".as_bytes(), "xyz".as_bytes())
-                ],
+                &[(123.0, "abc".as_bytes()), (321.0, "xyz".as_bytes())],
                 SortedSetAddOptionalArguments {
                     xx: true,
                     lt: true,
@@ -271,7 +273,7 @@ mod tests {
                 .into_inner(),
             Request::SortedSetAdd(SortedSetAdd::new(
                 b"z",
-                &[("1.2".as_bytes(), "a".as_bytes())],
+                &[(1.2, "a".as_bytes())],
                 SortedSetAddOptionalArguments {
                     incr: true,
                     ..Default::default()
@@ -286,7 +288,7 @@ mod tests {
                 .into_inner(),
             Request::SortedSetAdd(SortedSetAdd::new(
                 b"z",
-                &[("-inf".as_bytes(), "abc".as_bytes()), ("+inf".as_bytes(), "xyz".as_bytes())],
+                &[(f64::NEG_INFINITY, "abc".as_bytes()), (f64::INFINITY, "xyz".as_bytes())],
                 SortedSetAddOptionalArguments::default()
             ))
         );
@@ -298,7 +300,7 @@ mod tests {
               .into_inner(),
           Request::SortedSetAdd(SortedSetAdd::new(
               b"z",
-              &[("1.23".as_bytes(), "a".as_bytes()), ("23.4".as_bytes(), "b".as_bytes()), ("345".as_bytes(), "c".as_bytes())],
+              &[(1.23, "a".as_bytes()), (23.4, "b".as_bytes()), (345.0, "c".as_bytes())],
               SortedSetAddOptionalArguments::default()
           ))
         );
@@ -310,7 +312,7 @@ mod tests {
               .into_inner(),
           Request::SortedSetAdd(SortedSetAdd::new(
               b"z",
-              &[("123".as_bytes(), "a".as_bytes()), ("321".as_bytes(), "b".as_bytes())],
+              &[(123.0, "a".as_bytes()), (321.0, "b".as_bytes())],
               SortedSetAddOptionalArguments {
                   nx: true,
                   gt: true,

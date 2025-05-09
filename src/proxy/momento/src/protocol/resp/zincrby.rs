@@ -13,7 +13,7 @@ use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
 use crate::ProxyError;
 
-use super::{parse_sorted_set_score, update_method_metrics};
+use super::update_method_metrics;
 
 pub async fn zincrby(
     client: &mut CacheClient,
@@ -22,14 +22,19 @@ pub async fn zincrby(
     req: &SortedSetIncrement,
 ) -> ProxyResult {
     update_method_metrics(&ZINCRBY, &ZINCRBY_EX, async move {
+        // Momento calls cannot accept f64::INFINITY or f64::NEG_INFINITY,
+        // so use f64::MAX and f64::MIN instead
+        let increment = if req.increment() == f64::NEG_INFINITY {
+            f64::MIN
+        } else if req.increment() == f64::INFINITY {
+            f64::MAX
+        } else {
+            req.increment()
+        };
+
         let response = match time::timeout(
             Duration::from_millis(200),
-            client.sorted_set_increment_score(
-                cache_name,
-                req.key(),
-                req.member(),
-                parse_sorted_set_score(req.increment())?,
-            ),
+            client.sorted_set_increment_score(cache_name, req.key(), req.member(), increment),
         )
         .await
         {

@@ -14,7 +14,7 @@ use crate::error::ProxyResult;
 use crate::klog::{klog_1, Status};
 use crate::ProxyError;
 
-use super::{parse_sorted_set_score, update_method_metrics, zincrby};
+use super::{update_method_metrics, zincrby};
 
 pub async fn zadd(
     client: &mut CacheClient,
@@ -41,32 +41,19 @@ pub async fn zadd(
 
         // If INCR is set, then ZADD should behave like ZINCRBY (as per the docs), which accepts only a single score-member pair
         if req.optional_args().incr {
-            if req.members().len() != 1 {
-                klog_1(&"zadd", &req.key(), Status::ServerError, 0);
-                return Err(ProxyError::from(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "INCR option requires exactly one score-member pair",
-                )));
-            }
             let zincry_request =
-                SortedSetIncrement::new(req.key(), &req.members()[0].0, &req.members()[0].1);
+                SortedSetIncrement::new(req.key(), req.members()[0].0, &req.members()[0].1);
             zincrby(client, cache_name, response_buf, &zincry_request).await?;
             return Ok(());
         }
 
-        // Otherwise it's a regular ZADD call, and we should convert scores to f64 values before making Momento call
+        // Otherwise it's a regular ZADD call
         let mut converted_members: Vec<SortedSetElement<Vec<u8>>> = Vec::new();
         for (score, member) in req.members() {
-            match parse_sorted_set_score(score) {
-                Ok(float_score) => converted_members.push(SortedSetElement {
-                    value: (**member).into(),
-                    score: float_score,
-                }),
-                Err(e) => {
-                    klog_1(&"zadd", &req.key(), Status::ServerError, 0);
-                    return Err(ProxyError::from(e));
-                }
-            }
+            converted_members.push(SortedSetElement {
+                value: (**member).into(),
+                score: *score,
+            })
         }
 
         match time::timeout(
