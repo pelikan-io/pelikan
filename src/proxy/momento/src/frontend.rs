@@ -393,39 +393,6 @@ pub(crate) async fn handle_resp_client(
                 resp::Request::SetIsMember(r) => {
                     resp::sismember(&mut client, &cache_name, &mut response_buf, r).await?
                 }
-                resp::Request::SortedSetCardinality(r) => {
-                    resp::zcard(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetIncrement(r) => {
-                    resp::zincrby(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetScore(r) => {
-                    resp::zscore(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetMultiScore(r) => {
-                    resp::zmscore(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetRemove(r) => {
-                    resp::zrem(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetRank(r) => {
-                    resp::zrank(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetRange(r) => {
-                    resp::zrange(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetAdd(r) => {
-                    resp::zadd(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetReverseRank(r) => {
-                    resp::zrevrank(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetCount(r) => {
-                    resp::zcount(&mut client, &cache_name, &mut response_buf, r).await?
-                }
-                resp::Request::SortedSetUnionStore(r) => {
-                    resp::zunionstore(&mut client, &cache_name, &mut response_buf, r).await?
-                }
                 _ => return Err(ProxyError::UnsupportedCommand(request.command())),
             }
 
