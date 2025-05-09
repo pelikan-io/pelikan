@@ -53,7 +53,7 @@ impl From<&SetMembers> for Message {
     fn from(value: &SetMembers) -> Message {
         Message::Array(Array {
             inner: Some(vec![
-                Message::BulkString(BulkString::new(b"GET")),
+                Message::BulkString(BulkString::new(b"SMEMBERS")),
                 Message::BulkString(BulkString::new(value.key())),
             ]),
         })
