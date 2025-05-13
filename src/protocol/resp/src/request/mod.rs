@@ -4,6 +4,7 @@
 
 use crate::message::*;
 use crate::*;
+use core::f64;
 use logger::Klog;
 use protocol_common::BufMut;
 use protocol_common::Parse;
@@ -42,7 +43,17 @@ mod sismember;
 mod smembers;
 mod srem;
 mod sunion;
-
+mod zadd;
+mod zcard;
+mod zcount;
+mod zincrby;
+mod zmscore;
+mod zrange;
+mod zrank;
+mod zrem;
+mod zrevrank;
+mod zscore;
+mod zunionstore;
 pub use self::lindex::*;
 pub use self::llen::*;
 pub use self::lpop::*;
@@ -72,6 +83,17 @@ pub use hset::*;
 pub use hvals::*;
 pub use sadd::*;
 pub use set::*;
+pub use zadd::*;
+pub use zcard::*;
+pub use zcount::*;
+pub use zincrby::*;
+pub use zmscore::*;
+pub use zrange::*;
+pub use zrank::*;
+pub use zrem::*;
+pub use zrevrank::*;
+pub use zscore::*;
+pub use zunionstore::*;
 
 /// response codes for klog
 /// matches Memcache protocol response codes for compatibility with existing tools
@@ -88,6 +110,7 @@ enum ResponseCode {
 }
 
 pub type FieldValuePair = (Arc<[u8]>, Arc<[u8]>);
+pub type ScoreMemberPair = (f64, Arc<[u8]>);
 
 /// Macro to deal with the boilerplate around the Request enum.
 macro_rules! decl_request {
@@ -98,7 +121,7 @@ macro_rules! decl_request {
             ),* $(,)?
         }
     } => {
-        #[derive(Debug, PartialEq, Eq)]
+        #[derive(Debug, PartialEq)]
         $vis enum $name {
             $( $variant($type), )*
         }
@@ -195,6 +218,17 @@ decl_request! {
         SetIntersect(SetIntersect) => "sinter",
         SetMembers(SetMembers) => "smembers",
         SetIsMember(SetIsMember) => "sismember",
+        SortedSetCardinality(SortedSetCardinality) => "zcard",
+        SortedSetIncrement(SortedSetIncrement) => "zincrby",
+        SortedSetScore(SortedSetScore) => "zscore",
+        SortedSetMultiScore(SortedSetMultiScore) => "zmscore",
+        SortedSetRemove(SortedSetRemove) => "zrem",
+        SortedSetRank(SortedSetRank) => "zrank",
+        SortedSetRange(SortedSetRange) => "zrange",
+        SortedSetAdd(SortedSetAdd) => "zadd",
+        SortedSetReverseRank(SortedSetReverseRank) => "zrevrank",
+        SortedSetCount(SortedSetCount) => "zcount",
+        SortedSetUnionStore(SortedSetUnionStore) => "zunionstore",
     }
 }
 
@@ -307,6 +341,28 @@ impl Display for ExpireTime {
 
 fn string_key(key: &[u8]) -> Cow<'_, str> {
     String::from_utf8_lossy(key)
+}
+
+fn parse_sorted_set_score(score: &[u8]) -> Result<f64, std::io::Error> {
+    if score == "-inf".as_bytes() {
+        Ok(f64::NEG_INFINITY)
+    } else if score == "+inf".as_bytes() {
+        Ok(f64::INFINITY)
+    } else if let Some(float) = std::str::from_utf8(score)
+        .map_err(|_| {
+            std::io::Error::new(std::io::ErrorKind::Other, "score string is not valid utf8")
+        })?
+        .parse::<f64>()
+        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "score string is not a f64"))
+        .map(Some)?
+    {
+        return Ok(float);
+    } else {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "score string is not a valid f64",
+        ));
+    }
 }
 
 #[cfg(test)]
