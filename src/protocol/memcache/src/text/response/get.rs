@@ -57,6 +57,16 @@ impl TextProtocol {
             }
         }
 
+        // For text GETs where all keys miss, emit just "END\r\n" by
+        // composing an empty Values; otherwise forward the original
+        // response.
+        // The binary protocol uses the `NotFound` directly.
+        if let Response::NotFound(_) = response {
+            let empty = Values {
+                values: Vec::new().into(),
+            };
+            return Ok(Response::Values(empty).compose(buffer));
+        }
         Ok(response.compose(buffer))
     }
 }
