@@ -168,6 +168,10 @@ impl Buffer {
 
 impl Drop for Buffer {
     fn drop(&mut self) {
+        let layout = Layout::array::<u8>(self.cap).unwrap();
+        unsafe {
+            dealloc(self.ptr, layout);
+        }
         SESSION_BUFFER_BYTE.sub(self.cap as _);
     }
 }
