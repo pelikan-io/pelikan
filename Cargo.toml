@@ -23,7 +23,6 @@ members = [
     "src/protocol/ping",
     "src/protocol/resp",
     "src/protocol/thrift",
-    "src/proxy/momento",
     "src/proxy/ping",
     "src/proxy/thrift",
     "src/server/pingserver",
