@@ -22,7 +22,6 @@ members = [
     "src/protocol/memcache",
     "src/protocol/ping",
     "src/protocol/resp",
-    "src/proxy/momento",
     "src/proxy/ping",
     "src/server/pingserver",
     "src/server/rds",
