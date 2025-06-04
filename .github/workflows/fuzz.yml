@@ -49,7 +49,6 @@ jobs:
           protocol/memcache,
           protocol/ping,
           protocol/resp,
-          protocol/thrift,
           storage/segcache,
         ]
     name: fuzz-${{ matrix.os }}-${{ matrix.target }}
