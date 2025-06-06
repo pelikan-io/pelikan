@@ -2305,16 +2305,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "protocol-thrift"
-version = "0.3.2"
-dependencies = [
- "common",
- "logger",
- "metriken",
- "protocol-common",
-]
-
-[[package]]
 name = "proxy"
 version = "0.3.2"
 dependencies = [
@@ -3016,20 +3006,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "thriftproxy"
-version = "0.3.2"
-dependencies = [
- "backtrace",
- "clap",
- "common",
- "config",
- "logger",
- "metriken",
- "protocol-thrift",
- "proxy",
 ]
 
 [[package]]
