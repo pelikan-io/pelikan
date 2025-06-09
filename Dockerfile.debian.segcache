@@ -1,0 +1,60 @@
+# Reference Dockerfile for building and running Segcache from a clean slate Debian install
+# 
+# Note: using `rust:latest` in FROM will save a lot of the effort of installing Rust
+# but will also bring along many packages from `buildpack-deps` or otherwise
+# we've created this Dockerfile from `debian:stable-slim` to make a best attempt
+# at demonstrating the list of packages one would need if starting from a minimal installation
+# for the purpose of informing developers of Pelikan.
+#
+# -----------------
+# Cargo Build Stage
+# -----------------
+
+FROM debian:stable-slim as cargo-build
+
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH \
+    RUST_VERSION=1.67.1
+
+# Install dependencies for Rustup
+RUN apt-get update; \ 
+    apt-get install -y --no-install-recommends ca-certificates curl netbase \
+    && rm -rf /var/lib/apt/lists/*
+
+# Fetch and run Rustup
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs > rustup-init
+RUN chmod +x rustup-init
+RUN sh rustup-init -y --no-modify-path --profile minimal --default-toolchain  stable
+RUN chmod -R a+w $RUSTUP_HOME $CARGO_HOME; 
+RUN rustup --version; \
+    cargo --version; \
+    rustc --version;
+
+# Copy files necessary for build
+COPY ./src src
+COPY ./config config
+COPY Cargo.lock .
+COPY Cargo.toml .
+
+# install build dependencies
+RUN apt-get update; apt-get install -y cmake clang make protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN cargo build --release
+
+
+# Run the Segcache binary
+
+FROM debian:stable-slim
+
+WORKDIR /app
+RUN mkdir config
+
+COPY --from=cargo-build ./target/release/pelikan_segcache_rs .
+COPY --from=cargo-build ./config/segcache.toml ./config
+
+RUN chmod +x ./pelikan_segcache_rs
+
+CMD ["./pelikan_segcache_rs", "./config/segcache.toml"]
+
