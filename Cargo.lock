@@ -206,9 +206,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 
 [[package]]
 name = "awaken"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd279f60d540c599125bfe1ac89293a411f8fed25fedbfbf3dc114eb6f0dc6df"
+checksum = "e0e5ca6a22c7592d882e26ea5b84d5653265b83a93e0280b74aee42cc912f21d"
 dependencies = [
  "libc",
  "mio 0.8.11",
@@ -2926,9 +2926,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "switchboard"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3578ed09f106e5254e636e6218d1dde3c2bab900f76f44c15e136c3161778fc"
+checksum = "81b68be1047904c7ce69a790fc28a0888004169c3699a055721aa114a7e1c29d"
 dependencies = [
  "awaken",
  "crossbeam-queue",
