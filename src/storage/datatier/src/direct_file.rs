@@ -31,16 +31,9 @@ struct AlignedBuffer {
 
 impl AlignedBuffer {
     fn new() -> Self {
-        let buffer = Self {
+        Self {
             data: [0; ALIGNMENT],
-        };
-        // Verify alignment at runtime in debug builds
-        debug_assert_eq!(
-            buffer.data.as_ptr() as usize % ALIGNMENT,
-            0,
-            "Buffer not properly aligned"
-        );
-        buffer
+        }
     }
 
     fn as_mut_slice(&mut self) -> &mut [u8] {
@@ -449,6 +442,13 @@ mod tests {
     use super::*;
     use std::io::{Read, Write};
     use tempfile::TempDir;
+
+    #[test]
+    fn aligned_buffer_alignment() {
+        let buffer = AlignedBuffer::new();
+        let ptr = buffer.data.as_ptr() as usize;
+        assert_eq!(ptr % ALIGNMENT, 0, "AlignedBuffer is not properly aligned");
+    }
 
     #[test]
     fn direct_file_partial_writes() {
