@@ -5,9 +5,10 @@ use super::*;
 /// file I/O if direct I/O is not supported.
 ///
 /// This implementation transparently handles O_DIRECT's alignment requirements:
-/// - Uses a 4KB-aligned internal buffer
-/// - Performs read-modify-write for partial blocks at the beginning/end of I/O
-/// - Uses cut-through writes for complete aligned blocks in the middle
+/// - Uses a 4KB-aligned internal buffer (only for partial blocks)
+/// - For writes: performs read-modify-write for partial blocks at start/end
+/// - For reads: buffers only partial blocks at start/end
+/// - Complete aligned blocks in the middle are handled directly without buffering
 /// - Works with any size reads/writes and any file offset
 ///
 /// The complexity of alignment is hidden - you can use the standard Read/Write
