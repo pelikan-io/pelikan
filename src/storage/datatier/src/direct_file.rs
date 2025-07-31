@@ -31,7 +31,7 @@ impl DirectFile {
                 Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
                     // O_DIRECT not supported, fall back to regular I/O
                     let file = OpenOptions::new().read(true).write(true).open(path)?;
-                    
+
                     return Ok(Self {
                         file,
                         direct_io: false,
