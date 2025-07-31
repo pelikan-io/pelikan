@@ -61,26 +61,24 @@ impl DirectFile {
                 .custom_flags(libc::O_DIRECT)
                 .open(path)
             {
-                Ok(file) => {
-                    return Ok(Self {
-                        file,
-                        direct_io: true,
-                        aligned_buffer: Some(AlignedBuffer::new()),
-                    });
-                }
+                Ok(file) => Ok(Self {
+                    file,
+                    direct_io: true,
+                    aligned_buffer: Some(AlignedBuffer::new()),
+                }),
                 Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
                     // O_DIRECT not supported, fall back to regular I/O
                     let file = OpenOptions::new().read(true).write(true).open(path)?;
 
-                    return Ok(Self {
+                    Ok(Self {
                         file,
                         direct_io: false,
                         aligned_buffer: None,
-                    });
+                    })
                 }
                 Err(e) => {
                     // Some other error occurred, propagate it
-                    return Err(e);
+                    Err(e)
                 }
             }
         }
@@ -126,13 +124,11 @@ impl DirectFile {
                 .custom_flags(libc::O_DIRECT)
                 .open(path)
             {
-                Ok(file) => {
-                    return Ok(Self {
-                        file,
-                        direct_io: true,
-                        aligned_buffer: Some(AlignedBuffer::new()),
-                    });
-                }
+                Ok(file) => Ok(Self {
+                    file,
+                    direct_io: true,
+                    aligned_buffer: Some(AlignedBuffer::new()),
+                }),
                 Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
                     // O_DIRECT not supported, fall back to regular I/O
                     let file = OpenOptions::new()
@@ -141,15 +137,15 @@ impl DirectFile {
                         .write(true)
                         .open(path)?;
 
-                    return Ok(Self {
+                    Ok(Self {
                         file,
                         direct_io: false,
                         aligned_buffer: None,
-                    });
+                    })
                 }
                 Err(e) => {
                     // Some other error occurred, propagate it
-                    return Err(e);
+                    Err(e)
                 }
             }
         }
@@ -214,9 +210,10 @@ impl DirectFile {
         // Calculate aligned boundaries
         let start_offset = (file_pos % ALIGNMENT as u64) as usize;
 
-        let buffer = self.aligned_buffer.as_mut().ok_or_else(|| {
-            std::io::Error::other("No aligned buffer available")
-        })?;
+        let buffer = self
+            .aligned_buffer
+            .as_mut()
+            .ok_or_else(|| std::io::Error::other("No aligned buffer available"))?;
         let aligned_buffer = buffer.as_mut_slice();
 
         let mut bytes_written = 0;
@@ -317,9 +314,10 @@ impl DirectFile {
         // Calculate aligned boundaries
         let start_offset = (file_pos % ALIGNMENT as u64) as usize;
 
-        let buffer = self.aligned_buffer.as_mut().ok_or_else(|| {
-            std::io::Error::other("No aligned buffer available")
-        })?;
+        let buffer = self
+            .aligned_buffer
+            .as_mut()
+            .ok_or_else(|| std::io::Error::other("No aligned buffer available"))?;
         let aligned_buffer = buffer.as_mut_slice();
 
         let mut total_read = 0;
