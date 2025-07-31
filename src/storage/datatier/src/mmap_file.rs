@@ -34,7 +34,7 @@ impl MmapFile {
 
         // make sure the file size matches the expected size
         if file.metadata()?.len() != total_size as u64 {
-            return Err(Error::new(ErrorKind::Other, "filesize mismatch"));
+            return Err(Error::other("filesize mismatch"));
         }
 
         // data resides after a small header
@@ -58,7 +58,7 @@ impl MmapFile {
 
         // check the user version
         if header.user_version() != user_version {
-            return Err(Error::new(ErrorKind::Other, "user version mismatch"));
+            return Err(Error::other("user version mismatch"));
         }
 
         // zero out the checksum in the header copy
@@ -79,7 +79,7 @@ impl MmapFile {
 
         // compare the stored checksum in the file to the calculated checksum
         if mmap[0..32] != hash.as_bytes()[0..32] {
-            return Err(Error::new(ErrorKind::Other, "checksum mismatch"));
+            return Err(Error::other("checksum mismatch"));
         }
 
         // return the loaded datapool

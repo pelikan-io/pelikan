@@ -5,7 +5,7 @@
 use blake3::Hash;
 use core::ops::Range;
 use std::fs::{File, OpenOptions};
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{Error, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 #[cfg(target_os = "linux")]
@@ -112,8 +112,7 @@ impl Header {
 
     fn check_version(&self) -> Result<(), std::io::Error> {
         if self.version != VERSION {
-            Err(Error::new(
-                ErrorKind::Other,
+            Err(Error::other(
                 "file has incompatible version",
             ))
         } else {
@@ -125,7 +124,7 @@ impl Header {
         if self.magic[0..8] == MAGIC[0..8] {
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::Other, "header is not recognized"))
+            Err(Error::other("header is not recognized"))
         }
     }
 

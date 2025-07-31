@@ -44,7 +44,7 @@ impl FileBackedMemory {
 
         // make sure the file size matches the expected size
         if file.file().metadata()?.len() != file_total_size.end as u64 {
-            return Err(Error::new(ErrorKind::Other, "filesize mismatch"));
+            return Err(Error::other("filesize mismatch"));
         }
 
         // calculate the page range for the data region
@@ -79,7 +79,7 @@ impl FileBackedMemory {
 
         // check the user version
         if header.user_version() != user_version {
-            return Err(Error::new(ErrorKind::Other, "user version mismatch"));
+            return Err(Error::other("user version mismatch"));
         }
 
         // copy the checksum out of the header and zero it in the header
@@ -115,7 +115,7 @@ impl FileBackedMemory {
 
         // compare the checksum agaianst what's in the header
         if file_checksum[0..32] != hash.as_bytes()[0..32] {
-            return Err(Error::new(ErrorKind::Other, "checksum mismatch"));
+            return Err(Error::other("checksum mismatch"));
         }
 
         // return the loaded datapool
