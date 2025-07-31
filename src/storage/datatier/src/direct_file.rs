@@ -222,7 +222,7 @@ impl DirectFile {
         let start_offset = (file_pos % ALIGNMENT as u64) as usize;
 
         let buffer = self.aligned_buffer.as_mut().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::Other, "No aligned buffer available")
+            std::io::Error::other("No aligned buffer available")
         })?;
         let aligned_buffer = buffer.as_mut_slice();
 
@@ -325,7 +325,7 @@ impl DirectFile {
         let start_offset = (file_pos % ALIGNMENT as u64) as usize;
 
         let buffer = self.aligned_buffer.as_mut().ok_or_else(|| {
-            std::io::Error::new(std::io::ErrorKind::Other, "No aligned buffer available")
+            std::io::Error::other("No aligned buffer available")
         })?;
         let aligned_buffer = buffer.as_mut_slice();
 
