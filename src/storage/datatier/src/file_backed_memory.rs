@@ -156,9 +156,10 @@ impl FileBackedMemory {
         file.file_mut().set_len(file_total_size.end as u64)?;
 
         // causes file to be zeroed out
+        let zero_page = vec![0u8; PAGE_SIZE];
         for page in 0..pages {
             loop {
-                if file.write(&[0; PAGE_SIZE])? == PAGE_SIZE {
+                if file.write(&zero_page)? == PAGE_SIZE {
                     break;
                 }
                 file.seek(SeekFrom::Start((page * PAGE_SIZE) as u64))?;
