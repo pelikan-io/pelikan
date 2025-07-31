@@ -4,15 +4,14 @@ use super::*;
 /// and F_NOCACHE on macOS to bypass the page cache. Falls back to regular
 /// file I/O if direct I/O is not supported.
 ///
-/// IMPORTANT: O_DIRECT has strict requirements:
-/// - Buffer memory must be aligned (typically 512 bytes)
-/// - I/O size must be a multiple of the block size
-/// - File offset must be aligned
+/// This implementation transparently handles O_DIRECT's alignment requirements:
+/// - Uses a 4KB-aligned internal buffer
+/// - Performs read-modify-write for partial blocks at the beginning/end of I/O
+/// - Uses cut-through writes for complete aligned blocks in the middle
+/// - Works with any size reads/writes and any file offset
 ///
-/// This implementation does NOT support read-modify-write for partial blocks.
-/// If you attempt to write data that isn't block-aligned in size, it will
-/// automatically fall back to buffered I/O. This is suitable for use cases
-/// like datatier where we're typically writing full pages.
+/// The complexity of alignment is hidden - you can use the standard Read/Write
+/// traits just like a regular file.
 pub struct DirectFile {
     file: File,
     direct_io: bool,
