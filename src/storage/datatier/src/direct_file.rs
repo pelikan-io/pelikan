@@ -26,10 +26,20 @@ impl DirectFile {
                     return Ok(Self {
                         file,
                         direct_io: true,
-                    })
+                    });
                 }
-                Err(_) => {
-                    // Fall back to regular I/O
+                Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
+                    // O_DIRECT not supported, fall back to regular I/O
+                    let file = OpenOptions::new().read(true).write(true).open(path)?;
+                    
+                    return Ok(Self {
+                        file,
+                        direct_io: false,
+                    });
+                }
+                Err(e) => {
+                    // Some other error occurred, propagate it
+                    return Err(e);
                 }
             }
         }
@@ -41,11 +51,14 @@ impl DirectFile {
         #[cfg(target_os = "macos")]
         {
             let fd = file.as_raw_fd();
-            unsafe {
-                libc::fcntl(fd, libc::F_NOCACHE, 1);
-            }
+            let result = unsafe { libc::fcntl(fd, libc::F_NOCACHE, 1) };
+            // F_NOCACHE is advisory, so we don't fail if it returns an error
+            let direct_io = result != -1;
+            return Ok(Self { file, direct_io });
         }
 
+        // Other platforms
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         Ok(Self {
             file,
             direct_io: false,
@@ -70,10 +83,24 @@ impl DirectFile {
                     return Ok(Self {
                         file,
                         direct_io: true,
-                    })
+                    });
                 }
-                Err(_) => {
-                    // Fall back to regular I/O
+                Err(e) if e.kind() == std::io::ErrorKind::InvalidInput => {
+                    // O_DIRECT not supported, fall back to regular I/O
+                    let file = OpenOptions::new()
+                        .create_new(true)
+                        .read(true)
+                        .write(true)
+                        .open(path)?;
+
+                    return Ok(Self {
+                        file,
+                        direct_io: false,
+                    });
+                }
+                Err(e) => {
+                    // Some other error occurred, propagate it
+                    return Err(e);
                 }
             }
         }
@@ -89,11 +116,14 @@ impl DirectFile {
         #[cfg(target_os = "macos")]
         {
             let fd = file.as_raw_fd();
-            unsafe {
-                libc::fcntl(fd, libc::F_NOCACHE, 1);
-            }
+            let result = unsafe { libc::fcntl(fd, libc::F_NOCACHE, 1) };
+            // F_NOCACHE is advisory, so we don't fail if it returns an error
+            let direct_io = result != -1;
+            return Ok(Self { file, direct_io });
         }
 
+        // Other platforms
+        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
         Ok(Self {
             file,
             direct_io: false,
