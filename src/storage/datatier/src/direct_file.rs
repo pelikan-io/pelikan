@@ -44,25 +44,23 @@ impl DirectFile {
             }
         }
 
-        // Open normally
-        let file = OpenOptions::new().read(true).write(true).open(path)?;
-
-        // Apply F_NOCACHE on macOS
-        #[cfg(target_os = "macos")]
+        #[cfg(not(target_os = "linux"))]
         {
-            let fd = file.as_raw_fd();
-            let result = unsafe { libc::fcntl(fd, libc::F_NOCACHE, 1) };
-            // F_NOCACHE is advisory, so we don't fail if it returns an error
-            let direct_io = result != -1;
-            return Ok(Self { file, direct_io });
-        }
+            // Open normally
+            let file = OpenOptions::new().read(true).write(true).open(path)?;
 
-        // Other platforms
-        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-        Ok(Self {
-            file,
-            direct_io: false,
-        })
+            #[allow(unused_assignments)]
+            let mut direct_io = false;
+
+            // Apply F_NOCACHE on macOS
+            #[cfg(target_os = "macos")]
+            {
+                let fd = file.as_raw_fd();
+                direct_io = unsafe { libc::fcntl(fd, libc::F_NOCACHE, 1) } != -1;
+            }
+
+            Ok(Self { file, direct_io })
+        }
     }
 
     /// Creates a new file with direct I/O if supported
@@ -105,29 +103,27 @@ impl DirectFile {
             }
         }
 
-        // Create normally
-        let file = OpenOptions::new()
-            .create_new(true)
-            .read(true)
-            .write(true)
-            .open(path)?;
-
-        // Apply F_NOCACHE on macOS
-        #[cfg(target_os = "macos")]
+        #[cfg(not(target_os = "linux"))]
         {
-            let fd = file.as_raw_fd();
-            let result = unsafe { libc::fcntl(fd, libc::F_NOCACHE, 1) };
-            // F_NOCACHE is advisory, so we don't fail if it returns an error
-            let direct_io = result != -1;
-            return Ok(Self { file, direct_io });
-        }
+            // Create normally
+            let file = OpenOptions::new()
+                .create_new(true)
+                .read(true)
+                .write(true)
+                .open(path)?;
 
-        // Other platforms
-        #[cfg(not(any(target_os = "linux", target_os = "macos")))]
-        Ok(Self {
-            file,
-            direct_io: false,
-        })
+            #[allow(unused_assignments)]
+            let mut direct_io = false;
+
+            // Apply F_NOCACHE on macOS
+            #[cfg(target_os = "macos")]
+            {
+                let fd = file.as_raw_fd();
+                direct_io = unsafe { libc::fcntl(fd, libc::F_NOCACHE, 1) } != -1;
+            }
+
+            Ok(Self { file, direct_io })
+        }
     }
 
     /// Returns true if direct I/O is enabled
