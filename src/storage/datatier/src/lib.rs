@@ -112,9 +112,7 @@ impl Header {
 
     fn check_version(&self) -> Result<(), std::io::Error> {
         if self.version != VERSION {
-            Err(Error::other(
-                "file has incompatible version",
-            ))
+            Err(Error::other("file has incompatible version"))
         } else {
             Ok(())
         }
