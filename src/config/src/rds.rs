@@ -46,7 +46,7 @@ pub struct RdsConfig {
     worker: Worker,
     #[serde(default)]
     time: Time,
-    #[cfg(feature = "boringssl")]
+    #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
     #[serde(default)]
     tls: Tls,
     #[serde(default)]
@@ -161,7 +161,7 @@ impl TimeConfig for RdsConfig {
     }
 }
 
-#[cfg(feature = "boringssl")]
+#[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
 impl TlsConfig for RdsConfig {
     fn tls(&self) -> &Tls {
         &self.tls
@@ -197,7 +197,7 @@ impl Default for RdsConfig {
             klog: Default::default(),
             sockio: Default::default(),
             tcp: Default::default(),
-            #[cfg(feature = "boringssl")]
+            #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
             tls: Default::default(),
         }
     }

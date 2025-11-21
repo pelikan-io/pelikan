@@ -6,6 +6,6 @@ pub mod bytes;
 pub mod expiry;
 pub mod metrics;
 pub mod signal;
-#[cfg(feature = "boringssl")]
+#[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
 pub mod ssl;
 pub mod traits;

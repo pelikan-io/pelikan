@@ -19,8 +19,12 @@ metriken = { workspace = true, optional = true }
 mio = { workspace = true, features = ["os-poll", "net"] }
 openssl = { workspace = true, optional = true }
 openssl-sys = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
+rustls-pemfile = { workspace = true, optional = true }
+webpki-roots = { workspace = true, optional = true }
 
 [features]
 boringssl = ["boring", "boring-sys"]
 metrics = ["metriken"]
 openssl = ["dep:openssl", "openssl-sys", "openssl/vendored"]
+rustls = ["dep:rustls", "rustls-pemfile", "webpki-roots"]
