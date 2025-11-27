@@ -60,8 +60,9 @@ Pelikan contains the following products:
 
 ## Legacy
 
-Pelikan legacy codebase in C can be found within the `legacy` folder of this
-project. It offers the same design blueprint as the current mainline, and
+Pelikan was initially implemented in C. The legacy codebase can be found at the
+[pelikan-c](https://github.com/pelikan-io/pelikan-c) repo.
+It offers the same design blueprint as the current mainline, and
 implements multiple storage backend, data structures, and protocols. However, it only
 builds single-threaded, plain-text backends. It remains as a reference, but
 is not actively worked on. We do not recommend it for production deployments.
