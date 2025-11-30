@@ -18,4 +18,6 @@ ringlog = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [features]
+rustls = ["pelikan-net/rustls"]
 boringssl = ["dep:boring", "pelikan-net/boringssl"]
+openssl = ["pelikan-net/openssl"]

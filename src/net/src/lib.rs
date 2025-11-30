@@ -7,7 +7,7 @@ mod listener;
 mod stream;
 mod tcp;
 
-#[cfg(any(feature = "boringssl", feature = "openssl"))]
+#[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
 mod tls_tcp;
 
 pub use connector::*;
@@ -15,7 +15,7 @@ pub use listener::*;
 pub use stream::*;
 pub use tcp::*;
 
-#[cfg(any(feature = "boringssl", feature = "openssl"))]
+#[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
 pub use tls_tcp::*;
 
 pub mod event {

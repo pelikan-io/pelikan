@@ -25,5 +25,6 @@ slab = { workspace = true }
 switchboard = { workspace = true }
 
 [features]
+rustls = ["pelikan-net/rustls"]
 boringssl = ["pelikan-net/boringssl"]
 openssl = ["pelikan-net/openssl"]

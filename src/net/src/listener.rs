@@ -10,7 +10,7 @@ pub struct Listener {
 
 enum ListenerType {
     Plain(TcpListener),
-    #[cfg(any(feature = "boringssl", feature = "openssl"))]
+    #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
     Tls((TcpListener, TlsTcpAcceptor)),
 }
 
@@ -22,7 +22,7 @@ impl From<TcpListener> for Listener {
     }
 }
 
-#[cfg(any(feature = "boringssl", feature = "openssl"))]
+#[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
 impl From<(TcpListener, TlsTcpAcceptor)> for Listener {
     fn from(other: (TcpListener, TlsTcpAcceptor)) -> Self {
         Self {
@@ -59,7 +59,7 @@ impl Listener {
                 let (stream, _addr) = listener.accept()?;
                 Ok(Stream::from(stream))
             }
-            #[cfg(any(feature = "boringssl", feature = "openssl"))]
+            #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
             ListenerType::Tls((listener, acceptor)) => {
                 let (stream, _addr) = listener.accept()?;
                 let stream = acceptor.accept(stream)?;
@@ -71,7 +71,7 @@ impl Listener {
     pub fn local_addr(&self) -> Result<SocketAddr> {
         match &self.inner {
             ListenerType::Plain(listener) => listener.local_addr(),
-            #[cfg(any(feature = "boringssl", feature = "openssl"))]
+            #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
             ListenerType::Tls((listener, _acceptor)) => listener.local_addr(),
         }
     }
@@ -86,7 +86,7 @@ impl event::Source for Listener {
     ) -> Result<()> {
         match &mut self.inner {
             ListenerType::Plain(listener) => listener.register(registry, token, interests),
-            #[cfg(any(feature = "boringssl", feature = "openssl"))]
+            #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
             ListenerType::Tls((listener, _acceptor)) => {
                 listener.register(registry, token, interests)
             }
@@ -101,7 +101,7 @@ impl event::Source for Listener {
     ) -> Result<()> {
         match &mut self.inner {
             ListenerType::Plain(listener) => listener.reregister(registry, token, interests),
-            #[cfg(any(feature = "boringssl", feature = "openssl"))]
+            #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
             ListenerType::Tls((listener, _acceptor)) => {
                 listener.reregister(registry, token, interests)
             }
@@ -111,7 +111,7 @@ impl event::Source for Listener {
     fn deregister(&mut self, registry: &mio::Registry) -> Result<()> {
         match &mut self.inner {
             ListenerType::Plain(listener) => listener.deregister(registry),
-            #[cfg(any(feature = "boringssl", feature = "openssl"))]
+            #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
             ListenerType::Tls((listener, _acceptor)) => listener.deregister(registry),
         }
     }

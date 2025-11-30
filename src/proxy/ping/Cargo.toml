@@ -25,5 +25,5 @@ common = { path = "../../common" }
 config = { path = "../../config" }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
-proxy = { path = "../../core/proxy", features = ["boringssl"] }
+proxy = { path = "../../core/proxy", features = ["rustls"] }
 protocol-ping = { path = "../../protocol/ping", features = ["client", "server"] }

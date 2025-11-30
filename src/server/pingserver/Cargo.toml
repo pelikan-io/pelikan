@@ -43,7 +43,7 @@ rustls = { version = "0.23.18", default-features = false, features = [
 ] }
 rustls-native-certs = "0.8.0"
 serde = { workspace = true, features = ["derive"] }
-server = { path = "../../core/server" }
+server = { path = "../../core/server", features = ["rustls"] }
 session = { path = "../../session" }
 tokio = { version = "1.43.1", features = ["macros", "rt-multi-thread"] }
 toml = { workspace = true }

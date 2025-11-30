@@ -10,7 +10,12 @@ mod boringssl;
 #[cfg(feature = "openssl")]
 mod openssl;
 
+#[cfg(feature = "rustls")]
+mod rustls;
+
 pub enum Implementation {
+    #[cfg(feature = "rustls")]
+    Rustls,
     #[cfg(feature = "boringssl")]
     Boringssl,
     #[cfg(feature = "openssl")]
@@ -19,13 +24,23 @@ pub enum Implementation {
 
 impl Default for Implementation {
     fn default() -> Self {
-        #[cfg(all(not(feature = "boringssl"), feature = "openssl"))]
+        // Prefer rustls, then boringssl, then openssl
+        #[cfg(feature = "rustls")]
         {
-            return Self::Openssl;
+            return Self::Rustls;
         }
 
-        #[cfg(feature = "boringssl")]
-        Self::Boringssl
+        #[cfg(all(not(feature = "rustls"), feature = "boringssl"))]
+        {
+            return Self::Boringssl;
+        }
+
+        #[cfg(all(
+            not(feature = "rustls"),
+            not(feature = "boringssl"),
+            feature = "openssl"
+        ))]
+        Self::Openssl
     }
 }
 
@@ -55,6 +70,16 @@ impl From<::boring::ssl::ShutdownResult> for ShutdownResult {
     }
 }
 
+#[cfg(feature = "rustls")]
+impl From<rustls::ShutdownResult> for ShutdownResult {
+    fn from(other: rustls::ShutdownResult) -> Self {
+        match other {
+            rustls::ShutdownResult::Sent => Self::Sent,
+            rustls::ShutdownResult::Received => Self::Received,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct TlsTcpStream {
     inner: TlsTcpStreamImpl,
@@ -62,6 +87,8 @@ pub struct TlsTcpStream {
 
 #[derive(Debug)]
 enum TlsTcpStreamImpl {
+    #[cfg(feature = "rustls")]
+    Rustls(rustls::TlsTcpStream),
     #[cfg(feature = "boringssl")]
     Boringssl(boringssl::TlsTcpStream),
     #[cfg(feature = "openssl")]
@@ -71,6 +98,8 @@ enum TlsTcpStreamImpl {
 impl AsRawFd for TlsTcpStream {
     fn as_raw_fd(&self) -> i32 {
         match &self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.as_raw_fd(),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.as_raw_fd(),
             #[cfg(feature = "openssl")]
@@ -82,6 +111,8 @@ impl AsRawFd for TlsTcpStream {
 impl TlsTcpStream {
     pub fn set_nodelay(&mut self, nodelay: bool) -> Result<()> {
         match &mut self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.set_nodelay(nodelay),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.set_nodelay(nodelay),
             #[cfg(feature = "openssl")]
@@ -91,6 +122,8 @@ impl TlsTcpStream {
 
     pub fn is_handshaking(&self) -> bool {
         match &self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.is_handshaking(),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.is_handshaking(),
             #[cfg(feature = "openssl")]
@@ -113,6 +146,8 @@ impl TlsTcpStream {
     /// recovery and that the connection should be closed.
     pub fn do_handshake(&mut self) -> Result<()> {
         match &mut self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.do_handshake(),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.do_handshake(),
             #[cfg(feature = "openssl")]
@@ -122,6 +157,8 @@ impl TlsTcpStream {
 
     pub fn shutdown(&mut self) -> Result<ShutdownResult> {
         match &mut self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.shutdown().map(|v| v.into()),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.shutdown().map(|v| v.into()),
             #[cfg(feature = "openssl")]
@@ -133,6 +170,8 @@ impl TlsTcpStream {
 impl Read for TlsTcpStream {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         match &mut self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.read(buf),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.read(buf),
             #[cfg(feature = "openssl")]
@@ -144,6 +183,8 @@ impl Read for TlsTcpStream {
 impl Write for TlsTcpStream {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         match &mut self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.write(buf),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.write(buf),
             #[cfg(feature = "openssl")]
@@ -153,6 +194,8 @@ impl Write for TlsTcpStream {
 
     fn flush(&mut self) -> Result<()> {
         match &mut self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.flush(),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.flush(),
             #[cfg(feature = "openssl")]
@@ -164,6 +207,8 @@ impl Write for TlsTcpStream {
 impl event::Source for TlsTcpStream {
     fn register(&mut self, registry: &Registry, token: Token, interest: Interest) -> Result<()> {
         match &mut self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.register(registry, token, interest),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.register(registry, token, interest),
             #[cfg(feature = "openssl")]
@@ -178,6 +223,8 @@ impl event::Source for TlsTcpStream {
         interest: mio::Interest,
     ) -> Result<()> {
         match &mut self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.reregister(registry, token, interest),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.reregister(registry, token, interest),
             #[cfg(feature = "openssl")]
@@ -187,6 +234,8 @@ impl event::Source for TlsTcpStream {
 
     fn deregister(&mut self, registry: &mio::Registry) -> Result<()> {
         match &mut self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpStreamImpl::Rustls(s) => s.deregister(registry),
             #[cfg(feature = "boringssl")]
             TlsTcpStreamImpl::Boringssl(s) => s.deregister(registry),
             #[cfg(feature = "openssl")]
@@ -200,6 +249,8 @@ pub struct TlsTcpAcceptor {
 }
 
 enum TlsTcpAcceptorImpl {
+    #[cfg(feature = "rustls")]
+    Rustls(rustls::TlsTcpAcceptor),
     #[cfg(feature = "boringssl")]
     Boringssl(boringssl::TlsTcpAcceptor),
     #[cfg(feature = "openssl")]
@@ -213,6 +264,10 @@ impl TlsTcpAcceptor {
 
     pub fn accept(&self, stream: TcpStream) -> Result<TlsTcpStream> {
         match &self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpAcceptorImpl::Rustls(s) => s.accept(stream).map(|s| TlsTcpStream {
+                inner: TlsTcpStreamImpl::Rustls(s),
+            }),
             #[cfg(feature = "boringssl")]
             TlsTcpAcceptorImpl::Boringssl(s) => s.accept(stream).map(|s| TlsTcpStream {
                 inner: TlsTcpStreamImpl::Boringssl(s),
@@ -240,6 +295,10 @@ pub struct TlsTcpAcceptorBuilder {
 impl TlsTcpAcceptorBuilder {
     pub fn build(self) -> Result<TlsTcpAcceptor> {
         match self.implementation {
+            #[cfg(feature = "rustls")]
+            Implementation::Rustls => Ok(TlsTcpAcceptor {
+                inner: TlsTcpAcceptorImpl::Rustls(rustls::TlsTcpAcceptor::build(self)?),
+            }),
             #[cfg(feature = "boringssl")]
             Implementation::Boringssl => Ok(TlsTcpAcceptor {
                 inner: TlsTcpAcceptorImpl::Boringssl(boringssl::TlsTcpAcceptor::build(self)?),
@@ -306,6 +365,8 @@ pub struct TlsTcpConnector {
 }
 
 enum TlsTcpConnectorImpl {
+    #[cfg(feature = "rustls")]
+    Rustls(rustls::TlsTcpConnector),
     #[cfg(feature = "boringssl")]
     Boringssl(boringssl::TlsTcpConnector),
     #[cfg(feature = "openssl")]
@@ -319,6 +380,10 @@ impl TlsTcpConnector {
 
     pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<TlsTcpStream> {
         match &self.inner {
+            #[cfg(feature = "rustls")]
+            TlsTcpConnectorImpl::Rustls(s) => s.connect(addr).map(|s| TlsTcpStream {
+                inner: TlsTcpStreamImpl::Rustls(s),
+            }),
             #[cfg(feature = "boringssl")]
             TlsTcpConnectorImpl::Boringssl(s) => s.connect(addr).map(|s| TlsTcpStream {
                 inner: TlsTcpStreamImpl::Boringssl(s),
@@ -343,6 +408,10 @@ pub struct TlsTcpConnectorBuilder {
 impl TlsTcpConnectorBuilder {
     pub fn build(self) -> Result<TlsTcpConnector> {
         match self.implementation {
+            #[cfg(feature = "rustls")]
+            Implementation::Rustls => Ok(TlsTcpConnector {
+                inner: TlsTcpConnectorImpl::Rustls(rustls::TlsTcpConnector::build(self)?),
+            }),
             #[cfg(feature = "boringssl")]
             Implementation::Boringssl => Ok(TlsTcpConnector {
                 inner: TlsTcpConnectorImpl::Boringssl(boringssl::TlsTcpConnector::build(self)?),
