@@ -2,8 +2,6 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-pub use boring::ssl::*;
-
 use pelikan_net::TlsTcpAcceptor;
 use std::io::Error as IoError;
 

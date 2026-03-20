@@ -25,7 +25,3 @@ session = { path = "../../session" }
 signal-hook = {workspace = true}
 slab = { workspace = true }
 queues = { workspace = true }
-
-[features]
-boringssl = ["pelikan-net/boringssl"]
-openssl = ["pelikan-net/openssl"]

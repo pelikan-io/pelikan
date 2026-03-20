@@ -10,17 +10,12 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-boring = { workspace = true, optional = true }
-boring-sys = { workspace = true, optional = true }
-foreign-types-shared_01 = { package = "foreign-types-shared", version = "0.1.1" }
-foreign-types-shared_03 = { package = "foreign-types-shared", version = "0.3.1" }
 libc = { workspace = true }
 metriken = { workspace = true, optional = true }
 mio = { workspace = true, features = ["os-poll", "net"] }
-openssl = { workspace = true, optional = true }
-openssl-sys = { workspace = true, optional = true }
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+webpki-roots = { workspace = true }
 
 [features]
-boringssl = ["boring", "boring-sys"]
 metrics = ["metriken"]
-openssl = ["dep:openssl", "openssl-sys", "openssl/vendored"]
