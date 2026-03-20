@@ -89,8 +89,7 @@ impl BinaryProtocol {
         buffer: &mut dyn BufMut,
     ) -> std::result::Result<usize, std::io::Error> {
         if request.key.len() > u16::MAX as _ {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 "request key too large for binary protocol",
             ));
         }

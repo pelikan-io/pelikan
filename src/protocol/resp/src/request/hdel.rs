@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 #[metric(name = "hdel")]
 pub static HDEL: Counter = Counter::new();
@@ -23,29 +23,29 @@ impl TryFrom<Message> for HashDelete {
     fn try_from(other: Message) -> Result<Self, Error> {
         if let Message::Array(array) = other {
             if array.inner.is_none() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let mut array = array.inner.unwrap();
 
             if array.len() < 3 {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let _command = take_bulk_string(&mut array)?;
 
-            let key = take_bulk_string(&mut array)?
-                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+            let key =
+                take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
             if key.is_empty() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let mut fields = Vec::with_capacity(array.len());
 
             while let Some(field) = take_bulk_string(&mut array)? {
                 if field.is_empty() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    return Err(Error::other("malformed command"));
                 }
                 fields.push(field);
             }
@@ -55,7 +55,7 @@ impl TryFrom<Message> for HashDelete {
                 fields: fields.into_boxed_slice(),
             })
         } else {
-            Err(Error::new(ErrorKind::Other, "malformed command"))
+            Err(Error::other("malformed command"))
         }
     }
 }

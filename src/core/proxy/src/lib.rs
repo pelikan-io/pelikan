@@ -77,7 +77,7 @@ fn map_err(e: std::io::Error) -> Result<()> {
 
 fn map_result(result: Result<usize>) -> Result<()> {
     match result {
-        Ok(0) => Err(Error::new(ErrorKind::Other, "client hangup")),
+        Ok(0) => Err(Error::other("client hangup")),
         Ok(_) => Ok(()),
         Err(e) => map_err(e),
     }

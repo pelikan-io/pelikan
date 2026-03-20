@@ -239,7 +239,7 @@ impl TcpConnector {
 
     pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<TcpStream> {
         let addrs: Vec<SocketAddr> = addr.to_socket_addrs()?.collect();
-        let mut s = Err(Error::new(ErrorKind::Other, "failed to resolve"));
+        let mut s = Err(Error::other("failed to resolve"));
         for addr in addrs {
             s = TcpStream::connect(addr);
             if s.is_ok() {

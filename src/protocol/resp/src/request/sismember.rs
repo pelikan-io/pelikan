@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 #[metric(name = "sismember")]
 pub static SISMEMBER: Counter = Counter::new();
@@ -29,19 +29,18 @@ impl TryFrom<Message> for SetIsMember {
     fn try_from(value: Message) -> Result<Self, Error> {
         let mut array = match value {
             Message::Array(array) => array.inner.unwrap(),
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         if array.len() != 3 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array)?;
 
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
-        let field = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
+        let field =
+            take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
         Ok(Self { key, field })
     }

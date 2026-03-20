@@ -8,7 +8,7 @@
 use core::cmp::{max, Ordering};
 use core::num::NonZeroU32;
 
-use ::rand::Rng;
+use ::rand::RngExt;
 
 use crate::rng;
 use crate::segments::*;
@@ -66,7 +66,7 @@ impl Eviction {
     /// Returns a random u32
     #[inline]
     pub fn random(&mut self) -> u32 {
-        self.rng.gen()
+        self.rng.random()
     }
 
     pub fn should_rerank(&mut self) -> bool {

@@ -26,26 +26,25 @@ impl TryFrom<Message> for SortedSetIncrement {
     fn try_from(other: Message) -> Result<Self, Error> {
         let array = match other {
             Message::Array(array) => array,
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         if array.inner.is_none() {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let mut array = array.inner.unwrap();
 
         if array.len() != 4 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array)?;
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
-        let increment_string = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
-        let member = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed content"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
+        let increment_string =
+            take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
+        let member =
+            take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed content"))?;
 
         // Parse the increment string into a float
         let increment = parse_sorted_set_score(&increment_string)?;

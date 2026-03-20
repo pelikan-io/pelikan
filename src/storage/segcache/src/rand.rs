@@ -6,12 +6,9 @@
 
 pub use inner::*;
 
-pub use rand::Rng as RandRng;
-pub use rand::RngCore as RandRngCore;
-
+use ::rand::TryRng;
 use core::cell::UnsafeCell;
-use rand::Error;
-use rand::RngCore;
+use core::convert::Infallible;
 use std::rc::Rc;
 
 pub struct ThreadRng {
@@ -33,33 +30,22 @@ pub fn thread_rng() -> ThreadRng {
     ThreadRng { rng }
 }
 
-impl RngCore for ThreadRng {
-    #[inline(always)]
-    fn next_u32(&mut self) -> u32 {
-        // SAFETY: We must make sure to stop using `rng` before anyone else
-        // creates another mutable reference
-        let rng = unsafe { &mut *self.rng.get() };
-        rng.next_u32()
-    }
+impl TryRng for ThreadRng {
+    type Error = Infallible;
 
     #[inline(always)]
-    fn next_u64(&mut self) -> u64 {
-        // SAFETY: We must make sure to stop using `rng` before anyone else
-        // creates another mutable reference
+    fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
         let rng = unsafe { &mut *self.rng.get() };
-        rng.next_u64()
+        rng.try_next_u32()
     }
 
-    fn fill_bytes(&mut self, dest: &mut [u8]) {
-        // SAFETY: We must make sure to stop using `rng` before anyone else
-        // creates another mutable reference
+    #[inline(always)]
+    fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
         let rng = unsafe { &mut *self.rng.get() };
-        rng.fill_bytes(dest)
+        rng.try_next_u64()
     }
 
-    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Error> {
-        // SAFETY: We must make sure to stop using `rng` before anyone else
-        // creates another mutable reference
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Self::Error> {
         let rng = unsafe { &mut *self.rng.get() };
         rng.try_fill_bytes(dest)
     }
@@ -67,7 +53,7 @@ impl RngCore for ThreadRng {
 
 #[cfg(test)]
 mod inner {
-    use rand::SeedableRng;
+    use ::rand::SeedableRng;
 
     pub type Random = rand_xoshiro::Xoshiro256PlusPlus;
 
@@ -79,13 +65,11 @@ mod inner {
 
 #[cfg(not(test))]
 mod inner {
-    use rand::SeedableRng;
-
     pub type Random = rand_chacha::ChaCha20Rng;
 
     // A cryptographically secure RNG using the ChaCha algorithm. Appropriate
     // for production.
     pub fn rng() -> Random {
-        rand_chacha::ChaCha20Rng::from_entropy()
+        ::rand::make_rng()
     }
 }

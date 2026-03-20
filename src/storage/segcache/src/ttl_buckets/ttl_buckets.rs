@@ -124,7 +124,7 @@ impl TtlBuckets {
             expired += bucket.expire(hashtable, segments);
         }
         let duration = start.elapsed();
-        debug!("expired: {} segments in {:?}", expired, duration);
+        debug!("expired: {expired} segments in {duration:?}");
 
         #[cfg(feature = "metrics")]
         EXPIRE_TIME.add(duration.as_nanos() as _);
@@ -140,7 +140,7 @@ impl TtlBuckets {
         }
         segments.set_flush_at(Instant::now());
         let duration = start.elapsed();
-        debug!("expired: {} segments in {:?}", cleared, duration);
+        debug!("expired: {cleared} segments in {duration:?}");
 
         #[cfg(feature = "metrics")]
         CLEAR_TIME.add(duration.as_nanos() as _);

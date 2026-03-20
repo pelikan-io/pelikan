@@ -75,10 +75,7 @@ impl RdsConfig {
             Ok(t) => Ok(t),
             Err(e) => {
                 eprintln!("{e}");
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Error parsing config",
-                ))
+                Err(std::io::Error::other("Error parsing config"))
             }
         }
     }

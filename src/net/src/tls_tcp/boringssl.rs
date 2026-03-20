@@ -69,7 +69,7 @@ impl TlsTcpStream {
                             STREAM_HANDSHAKE_EX.increment();
                         }
 
-                        Err(Error::new(ErrorKind::Other, "handshake failed"))
+                        Err(Error::other("handshake failed"))
                     }
                 }
             }
@@ -81,7 +81,7 @@ impl TlsTcpStream {
     pub fn shutdown(&mut self) -> Result<ShutdownResult> {
         self.inner
             .shutdown()
-            .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))
+            .map_err(|e| Error::other(e.to_string()))
     }
 }
 
@@ -156,17 +156,13 @@ pub struct TlsTcpAcceptor {
 
 impl TlsTcpAcceptor {
     pub fn build(builder: TlsTcpAcceptorBuilder) -> Result<TlsTcpAcceptor> {
-        let mut acceptor =
-            ::boring::ssl::SslAcceptor::mozilla_intermediate_v5(SslMethod::tls_client())
-                .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
+        let mut acceptor = ::boring::ssl::SslAcceptor::mozilla_intermediate_v5(SslMethod::tls())
+            .map_err(|e| Error::other(e.to_string()))?;
 
         // load the CA file, if provided
         if let Some(f) = builder.ca_file {
             acceptor.set_ca_file(f.clone()).map_err(|e| {
-                Error::new(
-                    ErrorKind::Other,
-                    format!("failed to load CA file: {}\n{}", f.display(), e),
-                )
+                Error::other(format!("failed to load CA file: {}\n{}", f.display(), e))
             })?;
         }
 
@@ -175,13 +171,14 @@ impl TlsTcpAcceptor {
             acceptor
                 .set_private_key_file(f.clone(), SslFiletype::PEM)
                 .map_err(|e| {
-                    Error::new(
-                        ErrorKind::Other,
-                        format!("failed to load private key file: {}\n{}", f.display(), e),
-                    )
+                    Error::other(format!(
+                        "failed to load private key file: {}\n{}",
+                        f.display(),
+                        e
+                    ))
                 })?;
         } else {
-            return Err(Error::new(ErrorKind::Other, "no private key file provided"));
+            return Err(Error::other("no private key file provided"));
         }
 
         // load the certificate chain, certificate file, or both
@@ -194,43 +191,35 @@ impl TlsTcpAcceptor {
                 acceptor
                     .set_certificate_file(cert.clone(), SslFiletype::PEM)
                     .map_err(|e| {
-                        Error::new(
-                            ErrorKind::Other,
-                            format!("failed to load certificate file: {}\n{}", cert.display(), e),
-                        )
+                        Error::other(format!(
+                            "failed to load certificate file: {}\n{}",
+                            cert.display(),
+                            e
+                        ))
                     })?;
 
                 // append the rest of the chain
                 let pem = std::fs::read(chain.clone()).map_err(|e| {
-                    Error::new(
-                        ErrorKind::Other,
-                        format!(
-                            "failed to load certificate chain file: {}\n{}",
-                            chain.display(),
-                            e
-                        ),
-                    )
+                    Error::other(format!(
+                        "failed to load certificate chain file: {}\n{}",
+                        chain.display(),
+                        e
+                    ))
                 })?;
                 let cert_chain = X509::stack_from_pem(&pem).map_err(|e| {
-                    Error::new(
-                        ErrorKind::Other,
-                        format!(
-                            "failed to load certificate chain file: {}\n{}",
-                            chain.display(),
-                            e
-                        ),
-                    )
+                    Error::other(format!(
+                        "failed to load certificate chain file: {}\n{}",
+                        chain.display(),
+                        e
+                    ))
                 })?;
                 for cert in cert_chain {
                     acceptor.add_extra_chain_cert(cert).map_err(|e| {
-                        Error::new(
-                            ErrorKind::Other,
-                            format!(
-                                "bad certificate in certificate chain file: {}\n{}",
-                                chain.display(),
-                                e
-                            ),
-                        )
+                        Error::other(format!(
+                            "bad certificate in certificate chain file: {}\n{}",
+                            chain.display(),
+                            e
+                        ))
                     })?;
                 }
             }
@@ -242,14 +231,11 @@ impl TlsTcpAcceptor {
                 acceptor
                     .set_certificate_chain_file(chain.clone())
                     .map_err(|e| {
-                        Error::new(
-                            ErrorKind::Other,
-                            format!(
-                                "failed to load certificate chain file: {}\n{}",
-                                chain.display(),
-                                e
-                            ),
-                        )
+                        Error::other(format!(
+                            "failed to load certificate chain file: {}\n{}",
+                            chain.display(),
+                            e
+                        ))
                     })?;
             }
             (None, Some(cert)) => {
@@ -257,15 +243,15 @@ impl TlsTcpAcceptor {
                 acceptor
                     .set_certificate_file(cert.clone(), SslFiletype::PEM)
                     .map_err(|e| {
-                        Error::new(
-                            ErrorKind::Other,
-                            format!("failed to load certificate file: {}\n{}", cert.display(), e),
-                        )
+                        Error::other(format!(
+                            "failed to load certificate file: {}\n{}",
+                            cert.display(),
+                            e
+                        ))
                     })?;
             }
             (None, None) => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     "no certificate file or certificate chain file provided",
                 ));
             }
@@ -297,7 +283,7 @@ impl TlsTcpAcceptor {
                     inner: stream,
                     state: TlsState::Handshaking,
                 }),
-                _ => Err(Error::new(ErrorKind::Other, "handshake failed")),
+                _ => Err(Error::other("handshake failed")),
             }
         }
     }
@@ -313,29 +299,23 @@ pub struct TlsTcpConnector {
 
 impl TlsTcpConnector {
     pub fn build(builder: TlsTcpConnectorBuilder) -> Result<TlsTcpConnector> {
-        let mut connector =
-            ::boring::ssl::SslAcceptor::mozilla_intermediate_v5(SslMethod::tls_server())
-                .map_err(|e| Error::new(ErrorKind::Other, e.to_string()))?;
+        let mut connector = ::boring::ssl::SslAcceptor::mozilla_intermediate_v5(SslMethod::tls())
+            .map_err(|e| Error::other(e.to_string()))?;
 
         // load the CA file, if provided
         if let Some(f) = builder.ca_file {
-            connector.set_ca_file(f).map_err(|e| {
-                Error::new(ErrorKind::Other, format!("failed to load CA file: {e}"))
-            })?;
+            connector
+                .set_ca_file(f)
+                .map_err(|e| Error::other(format!("failed to load CA file: {e}")))?;
         }
 
         // load the private key from file
         if let Some(f) = builder.private_key_file {
             connector
                 .set_private_key_file(f, SslFiletype::PEM)
-                .map_err(|e| {
-                    Error::new(
-                        ErrorKind::Other,
-                        format!("failed to load private key file: {e}"),
-                    )
-                })?;
+                .map_err(|e| Error::other(format!("failed to load private key file: {e}")))?;
         } else {
-            return Err(Error::new(ErrorKind::Other, "no private key file provided"));
+            return Err(Error::other("no private key file provided"));
         }
 
         // load the certificate chain, certificate file, or both
@@ -347,32 +327,18 @@ impl TlsTcpConnector {
                 // first load the leaf
                 connector
                     .set_certificate_file(cert, SslFiletype::PEM)
-                    .map_err(|e| {
-                        Error::new(
-                            ErrorKind::Other,
-                            format!("failed to load certificate file: {e}"),
-                        )
-                    })?;
+                    .map_err(|e| Error::other(format!("failed to load certificate file: {e}")))?;
 
                 // append the rest of the chain
                 let pem = std::fs::read(chain).map_err(|e| {
-                    Error::new(
-                        ErrorKind::Other,
-                        format!("failed to load certificate chain file: {e}"),
-                    )
+                    Error::other(format!("failed to load certificate chain file: {e}"))
                 })?;
                 let chain = X509::stack_from_pem(&pem).map_err(|e| {
-                    Error::new(
-                        ErrorKind::Other,
-                        format!("failed to load certificate chain file: {e}"),
-                    )
+                    Error::other(format!("failed to load certificate chain file: {e}"))
                 })?;
                 for cert in chain {
                     connector.add_extra_chain_cert(cert).map_err(|e| {
-                        Error::new(
-                            ErrorKind::Other,
-                            format!("bad certificate in certificate chain file: {e}"),
-                        )
+                        Error::other(format!("bad certificate in certificate chain file: {e}"))
                     })?;
                 }
             }
@@ -382,26 +348,17 @@ impl TlsTcpConnector {
 
                 // load the entire chain
                 connector.set_certificate_chain_file(chain).map_err(|e| {
-                    Error::new(
-                        ErrorKind::Other,
-                        format!("failed to load certificate chain file: {e}"),
-                    )
+                    Error::other(format!("failed to load certificate chain file: {e}"))
                 })?;
             }
             (None, Some(cert)) => {
                 // this will just load the leaf certificate from the file
                 connector
                     .set_certificate_file(cert, SslFiletype::PEM)
-                    .map_err(|e| {
-                        Error::new(
-                            ErrorKind::Other,
-                            format!("failed to load certificate file: {e}"),
-                        )
-                    })?;
+                    .map_err(|e| Error::other(format!("failed to load certificate file: {e}")))?;
             }
             (None, None) => {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     "no certificate file or certificate chain file provided",
                 ));
             }
@@ -414,7 +371,7 @@ impl TlsTcpConnector {
 
     pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<TlsTcpStream> {
         let addrs: Vec<SocketAddr> = addr.to_socket_addrs()?.collect();
-        let mut s = Err(Error::new(ErrorKind::Other, "failed to resolve"));
+        let mut s = Err(Error::other("failed to resolve"));
         for addr in addrs {
             s = TcpStream::connect(addr);
             if s.is_ok() {
@@ -442,7 +399,7 @@ impl TlsTcpConnector {
                     inner: stream,
                     state: TlsState::Handshaking,
                 }),
-                _ => Err(Error::new(ErrorKind::Other, "handshake failed")),
+                _ => Err(Error::other("handshake failed")),
             }
         }
     }

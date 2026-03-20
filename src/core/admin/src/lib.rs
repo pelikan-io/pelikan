@@ -182,8 +182,8 @@ impl AdminBuilder {
         let config = config.admin();
 
         let addr = config.socket_addr().map_err(|e| {
-            error!("{}", e);
-            std::io::Error::new(std::io::ErrorKind::Other, "Bad listen address")
+            error!("{e}");
+            std::io::Error::other("Bad listen address")
         })?;
 
         let tcp_listener = TcpListener::bind(addr)?;
@@ -210,12 +210,11 @@ impl AdminBuilder {
         let backlog = VecDeque::new();
 
         let http_server = if config.http_enabled() {
-            let addr = config.http_socket_addr().map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::Other, "Bad HTTP listen address")
-            })?;
-            let server = tiny_http::Server::http(addr).map_err(|_| {
-                std::io::Error::new(std::io::ErrorKind::Other, "Failed to create HTTP server")
-            })?;
+            let addr = config
+                .http_socket_addr()
+                .map_err(|_| std::io::Error::other("Bad HTTP listen address"))?;
+            let server = tiny_http::Server::http(addr)
+                .map_err(|_| std::io::Error::other("Failed to create HTTP server"))?;
             Some(server)
         } else {
             None
@@ -354,11 +353,11 @@ impl Admin {
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         // fill the session
         match session.fill() {
-            Ok(0) => Err(Error::new(ErrorKind::Other, "client hangup")),
+            Ok(0) => Err(Error::other("client hangup")),
             r => r,
         }?;
 
@@ -373,7 +372,7 @@ impl Admin {
                         session.send(AdminResponse::Ok)?;
                     }
                     AdminRequest::Quit => {
-                        return Err(Error::new(ErrorKind::Other, "should hangup"));
+                        return Err(Error::other("should hangup"));
                     }
                     AdminRequest::Stats => {
                         session.send(AdminResponse::Stats)?;
@@ -396,7 +395,7 @@ impl Admin {
                         .reregister(self.poll.registry(), token, interest)
                         .is_err()
                     {
-                        return Err(Error::new(ErrorKind::Other, "failed to reregister"));
+                        return Err(Error::other("failed to reregister"));
                     }
                 }
                 Ok(())
@@ -412,7 +411,7 @@ impl Admin {
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         match session.flush() {
             Ok(_) => Ok(()),
@@ -438,7 +437,7 @@ impl Admin {
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         match session.do_handshake() {
             Ok(()) => {
@@ -723,8 +722,7 @@ pub fn prometheus_stats() -> String {
         {
             for (_label, percentile, value) in snapshots.percentiles(metric.name()) {
                 data.push(format!(
-                    "# TYPE {name} gauge\n{name}{{percentile=\"{:02}\"}} {value} {timestamp}",
-                    percentile,
+                    "# TYPE {name} gauge\n{name}{{percentile=\"{percentile:02}\"}} {value} {timestamp}",
                 ));
             }
         }

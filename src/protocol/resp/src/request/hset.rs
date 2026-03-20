@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::sync::Arc;
 
 #[metric(name = "hset")]
@@ -30,26 +30,26 @@ impl TryFrom<Message> for HashSet {
     fn try_from(other: Message) -> Result<Self, Error> {
         if let Message::Array(array) = other {
             if array.inner.is_none() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let mut array = array.inner.unwrap();
 
             if array.len() < 4 {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             if array.len() % 2 == 1 {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let _command = take_bulk_string(&mut array)?;
 
-            let key = take_bulk_string(&mut array)?
-                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+            let key =
+                take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
             if key.is_empty() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             // loop as long as we have at least 2 arguments after the command
@@ -57,17 +57,17 @@ impl TryFrom<Message> for HashSet {
 
             while array.len() >= 2 {
                 let field = take_bulk_string(&mut array)?
-                    .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+                    .ok_or_else(|| Error::other("malformed command"))?;
 
                 if field.is_empty() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    return Err(Error::other("malformed command"));
                 }
 
                 let value = take_bulk_string(&mut array)?
-                    .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+                    .ok_or_else(|| Error::other("malformed command"))?;
 
                 if value.is_empty() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    return Err(Error::other("malformed command"));
                 }
 
                 data.push((field, value));
@@ -78,7 +78,7 @@ impl TryFrom<Message> for HashSet {
                 data: data.into(),
             })
         } else {
-            Err(Error::new(ErrorKind::Other, "malformed command"))
+            Err(Error::other("malformed command"))
         }
     }
 }

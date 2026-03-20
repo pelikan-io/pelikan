@@ -36,18 +36,17 @@ impl TryFrom<Message> for SortedSetAdd {
     fn try_from(value: Message) -> std::io::Result<Self> {
         let array = match value {
             Message::Array(array) => array,
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         let mut array = array.inner.unwrap();
         if array.len() < 3 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array)?;
 
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
         // There may be some optional arguments that come before the score-value pairs:
         // [NX | XX] [GT | LT] [CH] [INCR]
@@ -56,10 +55,7 @@ impl TryFrom<Message> for SortedSetAdd {
 
         while let Some(arg) = take_bulk_string(&mut array)? {
             if arg.is_empty() {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    "malformed command, empty string",
-                ));
+                return Err(Error::other("malformed command, empty string"));
             }
 
             match &*arg {
@@ -78,15 +74,14 @@ impl TryFrom<Message> for SortedSetAdd {
 
         // If INCR is set, then ZADD should behave like ZINCRBY (as per the docs), which accepts only a single score-member pair
         if optional_args.incr && members.len() != 2 {
-            return Err(Error::new(
-                ErrorKind::Other,
+            return Err(Error::other(
                 "INCR option accepts only a single score-member pair",
             ));
         }
 
         // Verify the score-member pairs and convert them to ScoreMemberPair objects
         if members.len() % 2 != 0 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
         let mut verified_score_member_pairs = Vec::with_capacity(members.len() / 2);
         for i in (0..members.len()).step_by(2) {

@@ -4,7 +4,7 @@
 
 use super::*;
 use logger::klog;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -18,34 +18,34 @@ impl TryFrom<Message> for Get {
     fn try_from(other: Message) -> Result<Self, Error> {
         if let Message::Array(array) = other {
             if array.inner.is_none() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let mut array = array.inner.unwrap();
 
             if array.len() != 2 {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let key = if let Message::BulkString(key) = array.remove(1) {
                 if key.inner.is_none() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    return Err(Error::other("malformed command"));
                 }
 
                 let key = key.inner.unwrap();
 
                 if key.is_empty() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    return Err(Error::other("malformed command"));
                 }
 
                 key
             } else {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             };
 
             Ok(Self { key })
         } else {
-            Err(Error::new(ErrorKind::Other, "malformed command"))
+            Err(Error::other("malformed command"))
         }
     }
 }

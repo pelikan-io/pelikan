@@ -71,8 +71,7 @@ impl BinaryProtocol {
             Request::Delete(r) => self.compose_delete_request(r, buffer),
             Request::Get(r) => self.compose_get_request(r, buffer),
             Request::Set(r) => self.compose_set_request(r, buffer),
-            _ => Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            _ => Err(std::io::Error::other(
                 "request unsupported for binary protocol",
             )),
         }

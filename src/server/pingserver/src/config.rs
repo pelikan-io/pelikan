@@ -85,17 +85,13 @@ impl Config {
         let config: Config = match toml::from_str(&content) {
             Ok(t) => t,
             Err(e) => {
-                error!("{}", e);
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Error parsing config",
-                ));
+                error!("{e}");
+                return Err(std::io::Error::other("Error parsing config"));
             }
         };
 
         if config.general.protocol == Protocol::Grpc && config.general.engine == Engine::Mio {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
+            return Err(std::io::Error::other(
                 "GRPC support requires using the Tokio engine",
             ));
         }
@@ -120,8 +116,8 @@ impl Config {
         self.server
             .socket_addr()
             .map_err(|e| {
-                error!("{}", e);
-                std::io::Error::new(std::io::ErrorKind::Other, "Bad listen address")
+                error!("{e}");
+                std::io::Error::other("Bad listen address")
             })
             .map_err(|_| {
                 std::process::exit(1);

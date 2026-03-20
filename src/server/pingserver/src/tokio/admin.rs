@@ -139,13 +139,11 @@ pub mod handlers {
                     for (_label, percentile, value) in percentiles {
                         if let Some(description) = metric.description() {
                             data.push(format!(
-                                "# TYPE {name} gauge\n# HELP {name} {description}\n{name}{{percentile=\"{:02}\"}} {value} {timestamp}",
-                                percentile,
+                                "# TYPE {name} gauge\n# HELP {name} {description}\n{name}{{percentile=\"{percentile:02}\"}} {value} {timestamp}",
                             ));
                         } else {
                             data.push(format!(
-                                "# TYPE {name} gauge\n{name}{{percentile=\"{:02}\"}} {value} {timestamp}",
-                                percentile,
+                                "# TYPE {name} gauge\n{name}{{percentile=\"{percentile:02}\"}} {value} {timestamp}",
                             ));
                         }
                     }

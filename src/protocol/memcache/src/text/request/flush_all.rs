@@ -38,7 +38,7 @@ impl TextProtocol {
 
         // if we have a space, we might have a noreply
         if let Ok((i, _)) = space1(input) {
-            let (i, _) = tag(b"noreply")(i)?;
+            let (i, _) = tag(&b"noreply"[..])(i)?;
             noreply = true;
             input = i;
         }

@@ -93,7 +93,7 @@ where
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         // fill the session
         map_result(session.fill())?;
@@ -103,7 +103,7 @@ where
             Ok(request) => self
                 .data_queue
                 .try_send_to(0, (request, token))
-                .map_err(|_| Error::new(ErrorKind::Other, "data queue is full")),
+                .map_err(|_| Error::other("data queue is full")),
             Err(e) => map_err(e),
         }
     }
@@ -113,7 +113,7 @@ where
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         match session.flush() {
             Ok(_) => Ok(()),

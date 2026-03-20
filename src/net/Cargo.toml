@@ -13,7 +13,6 @@ license = { workspace = true }
 boring = { workspace = true, optional = true }
 boring-sys = { workspace = true, optional = true }
 foreign-types-shared_03 = { package = "foreign-types-shared", version = "0.3.1" }
-foreign-types-shared_01 = { package = "foreign-types-shared", version = "0.1.1" }
 libc = { workspace = true }
 metriken = { workspace = true, optional = true }
 mio = { workspace = true, features = ["os-poll", "net"] }

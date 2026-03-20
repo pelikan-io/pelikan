@@ -31,28 +31,27 @@ impl TryFrom<Message> for SortedSetMultiScore {
     fn try_from(other: Message) -> Result<Self, Error> {
         let array = match other {
             Message::Array(array) => array,
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         if array.inner.is_none() {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let mut array = array.inner.unwrap();
 
         if array.len() < 3 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array)?;
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
         let mut members = Vec::with_capacity(array.len());
 
         while let Some(member) = take_bulk_string(&mut array)? {
             if member.is_empty() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
             members.push(member);
         }
