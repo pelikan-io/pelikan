@@ -47,7 +47,7 @@ impl Item {
     }
 
     /// Borrow the item value
-    pub fn value(&self) -> Value {
+    pub fn value(&self) -> Value<'_> {
         self.raw.value()
     }
 

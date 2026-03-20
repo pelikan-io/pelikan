@@ -11,6 +11,7 @@ use metriken::*;
 use pelikan_net::event::{Event, Source};
 use pelikan_net::*;
 use protocol_admin::*;
+use queues::{Queues, Waker};
 use session::{Buf, ServerSession, Session};
 use slab::Slab;
 use std::collections::VecDeque;
@@ -18,7 +19,6 @@ use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
-use switchboard::{Queues, Waker};
 use tiny_http::{Method, Request, Response};
 
 #[metric(name = "admin_request_parse")]

@@ -1,0 +1,20 @@
+[package]
+name = "queues"
+description = "Inter-thread communication via queues and wakers"
+authors = ["Brian Martin <brian@pelikan.io>"]
+
+version = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+crossbeam-queue = "0.3.12"
+pelikan-net = { workspace = true }
+rand = { workspace = true }
+rand_xoshiro = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+mio = { workspace = true, features = ["os-poll"] }

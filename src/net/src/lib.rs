@@ -6,6 +6,7 @@ mod connector;
 mod listener;
 mod stream;
 mod tcp;
+pub mod waker;
 
 #[cfg(any(feature = "boringssl", feature = "openssl"))]
 mod tls_tcp;

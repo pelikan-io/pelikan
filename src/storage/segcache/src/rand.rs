@@ -65,11 +65,12 @@ mod inner {
 
 #[cfg(not(test))]
 mod inner {
-    pub type Random = rand_chacha::ChaCha20Rng;
+    use ::rand::SeedableRng;
 
-    // A cryptographically secure RNG using the ChaCha algorithm. Appropriate
-    // for production.
+    pub type Random = rand_xoshiro::Xoshiro256PlusPlus;
+
+    // A fast PRNG appropriate for cache eviction sampling.
     pub fn rng() -> Random {
-        ::rand::make_rng()
+        rand_xoshiro::Xoshiro256PlusPlus::from_rng(&mut ::rand::rng())
     }
 }
