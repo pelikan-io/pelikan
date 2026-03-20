@@ -144,8 +144,8 @@ pub struct Admin {
     http_server: Option<tiny_http::Server>,
     /// The actual network listener for the ASCII Admin Endpoint
     listener: pelikan_net::Listener,
-    /// The drain handle for the logger
-    log_drain: LogDrain,
+    /// Kept alive to prevent the tracing-appender worker thread from exiting.
+    _log_drain: LogDrain,
     /// The maximum number of events to process per call to poll
     nevent: usize,
     /// The actual poll instantance
@@ -243,7 +243,7 @@ impl AdminBuilder {
 
     pub fn build(
         self,
-        log_drain: LogDrain,
+        _log_drain: LogDrain,
         signal_queue_rx: Receiver<Signal>,
         signal_queue_tx: Queues<Signal, ()>,
     ) -> Admin {
@@ -251,7 +251,7 @@ impl AdminBuilder {
             backlog: self.backlog,
             http_server: self.http_server,
             listener: self.listener,
-            log_drain,
+            _log_drain,
             nevent: self.nevent,
             poll: self.poll,
             sessions: self.sessions,
