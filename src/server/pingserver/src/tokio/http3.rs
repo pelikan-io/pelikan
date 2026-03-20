@@ -53,10 +53,11 @@ pub async fn run(config: Arc<Config>) {
                             match conn.accept().await {
                                 Ok(Some(resolver)) => {
                                     tokio::spawn(async move {
-                                        let (request, mut stream) = match resolver.resolve_request().await {
-                                            Ok(resolved) => resolved,
-                                            Err(_) => return,
-                                        };
+                                        let (request, mut stream) =
+                                            match resolver.resolve_request().await {
+                                                Ok(resolved) => resolved,
+                                                Err(_) => return,
+                                            };
 
                                         let start = Instant::now();
                                         let (_parts, _body) = request.into_parts();
