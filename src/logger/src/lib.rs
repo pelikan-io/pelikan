@@ -140,8 +140,7 @@ pub fn configure_logging<T: DebugConfig + KlogConfig>(config: &T) -> LogDrain {
 
         let klog_layer = tracing_subscriber::fmt::layer()
             .with_writer(
-                klog_writer
-                    .with_filter(|meta: &tracing::Metadata<'_>| meta.target() == "klog"),
+                klog_writer.with_filter(|meta: &tracing::Metadata<'_>| meta.target() == "klog"),
             )
             .with_target(false)
             .with_level(false)
