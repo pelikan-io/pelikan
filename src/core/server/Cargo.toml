@@ -24,7 +24,7 @@ protocol-common = { path = "../../protocol/common" }
 session = { path = "../../session" }
 signal-hook = {workspace = true}
 slab = { workspace = true }
-switchboard = { workspace = true }
+queues = { workspace = true }
 
 [features]
 boringssl = ["pelikan-net/boringssl"]

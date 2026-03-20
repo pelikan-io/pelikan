@@ -21,16 +21,16 @@ use core::marker::PhantomData;
 use core::time::Duration;
 use crossbeam_channel::{bounded, Receiver, Sender};
 use entrystore::EntryStore;
-use logger::Drain;
+use logger::LogDrain;
 use metriken::*;
 use pelikan_net::event::{Event, Source};
 use pelikan_net::*;
 use protocol_common::{Compose, Execute, Parse};
+use queues::{Queues, Waker};
 use session::{Buf, ServerSession, Session};
 use slab::Slab;
 use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
-use switchboard::{Queues, Waker};
 
 mod backend;
 mod frontend;

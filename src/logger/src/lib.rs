@@ -2,54 +2,63 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-//! This crate provides an asynchronous logging backend that can direct logs to
-//! one or more outputs.
+//! Logging backend for Pelikan, built on the `tracing` ecosystem.
 //!
-//! The core of this crate is the `AsyncLog` type, which is constructed using a
-//! builder that is specific to your logging needs. After building the
-//! `AsyncLog`, it can be registered as the global logger using the `start`
-//! method. You will be left with a `Box<dyn Drain>` which should be
-//! periodically flushed outside of any critical path. For example, in an admin
-//! thread or dedicated logging thread.
-//!
-//! For logging to a single file, the `LogBuilder` type can be used to construct
-//! an `AsyncLog` which has low overhead, but directs log messages to a single
-//! `Output`.
-//!
-//! A `SamplingLogBuilder` can be used to construct an `AsyncLog` which will
-//! filter the log messages using sampling before directing the log messages to
-//! a single `Output`.
-//!
-//! A `MultiLogBuilder` can be used to construct an `AsyncLog` which routes log
-//! messages based on the `target` metadata of the log `Record`. If there is an
-//! `AsyncLog` registered for that specific `target`, then the log message will
-//! be routed to that instance of `AsyncLog`. Log messages that do not match any
-//! specific target will be routed to the default `AsyncLog` that has been added
-//! to the `MultiLogBuilder`. If there is no default, messages that do not match
-//! any specific target will be simply dropped.
-//!
-//! This combination of logging types allows us to compose a logging backend
-//! which meets the application's needs. For example, you can use a local log
-//! macro to set the target to some specific category and log those messages to
-//! a file, while letting all other log messages pass to standard out. This
-//! could allow splitting command/access/audit logs from the normal logging.
-
-pub use ringlog::*;
+//! Sets up a non-blocking async writer via `tracing-appender` and bridges
+//! existing `log` crate callsites through `tracing-log`. The `klog!` macro
+//! provides callsite-sampled command logging.
 
 use config::{DebugConfig, KlogConfig};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use tracing_appender::non_blocking::WorkerGuard;
+use tracing_subscriber::fmt::writer::MakeWriterExt;
+use tracing_subscriber::prelude::*;
 
-////////////////////////////////////////////////////////////////////////////////
-// TODO(bmartin): everything below is Pelikan specific, and should be factored
-// out into a helper when we move this crate into rustcommon
-////////////////////////////////////////////////////////////////////////////////
+/// Re-export log macros so existing `#[macro_use] extern crate logger` +
+/// `error!()` etc. keep working.
+pub use log::{debug, error, info, trace, warn};
 
+/// Log a fatal error and terminate the process.
+#[macro_export]
+macro_rules! fatal {
+    () => {{
+        $crate::error!("fatal error");
+        std::process::exit(1);
+    }};
+    ($fmt:expr) => {{
+        $crate::error!($fmt);
+        std::process::exit(1);
+    }};
+    ($fmt:expr, $($arg:tt)*) => {{
+        $crate::error!($fmt, $($arg)*);
+        std::process::exit(1);
+    }};
+}
+
+/// The sample rate for klog, set during `configure_logging`.
+static KLOG_SAMPLE: AtomicUsize = AtomicUsize::new(100);
+
+/// Log a command execution at the configured sample rate.
+/// Only every Nth call actually emits a log event, avoiding format overhead
+/// on non-sampled invocations.
 #[macro_export]
 macro_rules! klog {
-    ($($arg:tt)*) => (
-        // we choose error level here because it is the lowest level and will
-        // not be filtered unless the level filter is set to `off`
-        error!(target: "klog", $($arg)*);
-    )
+    ($($arg:tt)*) => {{
+        static COUNTER: ::std::sync::atomic::AtomicUsize =
+            ::std::sync::atomic::AtomicUsize::new(0);
+        let sample = $crate::klog_sample();
+        if sample > 0
+            && COUNTER.fetch_add(1, ::std::sync::atomic::Ordering::Relaxed) % sample == 0
+        {
+            $crate::error!(target: "klog", $($arg)*);
+        }
+    }}
+}
+
+/// Returns the current klog sample rate.
+#[inline]
+pub fn klog_sample() -> usize {
+    KLOG_SAMPLE.load(Ordering::Relaxed)
 }
 
 pub trait Klog {
@@ -58,49 +67,97 @@ pub trait Klog {
     fn klog(&self, response: &Self::Response);
 }
 
-pub fn configure_logging<T: DebugConfig + KlogConfig>(config: &T) -> Box<dyn Drain> {
+/// Handle returned by `configure_logging`. Holds the worker guards for the
+/// non-blocking appenders. Logs are flushed when this is dropped.
+pub struct LogDrain {
+    _guards: Vec<WorkerGuard>,
+}
+
+/// Initialize the tracing subscriber with non-blocking file/stdout output
+/// and the tracing-log bridge for `log` crate compatibility.
+///
+/// Returns a `LogDrain` that must be kept alive for the process lifetime.
+pub fn configure_logging<T: DebugConfig + KlogConfig>(config: &T) -> LogDrain {
     let debug_config = config.debug();
-
-    let debug_output: Box<dyn Output> = if let Some(file) = debug_config.log_file() {
-        let backup = debug_config.log_backup().unwrap_or(format!("{file}.old"));
-        Box::new(
-            File::new(&file, &backup, debug_config.log_max_size())
-                .expect("failed to open debug log file"),
-        )
-    } else {
-        Box::new(Stdout::new())
-    };
-
-    let debug_log = LogBuilder::new()
-        .output(debug_output)
-        .log_queue_depth(debug_config.log_queue_depth())
-        .single_message_size(debug_config.log_single_message_size())
-        .build()
-        .expect("failed to initialize debug log");
-
     let klog_config = config.klog();
 
-    let klog = if let Some(file) = klog_config.file() {
-        let backup = klog_config.backup().unwrap_or(format!("{file}.old"));
-        let output = Box::new(
-            File::new(&file, &backup, klog_config.max_size()).expect("failed to open klog file"),
-        );
-        SamplingLogBuilder::new()
-            .output(output)
-            .format(klog_format)
-            .sample(klog_config.sample())
-            .log_queue_depth(klog_config.queue_depth())
-            .single_message_size(klog_config.single_message_size())
-            .build()
-            .expect("failed to initialize klog")
-    } else {
-        NopLogBuilder::new().build()
+    // Store the klog sample rate globally for the klog! macro
+    KLOG_SAMPLE.store(klog_config.sample(), Ordering::Relaxed);
+
+    // Map log::Level to tracing::Level
+    let level = match debug_config.log_level() {
+        log::Level::Error => tracing::Level::ERROR,
+        log::Level::Warn => tracing::Level::WARN,
+        log::Level::Info => tracing::Level::INFO,
+        log::Level::Debug => tracing::Level::DEBUG,
+        log::Level::Trace => tracing::Level::TRACE,
     };
 
-    MultiLogBuilder::new()
-        .level_filter(debug_config.log_level().to_level_filter())
-        .default(debug_log)
-        .add_target("klog", klog)
-        .build()
-        .start()
+    // Set up the debug log writer (file or stdout)
+    let (debug_writer, debug_guard) = if let Some(file) = debug_config.log_file() {
+        let dir = std::path::Path::new(&file)
+            .parent()
+            .unwrap_or(std::path::Path::new("."));
+        let filename = std::path::Path::new(&file)
+            .file_name()
+            .unwrap_or(std::ffi::OsStr::new("pelikan.log"));
+        let file_appender = tracing_appender::rolling::never(dir, filename);
+        tracing_appender::non_blocking(file_appender)
+    } else {
+        tracing_appender::non_blocking(std::io::stdout())
+    };
+
+    let mut guards = vec![debug_guard];
+
+    // Set up the klog writer if configured
+    let klog_writer_and_guard = klog_config.file().map(|file| {
+        let dir = std::path::Path::new(&file)
+            .parent()
+            .unwrap_or(std::path::Path::new("."));
+        let filename = std::path::Path::new(&file)
+            .file_name()
+            .unwrap_or(std::ffi::OsStr::new("klog"));
+        let file_appender = tracing_appender::rolling::never(dir, filename);
+        tracing_appender::non_blocking(file_appender)
+    });
+
+    if let Some((klog_writer, klog_guard)) = klog_writer_and_guard {
+        guards.push(klog_guard);
+
+        // Two-layer setup: debug log for everything, klog file for target="klog"
+        let debug_layer = tracing_subscriber::fmt::layer()
+            .with_writer(debug_writer.with_max_level(level))
+            .with_target(true)
+            .with_ansi(false);
+
+        let klog_layer = tracing_subscriber::fmt::layer()
+            .with_writer(
+                klog_writer.with_filter(|meta: &tracing::Metadata<'_>| meta.target() == "klog"),
+            )
+            .with_target(false)
+            .with_level(false)
+            .with_ansi(false);
+
+        tracing_subscriber::registry()
+            .with(debug_layer)
+            .with(klog_layer)
+            .try_init()
+            .ok();
+    } else {
+        // Single layer: debug log only
+        let debug_layer = tracing_subscriber::fmt::layer()
+            .with_writer(debug_writer.with_max_level(level))
+            .with_target(true)
+            .with_ansi(false);
+
+        tracing_subscriber::registry()
+            .with(debug_layer)
+            .try_init()
+            .ok();
+    }
+
+    // Bridge log crate events to tracing (ignore if already initialized)
+    let _ = tracing_log::LogTracer::init();
+
+    LogDrain { _guards: guards }
 }

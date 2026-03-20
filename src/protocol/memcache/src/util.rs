@@ -47,7 +47,7 @@ where
 
 // parses a string that is binary safe and less than the max key length
 pub fn key(input: &[u8], max_len: usize) -> IResult<&[u8], Option<&[u8]>> {
-    let (i, key) = take_till(|b| (b == b' ' || b == b'\r'))(input).map_err(|e| {
+    let (i, key) = take_till(|b| b == b' ' || b == b'\r')(input).map_err(|e| {
         if let nom::Err::Incomplete(_) = e {
             if input.len() > max_len {
                 nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag))

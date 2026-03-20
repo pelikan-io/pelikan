@@ -283,7 +283,7 @@ impl Segments {
     }
 
     /// Returns a mutable `Segment` view for the segment with the specified id
-    pub(crate) fn get_mut(&mut self, id: NonZeroU32) -> Result<Segment, SegmentsError> {
+    pub(crate) fn get_mut(&mut self, id: NonZeroU32) -> Result<Segment<'_>, SegmentsError> {
         let id = id.get() as usize - 1;
         if id < self.headers.len() {
             let header = self.headers.get_mut(id).unwrap();
@@ -307,7 +307,7 @@ impl Segments {
         &mut self,
         a: NonZeroU32,
         b: NonZeroU32,
-    ) -> Result<(Segment, Segment), SegmentsError> {
+    ) -> Result<(Segment<'_>, Segment<'_>), SegmentsError> {
         if a == b {
             Err(SegmentsError::BadSegmentId)
         } else {

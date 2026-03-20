@@ -30,13 +30,13 @@ members = [
     "src/storage/bloom",
     "src/storage/datatier",
     "src/storage/segcache",
+    "src/queues",
     "src/storage/types",
 ]
 
 [workspace.dependencies]
 ahash = "0.8.12"
 arrayvec = "0.7.6"
-awaken = "0.3.0"
 backtrace = "0.3.76"
 bitvec = "1.0.1"
 blake3 = "1.8.3"
@@ -49,7 +49,6 @@ clocksource = "0.8.3"
 criterion = "0.8.2"
 crossbeam-channel = "0.5.15"
 datatier = { path = "./src/storage/datatier", version = "0.1.0" }
-futures = "0.3.32"
 httparse = "1.10.1"
 libc = "0.2.183"
 log = "0.4.29"
@@ -63,20 +62,19 @@ openssl-sys = "0.9.112"
 parking_lot = "0.12.5"
 pelikan-net = { path = "./src/net", version = "0.4.1" }
 phf = "0.13.1"
-proc-macro2 = "1.0.106"
-quote = "1.0.45"
+queues = { path = "./src/queues", version = "0.3.2" }
 rand = "0.10.0"
-rand_chacha = "0.10.0"
 rand_xoshiro = "0.8.0"
-ringlog = "0.8.1"
 serde = "1.0.228"
 serde_json = "1.0.149"
 signal-hook = "0.4.3"
 slab = "0.4.12"
-switchboard = "0.4.0"
-syn = "2.0.117"
 thiserror = "2.0.18"
 tiny_http = "0.12.0"
+tracing = "0.1"
+tracing-appender = "0.2"
+tracing-log = "0.2"
+tracing-subscriber = "0.3"
 toml = "1.0.7"
 twox-hash = { version = "2.1.2", default-features = false, features = ["xxhash3_64", "alloc"] }
 urlencoding = "2.1.3"

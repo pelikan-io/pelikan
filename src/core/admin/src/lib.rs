@@ -11,6 +11,7 @@ use metriken::*;
 use pelikan_net::event::{Event, Source};
 use pelikan_net::*;
 use protocol_admin::*;
+use queues::{Queues, Waker};
 use session::{Buf, ServerSession, Session};
 use slab::Slab;
 use std::collections::VecDeque;
@@ -18,7 +19,6 @@ use std::io::{Error, ErrorKind, Result};
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::UNIX_EPOCH;
-use switchboard::{Queues, Waker};
 use tiny_http::{Method, Request, Response};
 
 #[metric(name = "admin_request_parse")]
@@ -144,8 +144,8 @@ pub struct Admin {
     http_server: Option<tiny_http::Server>,
     /// The actual network listener for the ASCII Admin Endpoint
     listener: pelikan_net::Listener,
-    /// The drain handle for the logger
-    log_drain: Box<dyn Drain>,
+    /// Kept alive to prevent the tracing-appender worker thread from exiting.
+    _log_drain: LogDrain,
     /// The maximum number of events to process per call to poll
     nevent: usize,
     /// The actual poll instantance
@@ -243,7 +243,7 @@ impl AdminBuilder {
 
     pub fn build(
         self,
-        log_drain: Box<dyn Drain>,
+        _log_drain: LogDrain,
         signal_queue_rx: Receiver<Signal>,
         signal_queue_tx: Queues<Signal, ()>,
     ) -> Admin {
@@ -251,7 +251,7 @@ impl AdminBuilder {
             backlog: self.backlog,
             http_server: self.http_server,
             listener: self.listener,
-            log_drain,
+            _log_drain,
             nevent: self.nevent,
             poll: self.poll,
             sessions: self.sessions,
@@ -598,14 +598,10 @@ impl Admin {
                         if self.signal_queue_tx.wake().is_err() {
                             fatal!("error waking threads for shutdown");
                         }
-                        let _ = self.log_drain.flush();
                         return;
                     }
                 }
             }
-
-            // flush pending log entries to log destinations
-            let _ = self.log_drain.flush();
         }
     }
 }

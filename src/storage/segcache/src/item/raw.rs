@@ -65,7 +65,7 @@ impl RawItem {
 
     /// Borrow the value
     // TODO(bmartin): should probably change this to be Option<>
-    pub(crate) fn value(&self) -> Value {
+    pub(crate) fn value(&self) -> Value<'_> {
         let bytes = unsafe {
             let ptr = self.data.add(self.value_offset());
             let len = self.vlen() as usize;
