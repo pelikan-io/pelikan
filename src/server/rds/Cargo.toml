@@ -15,7 +15,7 @@ path = "src/lib.rs"
 doc = true
 
 [[bin]]
-name = "pelikan_rds"
+name = "pelikan-rds"
 path = "src/main.rs"
 doc = false
 

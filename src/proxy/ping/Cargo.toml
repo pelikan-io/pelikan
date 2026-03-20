@@ -9,12 +9,12 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [lib]
-name = "pingproxy"
+name = "pelikan_pingproxy"
 path = "src/lib.rs"
 doc = true
 
 [[bin]]
-name = "pelikan_pingproxy_rs"
+name = "pelikan-pingproxy"
 path = "src/main.rs"
 doc = false
 

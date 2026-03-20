@@ -47,14 +47,12 @@ The framework approach allows us to develop new features and protocols quickly.
 
 Pelikan contains the following products:
 
-- `pelikan_segcache_rs`: a Memcached-like server with Segcache as the backing
+- `pelikan-segcache`: a Memcached-like server with Segcache as the backing
   storage, a TTL-centric design offering extremely high memory efficiency and
   excellent core scalability. See our [NSDI'21 paper] for design
   and evaluation details.
-- `pelikan_pingserver`: an over-engineered, production-ready ping server which
-  is useful as a tutorial and for measuring baseline RPC performance. It
-  supports multiple protocols and application transports to allow comparing the
-  performance of different protocols, transports, and implementations.
+- `pelikan-pingserver`: a minimal ping/pong server useful as a tutorial and
+  for measuring baseline RPC performance.
 - [`momento_proxy`][momento_proxy-url]: a proxy which allows existing
   applications to use Momento instead of a Memcache-compatible cache backend.
 
@@ -107,24 +105,24 @@ cargo test
 
 # Usage
 
-Using `pelikan_segcache_rs` as an example, other executables are highly similar.
+Using `pelikan-segcache` as an example, other executables are highly similar.
 
 To get info of the service, including usage format and options, run:
 
 ```sh
-target/release/pelikan_segcache_rs --help
+target/release/pelikan-segcache --help
 ```
 
 To launch the service with default settings, simply run:
 
 ```sh
-target/release/pelikan_segcache_rs
+target/release/pelikan-segcache
 ```
 
 To launch the service with the sample config file, run:
 
 ```sh
-target/release/pelikan_segcache_rs config/segcache.toml
+target/release/pelikan-segcache config/segcache.toml
 ```
 
 You should be able to try out the server using an existing memcached client,

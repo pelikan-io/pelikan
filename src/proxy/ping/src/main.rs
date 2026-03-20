@@ -9,7 +9,7 @@ use backtrace::Backtrace;
 use clap::{Arg, Command};
 use config::PingproxyConfig;
 use metriken::*;
-use pingproxy::Pingproxy;
+use pelikan_pingproxy::Pingproxy;
 
 use proxy::PERCENTILES;
 

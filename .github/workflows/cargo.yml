@@ -144,8 +144,8 @@ jobs:
         shell: bash
         run: |
           mkdir install
-          cp target/release/pelikan_pingserver install
-          cp target/release/pelikan_pingproxy_rs  install
+          cp target/release/pelikan-pingserver install
+          cp target/release/pelikan-pingproxy install
       - uses: actions/upload-artifact@v4
         if: ${{ matrix.profile == 'release' && matrix.os == 'ubuntu-latest' }}
         with:

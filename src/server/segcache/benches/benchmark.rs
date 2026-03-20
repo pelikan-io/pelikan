@@ -14,7 +14,7 @@
 
 use config::SegcacheConfig;
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use pelikan_segcache_rs::Segcache;
+use pelikan_segcache::Segcache;
 
 use std::io::{Read, Write};
 use std::net::TcpStream;
