@@ -21,7 +21,6 @@ impl AsRawFd for Stream {
         match &self.inner {
             StreamType::Tcp(s) => s.as_raw_fd(),
 
-            
             StreamType::TlsTcp(s) => s.as_raw_fd(),
         }
     }
@@ -37,7 +36,7 @@ impl Stream {
                     Interest::READABLE
                 }
             }
-            
+
             StreamType::TlsTcp(s) => s.interest(),
         }
     }
@@ -45,7 +44,7 @@ impl Stream {
     pub fn is_established(&mut self) -> bool {
         match &mut self.inner {
             StreamType::Tcp(s) => s.is_established(),
-            
+
             StreamType::TlsTcp(s) => !s.is_handshaking(),
         }
     }
@@ -53,7 +52,7 @@ impl Stream {
     pub fn is_handshaking(&self) -> bool {
         match &self.inner {
             StreamType::Tcp(_) => false,
-            
+
             StreamType::TlsTcp(s) => s.is_handshaking(),
         }
     }
@@ -61,7 +60,7 @@ impl Stream {
     pub fn do_handshake(&mut self) -> Result<()> {
         match &mut self.inner {
             StreamType::Tcp(_) => Ok(()),
-            
+
             StreamType::TlsTcp(s) => s.do_handshake(),
         }
     }
@@ -69,7 +68,7 @@ impl Stream {
     pub fn set_nodelay(&mut self, nodelay: bool) -> Result<()> {
         match &mut self.inner {
             StreamType::Tcp(s) => s.set_nodelay(nodelay),
-            
+
             StreamType::TlsTcp(s) => s.set_nodelay(nodelay),
         }
     }
@@ -78,7 +77,7 @@ impl Stream {
     pub fn shutdown(&mut self) -> Result<bool> {
         let result = match &mut self.inner {
             StreamType::Tcp(s) => s.shutdown(Shutdown::Both).map(|_| true),
-            
+
             StreamType::TlsTcp(s) => s.shutdown().map(|v| v == ShutdownResult::Received),
         };
 
@@ -106,7 +105,7 @@ impl Debug for Stream {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
         match &self.inner {
             StreamType::Tcp(s) => write!(f, "{s:?}"),
-            
+
             StreamType::TlsTcp(s) => write!(f, "{s:?}"),
         }
     }
@@ -120,7 +119,6 @@ impl From<TcpStream> for Stream {
     }
 }
 
-
 impl From<TlsTcpStream> for Stream {
     fn from(other: TlsTcpStream) -> Self {
         Self {
@@ -133,7 +131,7 @@ impl Read for Stream {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
         match &mut self.inner {
             StreamType::Tcp(s) => s.read(buf),
-            
+
             StreamType::TlsTcp(s) => s.read(buf),
         }
     }
@@ -143,7 +141,7 @@ impl Write for Stream {
     fn write(&mut self, buf: &[u8]) -> Result<usize> {
         match &mut self.inner {
             StreamType::Tcp(s) => s.write(buf),
-            
+
             StreamType::TlsTcp(s) => s.write(buf),
         }
     }
@@ -151,7 +149,7 @@ impl Write for Stream {
     fn flush(&mut self) -> Result<()> {
         match &mut self.inner {
             StreamType::Tcp(s) => s.flush(),
-            
+
             StreamType::TlsTcp(s) => s.flush(),
         }
     }
@@ -161,7 +159,7 @@ impl event::Source for Stream {
     fn register(&mut self, registry: &Registry, token: Token, interest: Interest) -> Result<()> {
         match &mut self.inner {
             StreamType::Tcp(s) => s.register(registry, token, interest),
-            
+
             StreamType::TlsTcp(s) => s.register(registry, token, interest),
         }
     }
@@ -174,7 +172,7 @@ impl event::Source for Stream {
     ) -> Result<()> {
         match &mut self.inner {
             StreamType::Tcp(s) => s.reregister(registry, token, interest),
-            
+
             StreamType::TlsTcp(s) => s.reregister(registry, token, interest),
         }
     }
@@ -182,7 +180,7 @@ impl event::Source for Stream {
     fn deregister(&mut self, registry: &mio::Registry) -> Result<()> {
         match &mut self.inner {
             StreamType::Tcp(s) => s.deregister(registry),
-            
+
             StreamType::TlsTcp(s) => s.deregister(registry),
         }
     }
@@ -193,6 +191,6 @@ impl event::Source for Stream {
 /// efficient than using a trait for dynamic dispatch.
 enum StreamType {
     Tcp(TcpStream),
-    
+
     TlsTcp(TlsTcpStream),
 }

@@ -10,7 +10,7 @@ pub struct Connector {
 
 enum ConnectorType {
     Tcp(TcpConnector),
-    
+
     TlsTcp(TlsTcpConnector),
 }
 
@@ -19,7 +19,7 @@ impl Connector {
     pub fn connect<A: ToSocketAddrs>(&self, addr: A) -> Result<Stream> {
         match &self.inner {
             ConnectorType::Tcp(connector) => Ok(Stream::from(connector.connect(addr)?)),
-            
+
             ConnectorType::TlsTcp(connector) => Ok(Stream::from(connector.connect(addr)?)),
         }
     }
@@ -32,7 +32,6 @@ impl From<TcpConnector> for Connector {
         }
     }
 }
-
 
 impl From<TlsTcpConnector> for Connector {
     fn from(other: TlsTcpConnector) -> Self {

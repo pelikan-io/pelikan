@@ -96,9 +96,7 @@ impl TlsTcpStream {
 
         match result {
             Ok(_) => Err(Error::from(ErrorKind::WouldBlock)),
-            Err(e) if e.kind() == ErrorKind::WouldBlock => {
-                Err(Error::from(ErrorKind::WouldBlock))
-            }
+            Err(e) if e.kind() == ErrorKind::WouldBlock => Err(Error::from(ErrorKind::WouldBlock)),
             Err(e) => {
                 metric! {
                     STREAM_HANDSHAKE.increment();
@@ -289,9 +287,7 @@ impl TlsTcpAcceptor {
         let config = ServerConfig::builder()
             .with_no_client_auth()
             .with_single_cert(certs, key)
-            .map_err(|e| {
-                Error::other(format!("failed to build TLS config: {}", e))
-            })?;
+            .map_err(|e| Error::other(format!("failed to build TLS config: {}", e)))?;
 
         Ok(TlsTcpAcceptor {
             config: Arc::new(config),
@@ -299,9 +295,8 @@ impl TlsTcpAcceptor {
     }
 
     pub fn accept(&self, stream: TcpStream) -> Result<TlsTcpStream> {
-        let conn = ServerConnection::new(Arc::clone(&self.config)).map_err(|e| {
-            Error::other(format!("failed to create server connection: {}", e))
-        })?;
+        let conn = ServerConnection::new(Arc::clone(&self.config))
+            .map_err(|e| Error::other(format!("failed to create server connection: {}", e)))?;
 
         let mut tls_stream = StreamOwned::new(conn, stream);
 
@@ -396,31 +391,24 @@ impl TlsTcpConnector {
             let ca_certs: Vec<CertificateDer<'static>> = rustls_pemfile::certs(&mut ca_reader)
                 .collect::<std::result::Result<Vec<_>, _>>()
                 .map_err(|e| {
-                    Error::other(format!(
-                            "failed to parse CA file: {}: {}",
-                            f.display(),
-                            e
-                        ))
+                    Error::other(format!("failed to parse CA file: {}: {}", f.display(), e))
                 })?;
             for cert in ca_certs {
-                root_store.add(cert).map_err(|e| {
-                    Error::other(format!("failed to add CA certificate: {}", e))
-                })?;
+                root_store
+                    .add(cert)
+                    .map_err(|e| Error::other(format!("failed to add CA certificate: {}", e)))?;
             }
         }
 
         let config_builder = rustls::ClientConfig::builder().with_root_certificates(root_store);
 
         let config = if builder.private_key_file.is_some() {
-            let certs =
-                load_certs(&builder.certificate_chain_file, &builder.certificate_file)?;
+            let certs = load_certs(&builder.certificate_chain_file, &builder.certificate_file)?;
             let key = load_private_key(&builder.private_key_file)?;
 
             config_builder
                 .with_client_auth_cert(certs, key)
-                .map_err(|e| {
-                    Error::other(format!("failed to build TLS config: {}", e))
-                })?
+                .map_err(|e| Error::other(format!("failed to build TLS config: {}", e)))?
         } else {
             config_builder.with_no_client_auth()
         };
@@ -444,9 +432,7 @@ impl TlsTcpConnector {
 
         let server_name = if let Some(name) = &self.server_name {
             ServerName::try_from(name.as_str())
-                .map_err(|e| {
-                    Error::other(format!("invalid server name: {}", e))
-                })?
+                .map_err(|e| Error::other(format!("invalid server name: {}", e)))?
                 .to_owned()
         } else {
             let ip = addrs
@@ -456,10 +442,8 @@ impl TlsTcpConnector {
             ServerName::IpAddress(ip.into())
         };
 
-        let conn =
-            ClientConnection::new(Arc::clone(&self.config), server_name).map_err(|e| {
-                Error::other(format!("failed to create client connection: {}", e))
-            })?;
+        let conn = ClientConnection::new(Arc::clone(&self.config), server_name)
+            .map_err(|e| Error::other(format!("failed to create client connection: {}", e)))?;
 
         let mut tls_stream = StreamOwned::new(conn, stream);
 
@@ -498,7 +482,9 @@ fn load_certs(
         }
         (Some(chain), None) => read_certs_from_file(chain),
         (None, Some(cert)) => read_certs_from_file(cert),
-        (None, None) => Err(Error::other("no certificate file or certificate chain file provided")),
+        (None, None) => Err(Error::other(
+            "no certificate file or certificate chain file provided",
+        )),
     }
 }
 
@@ -560,7 +546,7 @@ fn load_private_key(key_file: &Option<PathBuf>) -> Result<PrivateKeyDer<'static>
         }
     }
 
-    keys.into_iter().next().ok_or_else(|| {
-        Error::other(format!("no private key found in file: {}", f.display()))
-    })
+    keys.into_iter()
+        .next()
+        .ok_or_else(|| Error::other(format!("no private key found in file: {}", f.display())))
 }

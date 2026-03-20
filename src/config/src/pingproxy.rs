@@ -50,7 +50,7 @@ pub struct PingproxyConfig {
 
     #[serde(default)]
     time: Time,
-    
+
     #[serde(default)]
     tls: Tls,
 
@@ -127,7 +127,6 @@ impl TimeConfig for PingproxyConfig {
     }
 }
 
-
 impl TlsConfig for PingproxyConfig {
     fn tls(&self) -> &Tls {
         &self.tls
@@ -182,7 +181,7 @@ impl Default for PingproxyConfig {
             klog: Default::default(),
             sockio: Default::default(),
             tcp: Default::default(),
-            
+
             tls: Default::default(),
         }
     }

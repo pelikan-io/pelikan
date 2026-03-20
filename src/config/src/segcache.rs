@@ -46,7 +46,7 @@ pub struct SegcacheConfig {
     worker: Worker,
     #[serde(default)]
     time: Time,
-    
+
     #[serde(default)]
     tls: Tls,
     #[serde(default)]
@@ -158,7 +158,6 @@ impl TimeConfig for SegcacheConfig {
     }
 }
 
-
 impl TlsConfig for SegcacheConfig {
     fn tls(&self) -> &Tls {
         &self.tls
@@ -194,7 +193,7 @@ impl Default for SegcacheConfig {
             klog: Default::default(),
             sockio: Default::default(),
             tcp: Default::default(),
-            
+
             tls: Default::default(),
         }
     }

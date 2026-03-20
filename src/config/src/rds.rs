@@ -46,7 +46,7 @@ pub struct RdsConfig {
     worker: Worker,
     #[serde(default)]
     time: Time,
-    
+
     #[serde(default)]
     tls: Tls,
     #[serde(default)]
@@ -158,7 +158,6 @@ impl TimeConfig for RdsConfig {
     }
 }
 
-
 impl TlsConfig for RdsConfig {
     fn tls(&self) -> &Tls {
         &self.tls
@@ -194,7 +193,7 @@ impl Default for RdsConfig {
             klog: Default::default(),
             sockio: Default::default(),
             tcp: Default::default(),
-            
+
             tls: Default::default(),
         }
     }
