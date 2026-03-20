@@ -35,39 +35,22 @@ impl TryFrom<Message> for SortedSetUnionStore {
     fn try_from(other: Message) -> Result<Self, Error> {
         let array = match other {
             Message::Array(array) => array,
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    "malformed command, empty array",
-                ))
-            }
+            _ => return Err(Error::other("malformed command, empty array")),
         };
         if array.inner.is_none() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                "malformed command, inner array is none",
-            ));
+            return Err(Error::other("malformed command, inner array is none"));
         }
 
         let mut array = array.inner.unwrap();
         let _command = take_bulk_string(&mut array)?;
 
-        let destination_key = take_bulk_string(&mut array)?.ok_or_else(|| {
-            Error::new(
-                ErrorKind::Other,
-                "malformed command, invalid sorted set name",
-            )
-        })?;
+        let destination_key = take_bulk_string(&mut array)?
+            .ok_or_else(|| Error::other("malformed command, invalid sorted set name"))?;
 
-        let num_keys = take_bulk_string_as_u64(&mut array)?.ok_or_else(|| {
-            Error::new(
-                ErrorKind::Other,
-                "malformed command, invalid number of keys",
-            )
-        })?;
+        let num_keys = take_bulk_string_as_u64(&mut array)?
+            .ok_or_else(|| Error::other("malformed command, invalid number of keys"))?;
         if num_keys == 0 {
-            return Err(Error::new(
-                ErrorKind::Other,
+            return Err(Error::other(
                 "malformed command, number of keys cannot be 0",
             ));
         }
@@ -75,9 +58,8 @@ impl TryFrom<Message> for SortedSetUnionStore {
         // Collect num_keys source keys
         let mut source_keys = Vec::new();
         for _ in 0..num_keys {
-            let key = take_bulk_string(&mut array)?.ok_or_else(|| {
-                Error::new(ErrorKind::Other, "malformed command, invalid source key")
-            })?;
+            let key = take_bulk_string(&mut array)?
+                .ok_or_else(|| Error::other("malformed command, invalid source key"))?;
             source_keys.push(key);
         }
 
@@ -85,8 +67,7 @@ impl TryFrom<Message> for SortedSetUnionStore {
         let mut remaining_args = vec![];
         while let Some(arg) = take_bulk_string(&mut array)? {
             if arg.is_empty() {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     "malformed command, empty string for optional argument",
                 ));
             }
@@ -98,15 +79,13 @@ impl TryFrom<Message> for SortedSetUnionStore {
         let aggregate_function =
             if let Some(index) = remaining_args.iter().position(|arg| &**arg == b"AGGREGATE") {
                 if index + 1 >= remaining_args.len() {
-                    return Err(Error::new(
-                        ErrorKind::Other,
+                    return Err(Error::other(
                         "malformed command, no aggregate function provided after AGGREGATE",
                     ));
                 }
                 // Make sure there's either a WEIGHTS header or the end of the array after the AGGREGATE args.
                 if index + 2 < remaining_args.len() && &*remaining_args[index + 2] != b"WEIGHTS" {
-                    return Err(Error::new(
-                    ErrorKind::Other,
+                    return Err(Error::other(
                     "malformed command, expected WEIGHTS header or end of array after AGGREGATE",
                 ));
                 }
@@ -117,8 +96,7 @@ impl TryFrom<Message> for SortedSetUnionStore {
                     b"MIN" => Some(AggregateFunction::Min),
                     b"MAX" => Some(AggregateFunction::Max),
                     _ => {
-                        return Err(Error::new(
-                            ErrorKind::Other,
+                        return Err(Error::other(
                             "malformed command, invalid aggregate function",
                         ))
                     }
@@ -139,10 +117,9 @@ impl TryFrom<Message> for SortedSetUnionStore {
                     weight_args.push(weight_arg.clone());
                 }
                 println!("\n===weight_args length: {:?}", weight_args.len());
-                println!("\n===weight_args: {:?}", weight_args);
+                println!("\n===weight_args: {weight_args:?}");
                 if weight_args.len() != source_keys.len() {
-                    return Err(Error::new(
-                        ErrorKind::Other,
+                    return Err(Error::other(
                         "malformed command, number of weights must match number of source sets",
                     ));
                 }

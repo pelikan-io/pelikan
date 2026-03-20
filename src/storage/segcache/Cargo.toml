@@ -34,10 +34,10 @@ clocksource = { workspace = true }
 datatier = { workspace = true }
 log = { workspace = true }
 metriken = { workspace = true, optional = true }
-rand = { workspace = true , features = ["small_rng", "getrandom"] }
+rand = { workspace = true, features = ["sys_rng"] }
 rand_chacha = { workspace = true }
 rand_xoshiro = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-criterion = "0.5.1"
+criterion = { workspace = true }

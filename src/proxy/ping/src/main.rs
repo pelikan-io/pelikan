@@ -16,7 +16,7 @@ use proxy::PERCENTILES;
 fn main() {
     // custom panic hook to terminate whole process after unwinding
     std::panic::set_hook(Box::new(|s| {
-        error!("{}", s);
+        error!("{s}");
         println!("{:?}", Backtrace::new());
         std::process::exit(101);
     }));

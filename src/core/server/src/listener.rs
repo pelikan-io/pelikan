@@ -82,8 +82,8 @@ impl ListenerBuilder {
         let config = config.server();
 
         let addr = config.socket_addr().map_err(|e| {
-            error!("{}", e);
-            std::io::Error::new(std::io::ErrorKind::Other, "Bad listen address")
+            error!("{e}");
+            std::io::Error::other("Bad listen address")
         })?;
 
         let tcp_listener = TcpListener::bind(addr)?;
@@ -192,17 +192,17 @@ impl Listener {
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         // read from session to buffer
         match session.fill() {
             Ok(0) => {
                 // zero-length reads indicate remote side has closed connection
-                trace!("hangup for session: {:?}", session);
-                Err(Error::new(ErrorKind::Other, "client hangup"))
+                trace!("hangup for session: {session:?}");
+                Err(Error::other("client hangup"))
             }
             Ok(bytes) => {
-                trace!("read {} bytes for session: {:?}", bytes, session);
+                trace!("read {bytes} bytes for session: {session:?}");
                 Ok(())
             }
             Err(e) => {
@@ -229,7 +229,7 @@ impl Listener {
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         session.do_handshake()
     }

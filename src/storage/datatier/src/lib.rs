@@ -6,7 +6,7 @@ use blake3::Hash;
 // use clocksource::{Instant, Nanoseconds, Seconds, UnixInstant};
 use core::ops::Range;
 use std::fs::{File, OpenOptions};
-use std::io::{Error, ErrorKind, Read, Seek, SeekFrom, Write};
+use std::io::{Error, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 #[cfg(target_os = "linux")]
@@ -137,10 +137,7 @@ impl Header {
 
     fn check_version(&self) -> Result<(), std::io::Error> {
         if self.version != VERSION {
-            Err(Error::new(
-                ErrorKind::Other,
-                "file has incompatible version",
-            ))
+            Err(Error::other("file has incompatible version"))
         } else {
             Ok(())
         }
@@ -150,7 +147,7 @@ impl Header {
         if self.magic[0..8] == MAGIC[0..8] {
             Ok(())
         } else {
-            Err(Error::new(ErrorKind::Other, "header is not recognized"))
+            Err(Error::other("header is not recognized"))
         }
     }
 
@@ -201,7 +198,7 @@ impl MmapFile {
 
         // make sure the file size matches the expected size
         if file.metadata()?.len() != total_size as u64 {
-            return Err(Error::new(ErrorKind::Other, "filesize mismatch"));
+            return Err(Error::other("filesize mismatch"));
         }
 
         // data resides after a small header
@@ -225,7 +222,7 @@ impl MmapFile {
 
         // check the user version
         if header.user_version() != user_version {
-            return Err(Error::new(ErrorKind::Other, "user version mismatch"));
+            return Err(Error::other("user version mismatch"));
         }
 
         // zero out the checksum in the header copy
@@ -246,7 +243,7 @@ impl MmapFile {
 
         // compare the stored checksum in the file to the calculated checksum
         if mmap[0..32] != hash.as_bytes()[0..32] {
-            return Err(Error::new(ErrorKind::Other, "checksum mismatch"));
+            return Err(Error::other("checksum mismatch"));
         }
 
         // return the loaded datapool
@@ -451,7 +448,7 @@ impl FileBackedMemory {
 
         // make sure the file size matches the expected size
         if file.metadata()?.len() != file_total_size.end as u64 {
-            return Err(Error::new(ErrorKind::Other, "filesize mismatch"));
+            return Err(Error::other("filesize mismatch"));
         }
 
         // calculate the page range for the data region
@@ -486,7 +483,7 @@ impl FileBackedMemory {
 
         // check the user version
         if header.user_version() != user_version {
-            return Err(Error::new(ErrorKind::Other, "user version mismatch"));
+            return Err(Error::other("user version mismatch"));
         }
 
         // copy the checksum out of the header and zero it in the header
@@ -522,7 +519,7 @@ impl FileBackedMemory {
 
         // compare the checksum agaianst what's in the header
         if file_checksum[0..32] != hash.as_bytes()[0..32] {
-            return Err(Error::new(ErrorKind::Other, "checksum mismatch"));
+            return Err(Error::other("checksum mismatch"));
         }
 
         // return the loaded datapool

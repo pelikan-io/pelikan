@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::sync::Arc;
 
 #[metric(name = "hincrby")]
@@ -25,21 +25,20 @@ impl TryFrom<Message> for HashIncrBy {
     fn try_from(other: Message) -> Result<Self, Error> {
         let array = match other {
             Message::Array(array) => array,
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         let mut array = array.inner.unwrap();
         if array.len() != 4 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array)?;
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
-        let field = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed content"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
+        let field =
+            take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed content"))?;
         let increment = take_bulk_string_as_i64(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+            .ok_or_else(|| Error::other("malformed command"))?;
 
         Ok(Self {
             key,

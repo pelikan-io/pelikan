@@ -100,7 +100,7 @@ where
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         // fill the session
         map_result(session.fill())?;
@@ -112,7 +112,7 @@ where
                 PROCESS_REQ.increment();
                 if response.should_hangup() {
                     let _ = session.send(response);
-                    return Err(Error::new(ErrorKind::Other, "should hangup"));
+                    return Err(Error::other("should hangup"));
                 }
                 request.klog(&response);
                 match session.send(response) {
@@ -135,7 +135,7 @@ where
                                 .reregister(session, token, interest)
                                 .is_err()
                             {
-                                return Err(Error::new(ErrorKind::Other, "failed to reregister"));
+                                return Err(Error::other("failed to reregister"));
                             }
                         }
 
@@ -170,7 +170,7 @@ where
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         match session.flush() {
             Ok(_) => Ok(()),

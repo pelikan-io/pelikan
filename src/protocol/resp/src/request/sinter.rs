@@ -24,12 +24,12 @@ impl TryFrom<Message> for SetIntersect {
     fn try_from(value: Message) -> Result<Self, Self::Error> {
         let array = match value {
             Message::Array(array) => array,
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         let mut array = array.inner.unwrap();
         if array.len() < 2 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array)?;
@@ -37,8 +37,7 @@ impl TryFrom<Message> for SetIntersect {
         let mut keys = Vec::with_capacity(array.len());
         while !array.is_empty() {
             keys.push(
-                take_bulk_string(&mut array)?
-                    .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?,
+                take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?,
             );
         }
 

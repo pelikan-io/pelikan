@@ -33,10 +33,10 @@ use std::marker::PhantomData;
 
 use bitvec::prelude::BitVec;
 use metrohash::MetroHash64;
-use twox_hash::Xxh3Hash64;
+use twox_hash::XxHash3_64;
 
 fn xxh3hash<T: Hash + ?Sized>(value: &T, seed: u64) -> u64 {
-    let mut hasher = Xxh3Hash64::with_seed(seed);
+    let mut hasher = XxHash3_64::with_seed(seed);
     value.hash(&mut hasher);
     hasher.finish()
 }

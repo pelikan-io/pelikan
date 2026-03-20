@@ -96,7 +96,7 @@ fn main() {
 
     // load config from file
     let config = if let Some(file) = matches.get_one::<String>("CONFIG") {
-        debug!("loading config: {}", file);
+        debug!("loading config: {file}");
         match Config::load(file) {
             Ok(c) => c,
             Err(error) => {

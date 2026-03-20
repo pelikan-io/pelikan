@@ -119,7 +119,7 @@ where
                 for message in messages.drain(..) {
                     let sender = message.sender();
                     let (request, token) = message.into_inner();
-                    trace!("handling request from worker: {}", sender);
+                    trace!("handling request from worker: {sender}");
                     let response = self.storage.execute(&request);
                     PROCESS_REQ.increment();
                     let mut message = (request, response, token);

@@ -32,25 +32,24 @@ impl TryFrom<Message> for SortedSetRank {
     fn try_from(other: Message) -> Result<Self, Error> {
         let array = match other {
             Message::Array(array) => array,
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         if array.inner.is_none() {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let mut array = array.inner.unwrap();
 
         if !(3..=4).contains(&array.len()) {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let with_score = array.len() == 4;
         let _command = take_bulk_string(&mut array)?;
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
-        let member = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
+        let member =
+            take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
         Ok(Self {
             key,

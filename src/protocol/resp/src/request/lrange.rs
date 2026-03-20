@@ -23,21 +23,20 @@ impl TryFrom<Message> for ListRange {
     fn try_from(value: Message) -> Result<Self, Self::Error> {
         let mut array = match value {
             Message::Array(array) => array.inner.unwrap(),
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         if array.len() != 4 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array);
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
         let start = take_bulk_string_as_i64(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+            .ok_or_else(|| Error::other("malformed command"))?;
         let stop = take_bulk_string_as_i64(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+            .ok_or_else(|| Error::other("malformed command"))?;
 
         Ok(Self { key, start, stop })
     }

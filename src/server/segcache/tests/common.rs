@@ -208,7 +208,7 @@ pub fn tests() {
 // opens a new connection, operating on request + response pairs from the
 // provided data.
 fn test(name: &str, data: &[(&str, Option<&str>)]) {
-    info!("testing: {}", name);
+    info!("testing: {name}");
     debug!("connecting to server");
     let mut stream = TcpStream::connect("127.0.0.1:12321").expect("failed to connect");
     stream
@@ -287,7 +287,7 @@ pub fn admin_tests() {
 
 // opens a new connection to the admin port, sends a request, and checks the response.
 fn admin_test(name: &str, data: &[(&str, Option<&str>)]) {
-    info!("testing: {}", name);
+    info!("testing: {name}");
     debug!("connecting to server");
     let mut stream = TcpStream::connect("127.0.0.1:9999").expect("failed to connect");
     stream

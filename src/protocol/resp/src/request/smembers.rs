@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::sync::Arc;
 
 #[metric(name = "smembers")]
@@ -23,17 +23,16 @@ impl TryFrom<Message> for SetMembers {
     fn try_from(value: Message) -> Result<Self, Error> {
         let array = match value {
             Message::Array(array) => array,
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         let mut array = array.inner.unwrap();
         if array.len() < 2 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array)?;
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
         Ok(Self { key })
     }

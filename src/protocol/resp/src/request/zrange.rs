@@ -53,49 +53,28 @@ impl TryFrom<Message> for SortedSetRange {
     fn try_from(other: Message) -> Result<Self, Error> {
         let array = match other {
             Message::Array(array) => array,
-            _ => {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    "malformed command, empty array",
-                ))
-            }
+            _ => return Err(Error::other("malformed command, empty array")),
         };
         if array.inner.is_none() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                "malformed command, inner array is none",
-            ));
+            return Err(Error::other("malformed command, inner array is none"));
         }
 
         let mut array = array.inner.unwrap();
         let _command = take_bulk_string(&mut array)?;
 
-        let key = take_bulk_string(&mut array)?.ok_or_else(|| {
-            Error::new(
-                ErrorKind::Other,
-                "malformed command, invalid sorted set name",
-            )
-        })?;
-        let start = take_bulk_string(&mut array)?.ok_or_else(|| {
-            Error::new(
-                ErrorKind::Other,
-                "malformed command, unable to extract start value",
-            )
-        })?;
-        let stop = take_bulk_string(&mut array)?.ok_or_else(|| {
-            Error::new(
-                ErrorKind::Other,
-                "malformed command, unable to extract stop value",
-            )
-        })?;
+        let key = take_bulk_string(&mut array)?
+            .ok_or_else(|| Error::other("malformed command, invalid sorted set name"))?;
+        let start = take_bulk_string(&mut array)?
+            .ok_or_else(|| Error::other("malformed command, unable to extract start value"))?;
+        let stop = take_bulk_string(&mut array)?
+            .ok_or_else(|| Error::other("malformed command, unable to extract stop value"))?;
 
         // Parse for any remaining optional arguments
         let mut range_type = RangeType::ByIndex;
         let mut optional_args = SortedSetRangeOptionalArguments::default();
         while let Some(arg) = take_bulk_string(&mut array)? {
             if arg.is_empty() {
-                return Err(Error::new(
-                    ErrorKind::Other,
+                return Err(Error::other(
                     "malformed command, empty string for optional argument",
                 ));
             }
@@ -103,13 +82,9 @@ impl TryFrom<Message> for SortedSetRange {
             match &*arg {
                 b"BYSCORE" => {
                     if range_type == RangeType::ByScore {
-                        return Err(Error::new(
-                            ErrorKind::Other,
-                            "malformed command, BYSCORE already provided",
-                        ));
+                        return Err(Error::other("malformed command, BYSCORE already provided"));
                     } else if range_type == RangeType::ByLex {
-                        return Err(Error::new(
-                            ErrorKind::Other,
+                        return Err(Error::other(
                             "malformed command, BYSCORE and BYLEX cannot be provided together",
                         ));
                     } else {
@@ -118,15 +93,11 @@ impl TryFrom<Message> for SortedSetRange {
                 }
                 b"BYLEX" => {
                     if range_type == RangeType::ByScore {
-                        return Err(Error::new(
-                            ErrorKind::Other,
+                        return Err(Error::other(
                             "malformed command, BYSCORE and BYLEX cannot be provided together",
                         ));
                     } else if range_type == RangeType::ByLex {
-                        return Err(Error::new(
-                            ErrorKind::Other,
-                            "malformed command, BYLEX already provided",
-                        ));
+                        return Err(Error::other("malformed command, BYLEX already provided"));
                     } else {
                         range_type = RangeType::ByLex;
                     }
@@ -134,27 +105,16 @@ impl TryFrom<Message> for SortedSetRange {
                 b"REV" => optional_args.reversed = Some(true),
                 b"LIMIT" => {
                     let offset = take_bulk_string_as_u64(&mut array)?.ok_or_else(|| {
-                        Error::new(
-                            ErrorKind::Other,
-                            "malformed command, unable to extract offset",
-                        )
+                        Error::other("malformed command, unable to extract offset")
                     })?;
                     optional_args.offset = Some(offset);
                     let count = take_bulk_string_as_i64(&mut array)?.ok_or_else(|| {
-                        Error::new(
-                            ErrorKind::Other,
-                            "malformed command, unable to extract count",
-                        )
+                        Error::other("malformed command, unable to extract count")
                     })?;
                     optional_args.count = Some(count);
                 }
                 b"WITHSCORES" => optional_args.with_scores = Some(true),
-                _ => {
-                    return Err(Error::new(
-                        ErrorKind::Other,
-                        "malformed command, invalid optional argument",
-                    ))
-                }
+                _ => return Err(Error::other("malformed command, invalid optional argument")),
             }
         }
 
@@ -165,16 +125,14 @@ impl TryFrom<Message> for SortedSetRange {
             && optional_args.count.is_some()
             && range_type == RangeType::ByIndex
         {
-            return Err(Error::new(
-                ErrorKind::Other,
+            return Err(Error::other(
                 "malformed command, LIMIT can only be used with BYSCORE or BYLEX",
             ));
         }
 
         // WITHSCORES cannot be used with BYLEX
         if optional_args.with_scores.is_some() && range_type == RangeType::ByLex {
-            return Err(Error::new(
-                ErrorKind::Other,
+            return Err(Error::other(
                 "malformed command, WITHSCORES cannot be used with BYLEX",
             ));
         }

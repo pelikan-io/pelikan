@@ -105,12 +105,7 @@ impl RequestHeader {
 
         let total_body_len: u32 = (key_len as u64 + value_len as u64 + EXTRAS_LEN as u64)
             .try_into()
-            .map_err(|_e| {
-                std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "request body too large for binary protocol",
-                )
-            })?;
+            .map_err(|_e| std::io::Error::other("request body too large for binary protocol"))?;
 
         let mut header = Self::with_opcode(Opcode::Set);
         header.key_len = key_len;
