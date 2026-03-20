@@ -9,17 +9,12 @@ use serde::{Deserialize, Serialize};
 
 use std::io::Read;
 
-#[derive(Copy, Clone, Serialize, Deserialize, Debug)]
+#[derive(Copy, Clone, Default, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum Protocol {
+    #[default]
     Memcache,
     Resp,
-}
-
-impl Default for Protocol {
-    fn default() -> Self {
-        Self::Memcache
-    }
 }
 
 // support for memcache flags is on by default

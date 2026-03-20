@@ -17,6 +17,7 @@ pub enum Implementation {
     Openssl,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for Implementation {
     fn default() -> Self {
         #[cfg(all(not(feature = "boringssl"), feature = "openssl"))]
