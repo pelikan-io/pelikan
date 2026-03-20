@@ -10,14 +10,8 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-common = { path = "../common", default-features = false }
+common = { path = "../common" }
 log = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 toml = { workspace = true }
-
-[features]
-default = ["rustls"]
-rustls = ["common/rustls"]
-boringssl = ["common/boringssl"]
-openssl = ["common/openssl"]

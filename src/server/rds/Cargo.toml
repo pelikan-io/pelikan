@@ -46,7 +46,7 @@ entrystore = { path = "../../entrystore" }
 logger = { path = "../../logger" }
 metriken = { workspace = true }
 protocol-resp = { path = "../../protocol/resp" }
-server = { path = "../../core/server", features = ["rustls"] }
+server = { path = "../../core/server" }
 
 [dev-dependencies]
 criterion = { workspace = true }

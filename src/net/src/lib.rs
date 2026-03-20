@@ -8,15 +8,12 @@ mod stream;
 mod tcp;
 pub mod waker;
 
-#[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
 mod tls_tcp;
 
 pub use connector::*;
 pub use listener::*;
 pub use stream::*;
 pub use tcp::*;
-
-#[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
 pub use tls_tcp::*;
 
 pub mod event {
@@ -45,7 +42,7 @@ pub(crate) use metric;
 
 use core::fmt::Debug;
 use core::ops::Deref;
-use std::io::{Error, ErrorKind, Read, Write};
+use std::io::{Error, Read, Write};
 use std::net::{SocketAddr, ToSocketAddrs};
 
 type Result<T> = std::io::Result<T>;

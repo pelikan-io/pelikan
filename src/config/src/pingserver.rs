@@ -46,7 +46,7 @@ pub struct PingserverConfig {
     worker: Worker,
     #[serde(default)]
     time: Time,
-    #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
+    
     #[serde(default)]
     tls: Tls,
 
@@ -111,7 +111,7 @@ impl TimeConfig for PingserverConfig {
     }
 }
 
-#[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
+
 impl TlsConfig for PingserverConfig {
     fn tls(&self) -> &Tls {
         &self.tls
@@ -174,7 +174,7 @@ impl Default for PingserverConfig {
             klog: Default::default(),
             sockio: Default::default(),
             tcp: Default::default(),
-            #[cfg(any(feature = "rustls", feature = "boringssl", feature = "openssl"))]
+            
             tls: Default::default(),
         }
     }
