@@ -354,9 +354,9 @@ fn parse_sorted_set_score(score: &[u8]) -> Result<f64, std::io::Error> {
         .map_err(|_| std::io::Error::other("score string is not a f64"))
         .map(Some)?
     {
-        return Ok(float);
+        Ok(float)
     } else {
-        return Err(std::io::Error::other("score string is not a valid f64"));
+        Err(std::io::Error::other("score string is not a valid f64"))
     }
 }
 
