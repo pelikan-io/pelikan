@@ -1186,6 +1186,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pelikan-rds"
+version = "0.3.2"
+dependencies = [
+ "backtrace",
+ "clap",
+ "common",
+ "config",
+ "criterion",
+ "entrystore",
+ "logger",
+ "metriken",
+ "protocol-resp",
+ "server",
+]
+
+[[package]]
 name = "pelikan-segcache"
 version = "0.3.2"
 dependencies = [
@@ -1575,22 +1591,6 @@ checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
-]
-
-[[package]]
-name = "rds"
-version = "0.3.2"
-dependencies = [
- "backtrace",
- "clap",
- "common",
- "config",
- "criterion",
- "entrystore",
- "logger",
- "metriken",
- "protocol-resp",
- "server",
 ]
 
 [[package]]
