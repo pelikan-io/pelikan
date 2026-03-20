@@ -634,7 +634,7 @@ impl Segments {
                 .unwrap();
             segment.check_magic();
             let count = segment.live_items();
-            debug!("{} items in segment {} segment: {:?}", count, id, segment);
+            debug!("{count} items in segment {id} segment: {segment:?}");
             total += segment.live_items() as usize;
         }
         total

@@ -3,7 +3,8 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use bloom::BloomFilter;
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{criterion_group, criterion_main, Criterion};
+use std::hint::black_box;
 
 const MB: usize = 1024 * 1024;
 

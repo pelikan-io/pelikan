@@ -161,7 +161,7 @@ mod tests {
                 assert_eq!(get.opaque, Some(0));
             }
             Ok((_consumed, request)) => {
-                panic!("wrong request type: {:?}", request);
+                panic!("wrong request type: {request:?}");
             }
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::WouldBlock {
@@ -197,7 +197,7 @@ mod tests {
                 assert_eq!(get.opaque, Some(0xDECAFBAD));
             }
             Ok((_consumed, request)) => {
-                panic!("wrong request type: {:?}", request);
+                panic!("wrong request type: {request:?}");
             }
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::WouldBlock {
@@ -257,7 +257,7 @@ mod tests {
                 assert_eq!(get.opaque, Some(0));
             }
             Ok((_consumed, request)) => {
-                panic!("wrong request type: {:?}", request);
+                panic!("wrong request type: {request:?}");
             }
             Err(e) => {
                 if e.kind() == std::io::ErrorKind::WouldBlock {

@@ -5,6 +5,7 @@
 use super::*;
 use crate::hashtable::HashBucket;
 use crate::item::ITEM_HDR_SIZE;
+use ::rand::Rng;
 use core::num::NonZeroU32;
 
 use std::time::Duration;
