@@ -53,8 +53,6 @@ Pelikan contains the following products:
   and evaluation details.
 - `pelikan-pingserver`: a minimal ping/pong server useful as a tutorial and
   for measuring baseline RPC performance.
-- [`momento_proxy`][momento_proxy-url]: a proxy which allows existing
-  applications to use Momento instead of a Memcache-compatible cache backend.
 
 ## Legacy
 
@@ -78,9 +76,6 @@ is not actively worked on. We do not recommend it for production deployments.
 ## Requirement
 
 - Rust [stable toolchain](https://www.rust-lang.org/learn/get-started)
-- (to build `momento_proxy`) Follow [the gRPC instructions here][grpc-url]
-  to install Protocol Buffer Compiler. Alternatively, you can skip the
-  `momento_proxy` package.
 - C toolchain: `llvm/clang (>= 7.0)`
 - Build tools: `cmake (>= 3.2)`
 
@@ -93,8 +88,6 @@ necessary if you are building legacy Pelikan which is written in C.
 git clone https://github.com/pelikan-io/pelikan
 cd pelikan
 cargo build --release
-# to skip momento_proxy, run:
-# cargo build --workspace --exclude momento_proxy --release
 ```
 
 ## Tests
@@ -201,9 +194,7 @@ This software is licensed under the Apache 2.0 license, see [LICENSE](LICENSE) f
 [check-linker-bug]: https://sourceforge.net/p/check/mailman/message/32835594/
 [license-badge]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
 [license-url]: https://github.com/pelikan-io/pelikan/blob/main/LICENSE
-[momento_proxy-url]: src/proxy/momento/README.md
 [nsdi'21 paper]: https://www.usenix.org/conference/nsdi21/presentation/yang-juncheng
 [zulip-badge]: https://img.shields.io/badge/zulip-join_chat-blue.svg
 [zulip-url]: https://pelikan.zulipchat.com/
-[grpc-url]: https://grpc.io/docs/protoc-installation/
 [discord-url]: https://discord.gg/yUBWHqxGUR
