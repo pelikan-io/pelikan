@@ -36,34 +36,34 @@ cargo +nightly fuzz run <target>
 
 ## Products
 
-- `pelikan_segcache_rs` - Memcached-compatible server with Segcache storage (TTL-centric, high memory efficiency)
-- `pelikan_pingserver` - Multi-protocol ping server for benchmarking and tutorials
-- `pelikan_rds` - RESP (Redis protocol) server
-- `pelikan_pingproxy_rs` - Ping protocol proxy
+- `pelikan-segcache` - Memcached-compatible server with Segcache storage (TTL-centric, high memory efficiency)
+- `pelikan-pingserver` - Ping server for testing and benchmarking
+- `pelikan-rds` - RESP (Redis protocol) server
+- `pelikan-pingproxy` - Ping protocol proxy
 
 ### Running Products
 
 ```bash
 # Run with default settings
-target/release/pelikan_segcache_rs
+target/release/pelikan-segcache
 
 # Run with config file
-target/release/pelikan_segcache_rs config/segcache.toml
+target/release/pelikan-segcache config/segcache.toml
 
 # Get help and options
-target/release/pelikan_segcache_rs --help
+target/release/pelikan-segcache --help
 ```
 
 ## Architecture
 
 ### Workspace Structure
 
-The workspace contains 23 crates organized in layers:
+The workspace is organized in layers:
 
 **Core Infrastructure** (`src/`)
 - `common/` - Shared types and traits across servers
 - `config/` - TOML-based configuration parsing
-- `logger/` - Centralized logging with ringlog
+- `logger/` - Centralized logging with tracing
 - `net/` - Networking abstractions, event loops, TLS support
 - `session/` - Session management
 - `entrystore/` - Entry storage type collection
@@ -133,19 +133,15 @@ Fuzz targets exist for protocols and storage:
 ## Dependencies
 
 Key dependencies:
-- **Async**: tokio (runtime)
-- **Networking**: mio (event loop), boring/openssl (TLS)
+- **Networking**: mio (event loop), rustls (TLS)
 - **Metrics**: metriken
-- **Logging**: ringlog
+- **Logging**: tracing
 - **Parsing**: nom (parser combinators)
 - **Serialization**: serde, toml
 
 ## Build Requirements
 
 - Rust stable toolchain
-- C toolchain: llvm/clang >= 7.0
-- cmake >= 3.2
-- (Optional) Protocol Buffer Compiler for certain features
 
 ## Platform Support
 
