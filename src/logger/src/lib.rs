@@ -73,14 +73,6 @@ pub struct LogDrain {
     _guards: Vec<WorkerGuard>,
 }
 
-impl LogDrain {
-    /// No-op flush for API compatibility. The tracing-appender background
-    /// thread handles flushing continuously.
-    pub fn flush(&self) -> Result<(), std::io::Error> {
-        Ok(())
-    }
-}
-
 /// Initialize the tracing subscriber with non-blocking file/stdout output
 /// and the tracing-log bridge for `log` crate compatibility.
 ///

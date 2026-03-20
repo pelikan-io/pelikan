@@ -598,14 +598,11 @@ impl Admin {
                         if self.signal_queue_tx.wake().is_err() {
                             fatal!("error waking threads for shutdown");
                         }
-                        let _ = self.log_drain.flush();
                         return;
                     }
                 }
             }
 
-            // flush pending log entries to log destinations
-            let _ = self.log_drain.flush();
         }
     }
 }
