@@ -12,7 +12,7 @@ use std::thread::JoinHandle;
 pub struct ProcessBuilder<Parser, Request, Response, Storage> {
     admin: AdminBuilder,
     listener: ListenerBuilder,
-    log_drain: Box<dyn Drain>,
+    log_drain: LogDrain,
     workers: WorkersBuilder<Parser, Request, Response, Storage>,
 }
 
@@ -25,7 +25,7 @@ where
 {
     pub fn new<T: AdminConfig + ServerConfig + TlsConfig + WorkerConfig>(
         config: &T,
-        log_drain: Box<dyn Drain>,
+        log_drain: LogDrain,
         protocol: P,
         storage: Storage,
     ) -> Result<Self> {

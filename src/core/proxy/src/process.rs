@@ -27,7 +27,7 @@ pub struct ProcessBuilder<
         BackendResponse,
     >,
     listener: ListenerBuilder,
-    log_drain: Box<dyn Drain>,
+    log_drain: LogDrain,
 }
 
 impl<
@@ -57,7 +57,7 @@ where
 {
     pub fn new<T: AdminConfig + FrontendConfig + BackendConfig + TlsConfig + ListenerConfig>(
         config: &T,
-        log_drain: Box<dyn Drain>,
+        log_drain: LogDrain,
         backend_protocol: BackendProto,
         frontend_protocol: FrontendProto,
     ) -> Result<Self> {

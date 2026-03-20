@@ -145,7 +145,7 @@ pub struct Admin {
     /// The actual network listener for the ASCII Admin Endpoint
     listener: pelikan_net::Listener,
     /// The drain handle for the logger
-    log_drain: Box<dyn Drain>,
+    log_drain: LogDrain,
     /// The maximum number of events to process per call to poll
     nevent: usize,
     /// The actual poll instantance
@@ -243,7 +243,7 @@ impl AdminBuilder {
 
     pub fn build(
         self,
-        log_drain: Box<dyn Drain>,
+        log_drain: LogDrain,
         signal_queue_rx: Receiver<Signal>,
         signal_queue_tx: Queues<Signal, ()>,
     ) -> Admin {

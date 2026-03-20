@@ -21,7 +21,7 @@ use core::marker::PhantomData;
 use core::time::Duration;
 use crossbeam_channel::{bounded, Receiver, Sender};
 use entrystore::EntryStore;
-use logger::Drain;
+use logger::LogDrain;
 use metriken::*;
 use pelikan_net::event::{Event, Source};
 use pelikan_net::*;

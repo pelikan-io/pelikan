@@ -18,7 +18,7 @@ mod metrics;
 static METRICS_SNAPSHOT: Lazy<Arc<RwLock<metrics::MetricsSnapshot>>> =
     Lazy::new(|| Arc::new(RwLock::new(Default::default())));
 
-pub fn spawn(config: Config, mut log: Box<dyn Drain>) {
+pub fn spawn(config: Config, log: logger::LogDrain) {
     let config = Arc::new(config);
 
     // initialize async runtime for control plane
@@ -28,14 +28,9 @@ pub fn spawn(config: Config, mut log: Box<dyn Drain>) {
         .build()
         .expect("failed to initialize tokio runtime");
 
-    // spawn logging thread
-    control_runtime.spawn(async move {
-        while RUNNING.load(Ordering::Relaxed) {
-            sleep(Duration::from_millis(1)).await;
-            let _ = log.flush();
-        }
-        let _ = log.flush();
-    });
+    // Keep the log drain alive for the process lifetime.
+    // The tracing-appender background thread handles flushing.
+    let _log_drain = log;
 
     // spawn thread to maintain histogram snapshots
     {

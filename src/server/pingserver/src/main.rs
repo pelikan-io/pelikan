@@ -4,7 +4,7 @@ extern crate logger;
 use config::{Config, Engine};
 
 use entrystore::Noop;
-use logger::{configure_logging, Drain};
+use logger::configure_logging;
 use protocol_ping::{PingProtocol, Request, Response};
 use server::{ProcessBuilder, PERCENTILES};
 

@@ -99,7 +99,7 @@ use core::marker::PhantomData;
 use core::time::Duration;
 use crossbeam_channel::{bounded, Sender};
 use entrystore::EntryStore;
-use logger::{Drain, Klog};
+use logger::{Klog, LogDrain};
 use metriken::*;
 use pelikan_net::event::{Event, Source};
 use pelikan_net::*;
