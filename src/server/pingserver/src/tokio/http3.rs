@@ -51,10 +51,14 @@ pub async fn run(config: Arc<Config>) {
                     {
                         loop {
                             match conn.accept().await {
-                                Ok(Some((request, mut stream))) => {
-                                    let start = Instant::now();
-
+                                Ok(Some(resolver)) => {
                                     tokio::spawn(async move {
+                                        let (request, mut stream) = match resolver.resolve_request().await {
+                                            Ok(resolved) => resolved,
+                                            Err(_) => return,
+                                        };
+
+                                        let start = Instant::now();
                                         let (_parts, _body) = request.into_parts();
 
                                         let mut content = BytesMut::new();
@@ -112,13 +116,9 @@ pub async fn run(config: Arc<Config>) {
                                     // break if no Request is accepted
                                     break;
                                 }
-                                Err(err) => {
-                                    match err.get_error_level() {
-                                        // break on connection errors
-                                        h3::error::ErrorLevel::ConnectionError => break,
-                                        // continue on stream errors
-                                        h3::error::ErrorLevel::StreamError => continue,
-                                    }
+                                Err(_) => {
+                                    // connection error — break
+                                    break;
                                 }
                             }
                         }
