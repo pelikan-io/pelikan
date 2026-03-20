@@ -5,7 +5,7 @@
 use super::*;
 use logger::klog;
 use std::fmt::{Display, Formatter};
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::sync::Arc;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -78,26 +78,26 @@ impl TryFrom<Message> for Set {
     fn try_from(other: Message) -> Result<Self, Error> {
         if let Message::Array(array) = other {
             if array.inner.is_none() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let mut array = array.inner.unwrap();
 
             if array.len() < 3 {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let _command = take_bulk_string(&mut array)?;
 
-            let key = take_bulk_string(&mut array)?
-                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+            let key =
+                take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
             if key.is_empty() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
-            let value = take_bulk_string(&mut array)?
-                .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+            let value =
+                take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
 
             let mut expire_time = None;
             let mut mode = SetMode::Set;
@@ -107,73 +107,73 @@ impl TryFrom<Message> for Set {
                 match token.as_str() {
                     "EX" => {
                         if expire_time.is_some() {
-                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                            return Err(Error::other("malformed command"));
                         }
 
                         let s = take_bulk_string_as_u64(&mut array)?
-                            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+                            .ok_or_else(|| Error::other("malformed command"))?;
 
                         expire_time = Some(ExpireTime::Seconds(s));
                     }
                     "PX" => {
                         if expire_time.is_some() {
-                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                            return Err(Error::other("malformed command"));
                         }
 
                         let ms = take_bulk_string_as_u64(&mut array)?
-                            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+                            .ok_or_else(|| Error::other("malformed command"))?;
 
                         expire_time = Some(ExpireTime::Milliseconds(ms));
                     }
                     "EXAT" => {
                         if expire_time.is_some() {
-                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                            return Err(Error::other("malformed command"));
                         }
 
                         let s = take_bulk_string_as_u64(&mut array)?
-                            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+                            .ok_or_else(|| Error::other("malformed command"))?;
 
                         expire_time = Some(ExpireTime::UnixSeconds(s));
                     }
                     "PXAT" => {
                         if expire_time.is_some() {
-                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                            return Err(Error::other("malformed command"));
                         }
 
                         let ms = take_bulk_string_as_u64(&mut array)?
-                            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+                            .ok_or_else(|| Error::other("malformed command"))?;
 
                         expire_time = Some(ExpireTime::UnixMilliseconds(ms));
                     }
                     "KEEPTTL" => {
                         if expire_time.is_some() {
-                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                            return Err(Error::other("malformed command"));
                         }
                         expire_time = Some(ExpireTime::KeepTtl);
                     }
                     "NX" => {
                         if mode != SetMode::Set {
-                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                            return Err(Error::other("malformed command"));
                         }
 
                         mode = SetMode::Add;
                     }
                     "XX" => {
                         if mode != SetMode::Set {
-                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                            return Err(Error::other("malformed command"));
                         }
 
                         mode = SetMode::Replace;
                     }
                     "GET" => {
                         if get_old {
-                            return Err(Error::new(ErrorKind::Other, "malformed command"));
+                            return Err(Error::other("malformed command"));
                         }
 
                         get_old = true;
                     }
                     _ => {
-                        return Err(Error::new(ErrorKind::Other, "malformed command"));
+                        return Err(Error::other("malformed command"));
                     }
                 }
             }
@@ -186,7 +186,7 @@ impl TryFrom<Message> for Set {
                 get_old,
             })
         } else {
-            Err(Error::new(ErrorKind::Other, "malformed command"))
+            Err(Error::other("malformed command"))
         }
     }
 }

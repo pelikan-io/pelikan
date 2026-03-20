@@ -1,5 +1,5 @@
 [package]
-name = "rds"
+name = "pelikan-rds"
 description = "a RESP protocol server"
 authors = ["Brian Martin <brian@pelikan.io>"]
 
@@ -15,7 +15,7 @@ path = "src/lib.rs"
 doc = true
 
 [[bin]]
-name = "pelikan_rds"
+name = "pelikan-rds"
 path = "src/main.rs"
 doc = false
 
@@ -49,4 +49,4 @@ protocol-resp = { path = "../../protocol/resp" }
 server = { path = "../../core/server", features = ["rustls"] }
 
 [dev-dependencies]
-criterion = "0.5.1"
+criterion = { workspace = true }

@@ -566,7 +566,7 @@ impl<'a> Segment<'a> {
                 if !(-0.5..=0.5).contains(&t) {
                     cutoff *= 1.0 + t;
                 }
-                trace!("cutoff adj to: {}", cutoff);
+                trace!("cutoff adj to: {cutoff}");
             }
 
             let item_frequency =
@@ -579,11 +579,7 @@ impl<'a> Segment<'a> {
                 && weighted_frequency <= cutoff
             {
                 trace!(
-                    "evicting item size: {} freq: {} w_freq: {} cutoff: {}",
-                    item_size,
-                    item_frequency,
-                    weighted_frequency,
-                    cutoff
+                    "evicting item size: {item_size} freq: {item_frequency} w_freq: {weighted_frequency} cutoff: {cutoff}"
                 );
                 if !hashtable.evict(item.key(), offset.try_into().unwrap(), self) {
                     // this *shouldn't* happen, but to keep header integrity, we
@@ -597,11 +593,7 @@ impl<'a> Segment<'a> {
                 continue;
             } else {
                 trace!(
-                    "keeping item size: {} freq: {} w_freq: {} cutoff: {}",
-                    item_size,
-                    item_frequency,
-                    weighted_frequency,
-                    cutoff
+                    "keeping item size: {item_size} freq: {item_frequency} w_freq: {weighted_frequency} cutoff: {cutoff}"
                 );
             }
 

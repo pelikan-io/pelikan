@@ -161,7 +161,7 @@ where
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         // fill the session
         map_result(session.fill())?;
@@ -173,7 +173,7 @@ where
                     self.free_queue.push_back(token);
                     self.data_queue
                         .try_send_to(0, (request, response, fe_token))
-                        .map_err(|_| Error::new(ErrorKind::Other, "data queue is full"))
+                        .map_err(|_| Error::other("data queue is full"))
                 } else {
                     panic!("corrupted state");
                 }
@@ -187,7 +187,7 @@ where
         let session = self
             .sessions
             .get_mut(token.0)
-            .ok_or_else(|| Error::new(ErrorKind::Other, "non-existant session"))?;
+            .ok_or_else(|| Error::other("non-existant session"))?;
 
         match session.flush() {
             Ok(_) => Ok(()),

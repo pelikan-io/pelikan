@@ -202,7 +202,7 @@ impl TtlBucket {
                         continue;
                     }
                     let offset = segment.write_offset() as usize;
-                    trace!("offset: {}", offset);
+                    trace!("offset: {offset}");
                     if offset + size <= seg_size {
                         let size = size as i32;
                         let item = segment.alloc_item(size);

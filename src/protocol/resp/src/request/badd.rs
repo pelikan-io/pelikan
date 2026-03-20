@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use super::*;
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 use std::sync::Arc;
 
 /// Represents the btree add command which was added to Twitter's internal
@@ -42,17 +42,17 @@ impl TryFrom<Message> for BtreeAdd {
     fn try_from(other: Message) -> Result<Self, Error> {
         if let Message::Array(array) = other {
             if array.inner.is_none() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let mut array = array.inner.unwrap();
 
             if array.len() < 4 {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             if array.len() % 2 == 1 {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let _command = take_bulk_string(&mut array)?;
@@ -60,13 +60,13 @@ impl TryFrom<Message> for BtreeAdd {
             let outer_key = take_bulk_string(&mut array)?;
 
             if outer_key.is_none() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             let outer_key = outer_key.unwrap();
 
             if outer_key.is_empty() {
-                return Err(Error::new(ErrorKind::Other, "malformed command"));
+                return Err(Error::other("malformed command"));
             }
 
             //loop as long as we have at least 2 arguments after the command
@@ -74,24 +74,24 @@ impl TryFrom<Message> for BtreeAdd {
             while array.len() >= 2 {
                 let inner_key = take_bulk_string(&mut array)?;
                 if inner_key.is_none() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    return Err(Error::other("malformed command"));
                 }
                 let inner_key = inner_key.unwrap();
 
                 if inner_key.is_empty() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    return Err(Error::other("malformed command"));
                 }
 
                 let value = take_bulk_string(&mut array)?;
 
                 if value.is_none() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    return Err(Error::other("malformed command"));
                 }
 
                 let value = value.unwrap();
 
                 if value.is_empty() {
-                    return Err(Error::new(ErrorKind::Other, "malformed command"));
+                    return Err(Error::other("malformed command"));
                 }
 
                 pairs.push((inner_key, value));
@@ -102,7 +102,7 @@ impl TryFrom<Message> for BtreeAdd {
                 inner_key_value_pairs: pairs.into(),
             })
         } else {
-            Err(Error::new(ErrorKind::Other, "malformed command"))
+            Err(Error::other("malformed command"))
         }
     }
 }

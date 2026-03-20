@@ -49,7 +49,7 @@ impl Segments {
 
         let evict_policy = builder.evict_policy;
 
-        debug!("eviction policy: {:?}", evict_policy);
+        debug!("eviction policy: {evict_policy:?}");
 
         let mut headers = Vec::with_capacity(0);
         headers.reserve_exact(segments);
@@ -143,7 +143,7 @@ impl Segments {
         offset: usize,
     ) -> Option<RawItem> {
         let seg_id = seg_id.map(|v| v.get())?;
-        trace!("getting item from: seg: {} offset: {}", seg_id, offset);
+        trace!("getting item from: seg: {seg_id} offset: {offset}");
         assert!(seg_id <= self.cap);
 
         let seg_begin = self.segment_size() as usize * (seg_id as usize - 1);
@@ -209,7 +209,7 @@ impl Segments {
                         let start = ttl_bucket.next_to_merge().unwrap_or(first_seg);
                         match self.merge_evict(start, hashtable) {
                             Ok(next_to_merge) => {
-                                debug!("merged ttl_bucket: {} seg: {}", bucket_id, start);
+                                debug!("merged ttl_bucket: {bucket_id} seg: {start}");
                                 ttl_bucket.set_next_to_merge(next_to_merge);
 
                                 #[cfg(feature = "metrics")]
@@ -283,7 +283,7 @@ impl Segments {
     }
 
     /// Returns a mutable `Segment` view for the segment with the specified id
-    pub(crate) fn get_mut(&mut self, id: NonZeroU32) -> Result<Segment, SegmentsError> {
+    pub(crate) fn get_mut(&mut self, id: NonZeroU32) -> Result<Segment<'_>, SegmentsError> {
         let id = id.get() as usize - 1;
         if id < self.headers.len() {
             let header = self.headers.get_mut(id).unwrap();
@@ -307,7 +307,7 @@ impl Segments {
         &mut self,
         a: NonZeroU32,
         b: NonZeroU32,
-    ) -> Result<(Segment, Segment), SegmentsError> {
+    ) -> Result<(Segment<'_>, Segment<'_>), SegmentsError> {
         if a == b {
             Err(SegmentsError::BadSegmentId)
         } else {
@@ -634,7 +634,7 @@ impl Segments {
                 .unwrap();
             segment.check_magic();
             let count = segment.live_items();
-            debug!("{} items in segment {} segment: {:?}", count, id, segment);
+            debug!("{count} items in segment {id} segment: {segment:?}");
             total += segment.live_items() as usize;
         }
         total
@@ -683,7 +683,7 @@ impl Segments {
                     break;
                 }
             } else {
-                warn!("invalid segment id: {}", id);
+                warn!("invalid segment id: {id}");
                 break;
             }
         }
@@ -718,7 +718,7 @@ impl Segments {
                     break;
                 }
             } else {
-                warn!("invalid segment id: {}", id);
+                warn!("invalid segment id: {id}");
                 break;
             }
         }
@@ -766,19 +766,14 @@ impl Segments {
             let mut dst = self.get_mut(start)?;
             let dst_old_size = dst.live_bytes();
 
-            trace!("prune merge with cutoff: {}", cutoff);
+            trace!("prune merge with cutoff: {cutoff}");
             cutoff = dst.prune(hashtable, cutoff, target_ratio);
-            trace!("cutoff is now: {}", cutoff);
+            trace!("cutoff is now: {cutoff}");
 
             dst.compact(hashtable)?;
 
             let dst_new_size = dst.live_bytes();
-            trace!(
-                "dst {}: {} bytes -> {} bytes",
-                dst_id,
-                dst_old_size,
-                dst_new_size
-            );
+            trace!("dst {dst_id}: {dst_old_size} bytes -> {dst_new_size} bytes");
 
             dst.mark_merged();
             merged += 1;
@@ -880,12 +875,7 @@ impl Segments {
             dst.compact(hashtable)?;
 
             let dst_new_size = dst.live_bytes();
-            trace!(
-                "dst {}: {} bytes -> {} bytes",
-                dst_id,
-                dst_old_size,
-                dst_new_size
-            );
+            trace!("dst {dst_id}: {dst_old_size} bytes -> {dst_new_size} bytes");
 
             dst.mark_merged();
             merged += 1;

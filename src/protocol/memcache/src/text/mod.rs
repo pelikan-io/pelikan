@@ -54,7 +54,7 @@ impl TextProtocol {
     }
 
     fn parse_command<'a>(&self, input: &'a [u8]) -> IResult<&'a [u8], Command> {
-        let (remaining, command_bytes) = take_till(|b| (b == b' ' || b == b'\r'))(input)?;
+        let (remaining, command_bytes) = take_till(|b| b == b' ' || b == b'\r')(input)?;
         let command = match command_bytes {
             b"add" | b"ADD" => Command::Add,
             b"append" | b"APPEND" => Command::Append,

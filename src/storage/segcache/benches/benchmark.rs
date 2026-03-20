@@ -3,7 +3,7 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 use criterion::{criterion_group, criterion_main, Criterion, Throughput};
-use rand::RngCore;
+use rand::Rng;
 use rand::SeedableRng;
 use segcache::*;
 
@@ -12,7 +12,7 @@ use std::time::Duration;
 pub const MB: usize = 1024 * 1024;
 
 // A very fast PRNG which is appropriate for testing
-pub fn rng() -> impl RngCore {
+pub fn rng() -> impl Rng {
     rand_xoshiro::Xoshiro256PlusPlus::seed_from_u64(0)
 }
 

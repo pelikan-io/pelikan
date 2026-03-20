@@ -1,27 +1,14 @@
 #[macro_use]
 extern crate logger;
 
-use config::{Config, Engine};
-
-use entrystore::Noop;
-use logger::{configure_logging, Drain};
-use protocol_ping::{PingProtocol, Request, Response};
-use server::{ProcessBuilder, PERCENTILES};
-
 use backtrace::Backtrace;
 use clap::{Arg, Command};
+use config::PingserverConfig;
+use entrystore::Noop;
+use logger::configure_logging;
 use metriken::*;
-
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Duration;
-
-type Protocol = PingProtocol;
-type Storage = Noop;
-
-mod config;
-mod tokio;
-
-static RUNNING: AtomicBool = AtomicBool::new(true);
+use protocol_ping::{PingProtocol, Request, Response};
+use server::{ProcessBuilder, PERCENTILES};
 
 fn main() {
     // custom panic hook to terminate whole process after unwinding
@@ -35,19 +22,9 @@ fn main() {
     let matches = Command::new(env!("CARGO_BIN_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .long_about(
-            "A rust implementation of, arguably, the most over-engineered ping \
-            server.\n\n\
-            The purpose is to demonstrate how to create an otherwise minimal \
-            service with the libraries and modules provied by Pelikan, which \
-            meets stringent requirements on latencies, observability, \
-            configurability, and other valuable traits in a typical production \
-            environment.",
-        )
-        .arg(
-            Arg::new("CONFIG")
-                .help("Server configuration file")
-                .action(clap::ArgAction::Set)
-                .index(1),
+            "A minimal ping/pong server built with Pelikan libraries. \
+            Useful for testing and benchmarking the framework with \
+            near-zero application overhead.",
         )
         .arg(
             Arg::new("stats")
@@ -56,8 +33,15 @@ fn main() {
                 .help("List all metrics in stats")
                 .action(clap::ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("CONFIG")
+                .help("Server configuration file")
+                .action(clap::ArgAction::Set)
+                .index(1),
+        )
         .get_matches();
 
+    // output stats descriptions and exit if the `stats` option was provided
     if matches.get_flag("stats") {
         println!("{:<31} {:<15} DESCRIPTION", "NAME", "TYPE");
 
@@ -96,8 +80,8 @@ fn main() {
 
     // load config from file
     let config = if let Some(file) = matches.get_one::<String>("CONFIG") {
-        debug!("loading config: {}", file);
-        match Config::load(file) {
+        debug!("loading config: {file}");
+        match PingserverConfig::load(file) {
             Ok(c) => c,
             Err(error) => {
                 eprintln!("error loading config file: {file}\n{error}");
@@ -114,25 +98,19 @@ fn main() {
     // initialize metrics
     common::metrics::init();
 
-    // launch the server
-    match config.general.engine {
-        Engine::Mio => {
-            // initialize storage
-            let storage = Storage::new();
+    // initialize storage
+    let storage = Noop::new();
 
-            // initialize parser
-            let protocol = Protocol::default();
+    // initialize parser
+    let protocol = PingProtocol::default();
 
-            // initialize process
-            let process_builder = ProcessBuilder::<Protocol, Request, Response, Storage>::new(
-                &config, log, protocol, storage,
-            )
-            .expect("failed to initialize process");
+    // initialize process
+    let process_builder = ProcessBuilder::<PingProtocol, Request, Response, Noop>::new(
+        &config, log, protocol, storage,
+    )
+    .expect("failed to initialize process");
 
-            // spawn threads
-            let process = process_builder.spawn();
-            process.wait();
-        }
-        Engine::Tokio => tokio::spawn(config, log),
-    }
+    // spawn threads and wait
+    let process = process_builder.spawn();
+    process.wait();
 }

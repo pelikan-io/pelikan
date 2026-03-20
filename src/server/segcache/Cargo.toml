@@ -10,12 +10,12 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [lib]
-name = "pelikan_segcache_rs"
+name = "pelikan_segcache"
 path = "src/lib.rs"
 doc = true
 
 [[bin]]
-name = "pelikan_segcache_rs"
+name = "pelikan-segcache"
 path = "src/main.rs"
 doc = false
 
@@ -49,4 +49,4 @@ protocol-memcache = { path = "../../protocol/memcache" }
 server = { path = "../../core/server", features = ["rustls"] }
 
 [dev-dependencies]
-criterion = "0.5.1"
+criterion = { workspace = true }

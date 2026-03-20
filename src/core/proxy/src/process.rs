@@ -27,7 +27,7 @@ pub struct ProcessBuilder<
         BackendResponse,
     >,
     listener: ListenerBuilder,
-    log_drain: Box<dyn Drain>,
+    log_drain: LogDrain,
 }
 
 impl<
@@ -57,7 +57,7 @@ where
 {
     pub fn new<T: AdminConfig + FrontendConfig + BackendConfig + TlsConfig + ListenerConfig>(
         config: &T,
-        log_drain: Box<dyn Drain>,
+        log_drain: LogDrain,
         backend_protocol: BackendProto,
         frontend_protocol: FrontendProto,
     ) -> Result<Self> {
@@ -90,20 +90,22 @@ where
 
         // queues for the `Admin` to send `Signal`s to all sibling threads
         let (mut signal_queue_tx, mut signal_queue_rx) =
-            Queues::new(vec![self.admin.waker()], thread_wakers, QUEUE_CAPACITY);
+            Queues::new(vec![self.admin.waker()], thread_wakers, QUEUE_CAPACITY).unwrap();
 
         // queues for the `Listener` to send `Session`s to the worker threads
         let (mut listener_session_queues, worker_session_queues) = Queues::new(
             vec![self.listener.waker()],
             self.frontend.wakers(),
             QUEUE_CAPACITY,
-        );
+        )
+        .unwrap();
 
         let (fe_data_queues, be_data_queues) = Queues::new(
             self.frontend.wakers(),
             self.backend.wakers(),
             QUEUE_CAPACITY,
-        );
+        )
+        .unwrap();
 
         let mut admin = self
             .admin

@@ -137,11 +137,8 @@ impl PingserverConfig {
         match toml::from_str(&content) {
             Ok(t) => Ok(t),
             Err(e) => {
-                error!("{}", e);
-                Err(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "Error parsing config",
-                ))
+                error!("{e}");
+                Err(std::io::Error::other("Error parsing config"))
             }
         }
     }

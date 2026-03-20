@@ -143,8 +143,7 @@ impl Backend {
                         if let Some(addr) = addrs.next() {
                             endpoints.push(addr)
                         } else {
-                            return Err(std::io::Error::new(
-                                std::io::ErrorKind::Other,
+                            return Err(std::io::Error::other(
                                 "failed to resolve endpoint address",
                             ));
                         }
@@ -156,10 +155,7 @@ impl Backend {
             }
             Ok(endpoints)
         } else {
-            Err(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                "no endpoints provided",
-            ))
+            Err(std::io::Error::other("no endpoints provided"))
         }
     }
 }

@@ -28,19 +28,18 @@ impl TryFrom<Message> for ListIndex {
     fn try_from(value: Message) -> Result<Self, Self::Error> {
         let array = match value {
             Message::Array(array) => array,
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         let mut array = array.inner.unwrap();
         if array.len() != 3 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array)?;
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
         let index = take_bulk_string_as_i64(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
+            .ok_or_else(|| Error::other("malformed command"))?;
 
         Ok(Self { key, index })
     }

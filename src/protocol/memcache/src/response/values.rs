@@ -107,7 +107,7 @@ pub fn parse(input: &[u8]) -> IResult<&[u8], Values> {
     let mut input = input;
     loop {
         let (i, _) = space1(input)?;
-        let (i, key) = take_till(|b| (b == b' ' || b == b'\r'))(i)?;
+        let (i, key) = take_till(|b| b == b' ' || b == b'\r')(i)?;
 
         let (i, _) = space1(i)?;
         let (i, flags) = parse_u32(i)?;
@@ -154,7 +154,7 @@ pub fn parse(input: &[u8]) -> IResult<&[u8], Values> {
         });
 
         // look for a space or the start of a CRLF
-        let (i, s) = take_till(|b| (b == b' ' || b == b'\r'))(i)?;
+        let (i, s) = take_till(|b| b == b' ' || b == b'\r')(i)?;
 
         // we should have found one of the following tokens
         match s {

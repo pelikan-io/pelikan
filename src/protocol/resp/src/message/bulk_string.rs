@@ -5,7 +5,7 @@
 use super::*;
 use std::sync::Arc;
 
-use std::io::{Error, ErrorKind};
+use std::io::Error;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BulkString {
@@ -43,13 +43,13 @@ impl TryInto<u64> for BulkString {
 
     fn try_into(self) -> std::result::Result<u64, Error> {
         if self.inner.is_none() {
-            return Err(Error::new(ErrorKind::Other, "null bulk string"));
+            return Err(Error::other("null bulk string"));
         }
 
         std::str::from_utf8(self.inner.as_ref().unwrap())
-            .map_err(|_| Error::new(ErrorKind::Other, "bulk string is not valid utf8"))?
+            .map_err(|_| Error::other("bulk string is not valid utf8"))?
             .parse::<u64>()
-            .map_err(|_| Error::new(ErrorKind::Other, "bulk string is not a valid u64"))
+            .map_err(|_| Error::other("bulk string is not a valid u64"))
     }
 }
 

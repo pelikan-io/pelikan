@@ -34,26 +34,25 @@ impl TryFrom<Message> for SortedSetCount {
     fn try_from(other: Message) -> Result<Self, Error> {
         let array = match other {
             Message::Array(array) => array,
-            _ => return Err(Error::new(ErrorKind::Other, "malformed command")),
+            _ => return Err(Error::other("malformed command")),
         };
 
         if array.inner.is_none() {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let mut array = array.inner.unwrap();
 
         if array.len() != 4 {
-            return Err(Error::new(ErrorKind::Other, "malformed command"));
+            return Err(Error::other("malformed command"));
         }
 
         let _command = take_bulk_string(&mut array)?;
-        let key = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
-        let min_score_string = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed command"))?;
-        let max_score_string = take_bulk_string(&mut array)?
-            .ok_or_else(|| Error::new(ErrorKind::Other, "malformed content"))?;
+        let key = take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
+        let min_score_string =
+            take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed command"))?;
+        let max_score_string =
+            take_bulk_string(&mut array)?.ok_or_else(|| Error::other("malformed content"))?;
 
         let (min_score, min_score_exclusive) = parse_score_boundary_as_float(&min_score_string)?;
         let (max_score, max_score_exclusive) = parse_score_boundary_as_float(&max_score_string)?;
@@ -111,14 +110,14 @@ impl From<&SortedSetCount> for Message {
         let min_score_string = match (value.min_score, value.min_score_exclusive) {
             (f64::INFINITY, false) => "+inf".to_string(),
             (f64::NEG_INFINITY, false) => "-inf".to_string(),
-            (score, false) => format!("{}", score),
-            (score, true) => format!("({}", score),
+            (score, false) => format!("{score}"),
+            (score, true) => format!("({score}"),
         };
         let max_score_string = match (value.max_score, value.max_score_exclusive) {
             (f64::INFINITY, false) => "+inf".to_string(),
             (f64::NEG_INFINITY, false) => "-inf".to_string(),
-            (score, false) => format!("{}", score),
-            (score, true) => format!("({}", score),
+            (score, false) => format!("{score}"),
+            (score, true) => format!("({score}"),
         };
         Message::Array(Array {
             inner: Some(vec![
@@ -155,9 +154,9 @@ fn parse_score_boundary_as_float(value: &[u8]) -> Result<(f64, bool), Error> {
     };
 
     let score = std::str::from_utf8(number)
-        .map_err(|_| Error::new(ErrorKind::Other, "ZRANGE score is not valid utf8"))?
+        .map_err(|_| Error::other("ZRANGE score is not valid utf8"))?
         .parse::<f64>()
-        .map_err(|_| Error::new(ErrorKind::Other, "ZRANGE score is not a float"))?;
+        .map_err(|_| Error::other("ZRANGE score is not a float"))?;
 
     if exclusive_symbol {
         Ok((score, true))

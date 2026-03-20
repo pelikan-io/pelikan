@@ -9,14 +9,14 @@ use backtrace::Backtrace;
 use clap::{Arg, Command};
 use config::PingproxyConfig;
 use metriken::*;
-use pingproxy::Pingproxy;
+use pelikan_pingproxy::Pingproxy;
 
 use proxy::PERCENTILES;
 
 fn main() {
     // custom panic hook to terminate whole process after unwinding
     std::panic::set_hook(Box::new(|s| {
-        error!("{}", s);
+        error!("{s}");
         println!("{:?}", Backtrace::new());
         std::process::exit(101);
     }));

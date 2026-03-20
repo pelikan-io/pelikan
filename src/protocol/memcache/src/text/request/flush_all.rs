@@ -17,7 +17,7 @@ impl TextProtocol {
         if let Ok((i, _)) = space1(input) {
             // we need to check to make sure we didn't stop because
             // of the CRLF
-            let (i, c) = take_till(|b| (b == b' ' || b == b'\r'))(i)?;
+            let (i, c) = take_till(|b| b == b' ' || b == b'\r')(i)?;
             if !c.is_empty() {
                 // make sure it's a valid string
                 let c = std::str::from_utf8(c).map_err(|_| {
@@ -38,7 +38,7 @@ impl TextProtocol {
 
         // if we have a space, we might have a noreply
         if let Ok((i, _)) = space1(input) {
-            let (i, _) = tag(b"noreply")(i)?;
+            let (i, _) = tag(&b"noreply"[..])(i)?;
             noreply = true;
             input = i;
         }

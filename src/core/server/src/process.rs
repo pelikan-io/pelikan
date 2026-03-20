@@ -12,7 +12,7 @@ use std::thread::JoinHandle;
 pub struct ProcessBuilder<Parser, Request, Response, Storage> {
     admin: AdminBuilder,
     listener: ListenerBuilder,
-    log_drain: Box<dyn Drain>,
+    log_drain: LogDrain,
     workers: WorkersBuilder<Parser, Request, Response, Storage>,
 }
 
@@ -25,7 +25,7 @@ where
 {
     pub fn new<T: AdminConfig + ServerConfig + TlsConfig + WorkerConfig>(
         config: &T,
-        log_drain: Box<dyn Drain>,
+        log_drain: LogDrain,
         protocol: P,
         storage: Storage,
     ) -> Result<Self> {
@@ -55,14 +55,15 @@ where
 
         // queues for the `Admin` to send `Signal`s to all sibling threads
         let (mut signal_queue_tx, mut signal_queue_rx) =
-            Queues::new(vec![self.admin.waker()], thread_wakers, QUEUE_CAPACITY);
+            Queues::new(vec![self.admin.waker()], thread_wakers, QUEUE_CAPACITY).unwrap();
 
         // queues for the `Listener` to send `Session`s to the worker threads
         let (mut listener_session_queues, worker_session_queues) = Queues::new(
             vec![self.listener.waker()],
             self.workers.worker_wakers(),
             QUEUE_CAPACITY,
-        );
+        )
+        .unwrap();
 
         let mut admin = self
             .admin

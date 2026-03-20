@@ -14,7 +14,6 @@ boring = { workspace = true, optional = true }
 clocksource = { workspace = true }
 metriken = { workspace = true }
 pelikan-net = { workspace = true }
-ringlog = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [features]

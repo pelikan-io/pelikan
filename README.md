@@ -47,21 +47,18 @@ The framework approach allows us to develop new features and protocols quickly.
 
 Pelikan contains the following products:
 
-- `pelikan_segcache_rs`: a Memcached-like server with Segcache as the backing
+- `pelikan-segcache`: a Memcached-like server with Segcache as the backing
   storage, a TTL-centric design offering extremely high memory efficiency and
   excellent core scalability. See our [NSDI'21 paper] for design
   and evaluation details.
-- `pelikan_pingserver`: an over-engineered, production-ready ping server which
-  is useful as a tutorial and for measuring baseline RPC performance. It
-  supports multiple protocols and application transports to allow comparing the
-  performance of different protocols, transports, and implementations.
-- [`momento_proxy`][momento_proxy-url]: a proxy which allows existing
-  applications to use Momento instead of a Memcache-compatible cache backend.
+- `pelikan-pingserver`: a minimal ping/pong server useful as a tutorial and
+  for measuring baseline RPC performance.
 
 ## Legacy
 
-Pelikan legacy codebase in C can be found within the `legacy` folder of this
-project. It offers the same design blueprint as the current mainline, and
+Pelikan was initially implemented in C. The legacy codebase can be found at the
+[pelikan-c](https://github.com/pelikan-io/pelikan-c) repo.
+It offers the same design blueprint as the current mainline, and
 implements multiple storage backend, data structures, and protocols. However, it only
 builds single-threaded, plain-text backends. It remains as a reference, but
 is not actively worked on. We do not recommend it for production deployments.
@@ -79,9 +76,6 @@ is not actively worked on. We do not recommend it for production deployments.
 ## Requirement
 
 - Rust [stable toolchain](https://www.rust-lang.org/learn/get-started)
-- (to build `momento_proxy`) Follow [the gRPC instructions here][grpc-url]
-  to install Protocol Buffer Compiler. Alternatively, you can skip the
-  `momento_proxy` package.
 - C toolchain: `llvm/clang (>= 7.0)`
 - Build tools: `cmake (>= 3.2)`
 
@@ -94,8 +88,6 @@ necessary if you are building legacy Pelikan which is written in C.
 git clone https://github.com/pelikan-io/pelikan
 cd pelikan
 cargo build --release
-# to skip momento_proxy, run:
-# cargo build --workspace --exclude momento_proxy --release
 ```
 
 ## Tests
@@ -106,24 +98,24 @@ cargo test
 
 # Usage
 
-Using `pelikan_segcache_rs` as an example, other executables are highly similar.
+Using `pelikan-segcache` as an example, other executables are highly similar.
 
 To get info of the service, including usage format and options, run:
 
 ```sh
-target/release/pelikan_segcache_rs --help
+target/release/pelikan-segcache --help
 ```
 
 To launch the service with default settings, simply run:
 
 ```sh
-target/release/pelikan_segcache_rs
+target/release/pelikan-segcache
 ```
 
 To launch the service with the sample config file, run:
 
 ```sh
-target/release/pelikan_segcache_rs config/segcache.toml
+target/release/pelikan-segcache config/segcache.toml
 ```
 
 You should be able to try out the server using an existing memcached client,
@@ -202,9 +194,7 @@ This software is licensed under the Apache 2.0 license, see [LICENSE](LICENSE) f
 [check-linker-bug]: https://sourceforge.net/p/check/mailman/message/32835594/
 [license-badge]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
 [license-url]: https://github.com/pelikan-io/pelikan/blob/main/LICENSE
-[momento_proxy-url]: src/proxy/momento/README.md
 [nsdi'21 paper]: https://www.usenix.org/conference/nsdi21/presentation/yang-juncheng
 [zulip-badge]: https://img.shields.io/badge/zulip-join_chat-blue.svg
 [zulip-url]: https://pelikan.zulipchat.com/
-[grpc-url]: https://grpc.io/docs/protoc-installation/
 [discord-url]: https://discord.gg/yUBWHqxGUR

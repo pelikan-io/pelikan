@@ -74,6 +74,7 @@ const N_BUCKET_SLOT: usize = 8;
 const MAX_CHAIN_LEN: u64 = 16;
 
 use crate::*;
+use ::rand::RngExt;
 use ahash::RandomState;
 use core::marker::PhantomData;
 use core::num::NonZeroU32;
@@ -211,7 +212,7 @@ impl HashTable {
 
         // overflow factor is effectively bounded by the max chain length
         if overflow_factor > MAX_CHAIN_LEN as f64 {
-            panic!("hashtable overflow factor must be <= {}", MAX_CHAIN_LEN);
+            panic!("hashtable overflow factor must be <= {MAX_CHAIN_LEN}");
         }
 
         let slots = 1_u64 << power;
@@ -224,8 +225,7 @@ impl HashTable {
         data.reserve_exact(total_buckets);
         data.resize(total_buckets, HashBucket::new());
         debug!(
-            "hashtable has: {} primary slots across {} primary buckets and {} total buckets",
-            slots, buckets, total_buckets,
+            "hashtable has: {slots} primary slots across {buckets} primary buckets and {total_buckets} total buckets",
         );
 
         let hash_builder = RandomState::with_seeds(
@@ -277,7 +277,7 @@ impl HashTable {
                     // update item frequency
                     let mut freq = get_freq(*item_info);
                     if freq < 127 {
-                        let rand = thread_rng().gen::<u64>();
+                        let rand = thread_rng().random::<u64>();
                         if freq <= 16 || rand % freq == 0 {
                             freq = ((freq + 1) | 0x80) << FREQ_BIT_SHIFT;
                         } else {
@@ -521,7 +521,7 @@ impl HashTable {
                     // update item frequency
                     let mut freq = get_freq(*item_info);
                     if freq < 127 {
-                        let rand = thread_rng().gen::<u64>();
+                        let rand = thread_rng().random::<u64>();
                         if freq <= 16 || rand % freq == 0 {
                             freq = ((freq + 1) | 0x80) << FREQ_BIT_SHIFT;
                         } else {

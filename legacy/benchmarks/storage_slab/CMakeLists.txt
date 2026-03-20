@@ -1,3 +1,0 @@
-add_library(bench_storage_slab storage_slab.c)
-
-target_link_libraries(bench_storage_slab)

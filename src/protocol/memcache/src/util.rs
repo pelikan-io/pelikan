@@ -5,7 +5,7 @@
 pub use nom::bytes::streaming::*;
 pub use nom::character::streaming::*;
 pub use nom::error::ErrorKind;
-pub use nom::{AsChar, Err, IResult, InputTakeAtPosition};
+pub use nom::{AsChar, Err, IResult, Input};
 pub use std::io::Write;
 
 use crate::{TimeType, Ttl};
@@ -33,8 +33,8 @@ pub fn space0(input: &[u8]) -> IResult<&[u8], &[u8]> {
 
 pub fn signed_digit1<T, E: ParseError<T>>(input: T) -> IResult<T, T, E>
 where
-    T: InputTakeAtPosition,
-    <T as InputTakeAtPosition>::Item: AsChar,
+    T: Input,
+    <T as Input>::Item: AsChar,
 {
     input.split_at_position1(
         |item| {
@@ -47,7 +47,7 @@ where
 
 // parses a string that is binary safe and less than the max key length
 pub fn key(input: &[u8], max_len: usize) -> IResult<&[u8], Option<&[u8]>> {
-    let (i, key) = take_till(|b| (b == b' ' || b == b'\r'))(input).map_err(|e| {
+    let (i, key) = take_till(|b| b == b' ' || b == b'\r')(input).map_err(|e| {
         if let nom::Err::Incomplete(_) = e {
             if input.len() > max_len {
                 nom::Err::Failure(nom::error::Error::new(input, nom::error::ErrorKind::Tag))

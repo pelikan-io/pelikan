@@ -7,7 +7,7 @@ use std::mem::MaybeUninit;
 
 use crate::{response::status_line, Error, ParseResult};
 use httparse::{Header, ParserConfig, Status};
-use logger::{error, klog};
+use logger::klog;
 use protocol_common::{Parse, ParseOk};
 
 #[derive(Clone)]

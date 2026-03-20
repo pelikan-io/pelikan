@@ -1,3 +1,0 @@
-add_library(bench_storage_cuckoo storage_cuckoo.c)
-
-target_link_libraries(bench_storage_cuckoo)

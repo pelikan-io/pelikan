@@ -58,7 +58,7 @@ pub static WORKER_EVENT_WRITE: Counter = Counter::new();
 
 fn map_result(result: Result<usize>) -> Result<()> {
     match result {
-        Ok(0) => Err(Error::new(ErrorKind::Other, "client hangup")),
+        Ok(0) => Err(Error::other("client hangup")),
         Ok(_) => Ok(()),
         Err(e) => map_err(e),
     }
@@ -194,7 +194,7 @@ where
                 let storage_wakers = vec![storage.waker()];
                 let worker_wakers: Vec<Arc<Waker>> = workers.iter().map(|v| v.waker()).collect();
                 let (mut worker_data_queues, mut storage_data_queues) =
-                    Queues::new(worker_wakers, storage_wakers, QUEUE_CAPACITY);
+                    Queues::new(worker_wakers, storage_wakers, QUEUE_CAPACITY).unwrap();
 
                 // The storage thread precedes the worker threads in the set of
                 // wakers, so its signal queue is the first element of

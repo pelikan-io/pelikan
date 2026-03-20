@@ -19,7 +19,7 @@ use backtrace::Backtrace;
 use clap::{Arg, Command};
 use config::SegcacheConfig;
 use metriken::*;
-use pelikan_segcache_rs::Segcache;
+use pelikan_segcache::Segcache;
 use server::PERCENTILES;
 
 /// The entry point into the running Segcache instance. This function parses the
@@ -103,7 +103,7 @@ fn main() {
 
     // load config from file
     let config = if let Some(file) = matches.get_one::<String>("CONFIG") {
-        debug!("loading config: {}", file);
+        debug!("loading config: {file}");
         match SegcacheConfig::load(file) {
             Ok(c) => c,
             Err(error) => {

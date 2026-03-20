@@ -349,19 +349,14 @@ fn parse_sorted_set_score(score: &[u8]) -> Result<f64, std::io::Error> {
     } else if score == "+inf".as_bytes() {
         Ok(f64::INFINITY)
     } else if let Some(float) = std::str::from_utf8(score)
-        .map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::Other, "score string is not valid utf8")
-        })?
+        .map_err(|_| std::io::Error::other("score string is not valid utf8"))?
         .parse::<f64>()
-        .map_err(|_| std::io::Error::new(std::io::ErrorKind::Other, "score string is not a f64"))
+        .map_err(|_| std::io::Error::other("score string is not a f64"))
         .map(Some)?
     {
-        return Ok(float);
+        Ok(float)
     } else {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "score string is not a valid f64",
-        ));
+        Err(std::io::Error::other("score string is not a valid f64"))
     }
 }
 

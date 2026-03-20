@@ -36,10 +36,7 @@ impl TextProtocol {
                     DECR_NOT_FOUND.increment();
                 }
                 _ => {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "unexpected response",
-                    ));
+                    return Err(std::io::Error::other("unexpected response"));
                 }
             }
         }

@@ -8,6 +8,9 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-common = { path = "../common", default-features = false }
 config = { path = "../config", default-features = false }
-ringlog = { workspace = true }
+log = { workspace = true }
+tracing = { workspace = true }
+tracing-appender = { workspace = true }
+tracing-log = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["fmt", "env-filter"] }

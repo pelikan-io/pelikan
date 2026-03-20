@@ -162,7 +162,7 @@ pub enum ResponseType {
 pub struct ResponseParser {}
 
 pub(crate) fn response_type(input: &[u8]) -> IResult<&[u8], ResponseType> {
-    let (remaining, response_type_token) = take_till(|b| (b == b' ' || b == b'\r'))(input)?;
+    let (remaining, response_type_token) = take_till(|b| b == b' ' || b == b'\r')(input)?;
     let response_type = match response_type_token {
         b"ERROR" => ResponseType::Error,
         b"CLIENT_ERROR" => ResponseType::ClientError,

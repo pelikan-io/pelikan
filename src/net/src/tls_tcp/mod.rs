@@ -22,6 +22,7 @@ pub enum Implementation {
     Openssl,
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for Implementation {
     fn default() -> Self {
         // Prefer rustls, then boringssl, then openssl

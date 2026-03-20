@@ -36,4 +36,4 @@ USER pelikan
 EXPOSE 12321
 # admin port:
 EXPOSE 9999
-CMD ["which", "pelikan_pingserver"]
+CMD ["which", "pelikan-pingserver"]
