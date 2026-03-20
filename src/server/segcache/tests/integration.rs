@@ -13,7 +13,7 @@ extern crate logger;
 use crate::common::*;
 
 use config::SegcacheConfig;
-use pelikan_segcache_rs::Segcache;
+use pelikan_segcache::Segcache;
 
 use std::time::Duration;
 

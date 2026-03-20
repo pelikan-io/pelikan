@@ -1,5 +1,5 @@
 [package]
-name = "rds"
+name = "pelikan-rds"
 description = "a RESP protocol server"
 authors = ["Brian Martin <brian@pelikan.io>"]
 
@@ -15,7 +15,7 @@ path = "src/lib.rs"
 doc = true
 
 [[bin]]
-name = "pelikan_rds"
+name = "pelikan-rds"
 path = "src/main.rs"
 doc = false
 

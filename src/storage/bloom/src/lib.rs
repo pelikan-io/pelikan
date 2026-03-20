@@ -69,7 +69,7 @@ impl RawBloomFilter {
         assert_ne!(k, 0, "k must be greater than 0");
         assert!(k <= m, "m must be greater than k (got {k} > {m})");
         assert!(
-            m % usize::BITS as usize == 0,
+            m.is_multiple_of(usize::BITS as usize),
             "len must be a multiple of usize::BITS"
         );
 

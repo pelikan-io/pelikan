@@ -19,7 +19,7 @@ use backtrace::Backtrace;
 use clap::{Arg, Command};
 use config::SegcacheConfig;
 use metriken::*;
-use pelikan_segcache_rs::Segcache;
+use pelikan_segcache::Segcache;
 use server::PERCENTILES;
 
 /// The entry point into the running Segcache instance. This function parses the
