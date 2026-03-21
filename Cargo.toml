@@ -56,7 +56,7 @@ metrohash = "1.0.7"
 mio = "1.1.1"
 nom = "8.0.0"
 parking_lot = "0.12.5"
-pelikan-net = { path = "./src/net", version = "0.4.1" }
+pelikan-net = { path = "./src/net", version = "0.5.0" }
 phf = "0.13.1"
 queues = { path = "./src/queues", version = "0.3.2" }
 rand = "0.10.0"
