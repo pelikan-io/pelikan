@@ -1,10 +1,9 @@
-name: setup-smoketest
-description: common setup for pelikan smoketests
+name: setup-rust
+description: Install Rust stable toolchain with clippy
 
 runs:
   using: composite
   steps:
-    - uses: ./.github/actions/setup-protoc
     - uses: dtolnay/rust-toolchain@stable
       with:
         components: clippy
