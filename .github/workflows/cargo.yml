@@ -17,7 +17,7 @@ jobs:
       matrix:
         os: [ ubuntu-latest, macos-latest ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-rust
       - uses: Swatinem/rust-cache@v2
         with:
@@ -42,7 +42,7 @@ jobs:
   clippy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-rust
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@v2
@@ -67,7 +67,7 @@ jobs:
     permissions:
       security-events: write
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: actions/download-artifact@v4
       with:
         name: clippy-sarif
@@ -78,7 +78,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: Swatinem/rust-cache@v2
         with:
           shared-key: check-ubuntu-latest
@@ -93,7 +93,7 @@ jobs:
     name: rustfmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-rust
       - name: cargo fmt
         shell: bash
@@ -110,7 +110,7 @@ jobs:
         os: [ ubuntu-latest, macos-latest ]
         profile: [ release, debug ]
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-rust
       - uses: Swatinem/rust-cache@v2
         with:
@@ -144,6 +144,8 @@ jobs:
         shell: bash
         run: |
           mkdir install
+          cp target/release/pelikan-segcache install
+          cp target/release/pelikan-rds install
           cp target/release/pelikan-pingserver install
           cp target/release/pelikan-pingproxy install
       - uses: actions/upload-artifact@v4
