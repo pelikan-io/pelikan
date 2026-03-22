@@ -27,6 +27,9 @@ const QUEUE_DEPTH: usize = 4096;
 // log 1 in every N commands
 const SAMPLE: usize = 100;
 
+// max number of rotated log files to keep
+const MAX_KEEP_FILES: u64 = 3;
+
 // single message buffer size in bytes
 const SINGLE_MESSAGE_SIZE: usize = KB;
 
@@ -58,6 +61,10 @@ fn sample() -> usize {
     SAMPLE
 }
 
+fn max_keep_files() -> u64 {
+    MAX_KEEP_FILES
+}
+
 fn single_message_size() -> usize {
     SINGLE_MESSAGE_SIZE
 }
@@ -76,6 +83,8 @@ pub struct Klog {
     interval: usize,
     #[serde(default = "max_size")]
     max_size: u64,
+    #[serde(default = "max_keep_files")]
+    max_keep_files: u64,
     #[serde(default = "queue_depth")]
     queue_depth: usize,
     #[serde(default = "sample")]
@@ -116,6 +125,10 @@ impl Klog {
         self.sample
     }
 
+    pub fn max_keep_files(&self) -> u64 {
+        self.max_keep_files
+    }
+
     pub fn single_message_size(&self) -> usize {
         self.single_message_size
     }
@@ -129,6 +142,7 @@ impl Default for Klog {
             backup: backup(),
             interval: interval(),
             max_size: max_size(),
+            max_keep_files: max_keep_files(),
             queue_depth: queue_depth(),
             sample: sample(),
             single_message_size: single_message_size(),

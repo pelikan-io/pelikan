@@ -11,6 +11,8 @@ const LOG_LEVEL: Level = Level::Info;
 const LOG_FILE: Option<String> = None;
 const LOG_BACKUP: Option<String> = None;
 const LOG_MAX_SIZE: u64 = GB as u64;
+const LOG_MAX_KEEP_FILES: u64 = 7;
+const LOG_ROTATION_INTERVAL: LogRotationInterval = LogRotationInterval::Daily;
 const LOG_QUEUE_DEPTH: usize = 4096;
 const LOG_SINGLE_MESSAGE_SIZE: usize = KB;
 
@@ -29,6 +31,14 @@ fn log_backup() -> Option<String> {
 
 fn log_max_size() -> u64 {
     LOG_MAX_SIZE
+}
+
+fn log_max_keep_files() -> u64 {
+    LOG_MAX_KEEP_FILES
+}
+
+fn log_rotation_interval() -> LogRotationInterval {
+    LOG_ROTATION_INTERVAL
 }
 
 fn log_queue_depth() -> usize {
@@ -51,10 +61,23 @@ pub struct Debug {
     log_backup: Option<String>,
     #[serde(default = "log_max_size")]
     log_max_size: u64,
+    #[serde(default = "log_max_keep_files")]
+    log_max_keep_files: u64,
+    #[serde(default = "log_rotation_interval")]
+    log_rotation_interval: LogRotationInterval,
     #[serde(default = "log_queue_depth")]
     log_queue_depth: usize,
     #[serde(default = "log_single_message_size")]
     log_single_message_size: usize,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LogRotationInterval {
+    None,
+    Minutely,
+    Hourly,
+    Daily,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -90,6 +113,14 @@ impl Debug {
         self.log_max_size
     }
 
+    pub fn log_max_keep_files(&self) -> u64 {
+        self.log_max_keep_files
+    }
+
+    pub fn log_rotation_interval(&self) -> LogRotationInterval {
+        self.log_rotation_interval
+    }
+
     pub fn log_queue_depth(&self) -> usize {
         self.log_queue_depth
     }
@@ -107,6 +138,8 @@ impl Default for Debug {
             log_file: log_file(),
             log_backup: log_backup(),
             log_max_size: log_max_size(),
+            log_max_keep_files: log_max_keep_files(),
+            log_rotation_interval: log_rotation_interval(),
             log_queue_depth: log_queue_depth(),
             log_single_message_size: log_single_message_size(),
         }
