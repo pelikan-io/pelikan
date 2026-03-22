@@ -23,6 +23,7 @@ fn poolsize() -> usize {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Buf {
     #[serde(default = "size")]
+    #[serde(with = "crate::human_size::as_usize")]
     size: usize,
     #[serde(default = "poolsize")]
     poolsize: usize,

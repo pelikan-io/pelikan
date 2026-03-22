@@ -23,6 +23,7 @@ mod stats_log;
 mod tcp;
 pub mod time;
 
+mod human_size;
 mod tls;
 mod units;
 mod worker;
