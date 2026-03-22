@@ -8,7 +8,8 @@
 //! existing `log` crate callsites through `tracing-log`. The `klog!` macro
 //! provides callsite-sampled command logging.
 
-use config::{DebugConfig, KlogConfig};
+use config::{DebugConfig, KlogConfig, LogRotationInterval};
+use logroller::{Compression, LogRollerBuilder, Rotation, RotationAge, RotationSize};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
@@ -93,31 +94,63 @@ pub fn configure_logging<T: DebugConfig + KlogConfig>(config: &T) -> LogDrain {
         log::Level::Trace => tracing::Level::TRACE,
     };
 
-    // Set up the debug log writer (file or stdout)
+    // Set up the debug log writer (file with rotation, or stdout)
     let (debug_writer, debug_guard) = if let Some(file) = debug_config.log_file() {
-        let dir = std::path::Path::new(&file)
-            .parent()
-            .unwrap_or(std::path::Path::new("."));
-        let filename = std::path::Path::new(&file)
+        let path = std::path::Path::new(&file);
+        let dir = path.parent().unwrap_or(std::path::Path::new("."));
+        let filename = path
             .file_name()
-            .unwrap_or(std::ffi::OsStr::new("pelikan.log"));
-        let file_appender = tracing_appender::rolling::never(dir, filename);
-        tracing_appender::non_blocking(file_appender)
+            .map(std::path::Path::new)
+            .unwrap_or(std::path::Path::new("pelikan.log"));
+        match debug_config.log_rotation_interval() {
+            LogRotationInterval::None => {
+                // No rotation — user manages rotation externally (e.g. logrotate)
+                let file_appender = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(&file)
+                    .expect("failed to open debug log file");
+                tracing_appender::non_blocking(file_appender)
+            }
+            interval => {
+                let rotation_age = match interval {
+                    LogRotationInterval::Minutely => RotationAge::Minutely,
+                    LogRotationInterval::Hourly => RotationAge::Hourly,
+                    LogRotationInterval::Daily => RotationAge::Daily,
+                    LogRotationInterval::None => unreachable!(),
+                };
+                let file_appender = LogRollerBuilder::new(dir, filename)
+                    .rotation(Rotation::AgeBased(rotation_age))
+                    .max_keep_files(debug_config.log_max_keep_files())
+                    .compression(Compression::Gzip)
+                    .graceful_shutdown(true)
+                    .build()
+                    .expect("failed to create debug log appender");
+                tracing_appender::non_blocking(file_appender)
+            }
+        }
     } else {
         tracing_appender::non_blocking(std::io::stdout())
     };
 
     let mut guards = vec![debug_guard];
 
-    // Set up the klog writer if configured
+    // Set up the klog writer with size-based rotation if configured
     let klog_writer_and_guard = klog_config.file().map(|file| {
-        let dir = std::path::Path::new(&file)
-            .parent()
-            .unwrap_or(std::path::Path::new("."));
-        let filename = std::path::Path::new(&file)
+        let path = std::path::Path::new(&file);
+        let dir = path.parent().unwrap_or(std::path::Path::new("."));
+        let filename = path
             .file_name()
-            .unwrap_or(std::ffi::OsStr::new("klog"));
-        let file_appender = tracing_appender::rolling::never(dir, filename);
+            .map(std::path::Path::new)
+            .unwrap_or(std::path::Path::new("klog"));
+        let max_bytes = klog_config.max_size();
+        let file_appender = LogRollerBuilder::new(dir, filename)
+            .rotation(Rotation::SizeBased(RotationSize::Bytes(max_bytes)))
+            .max_keep_files(klog_config.max_keep_files())
+            .compression(Compression::Gzip)
+            .graceful_shutdown(true)
+            .build()
+            .expect("failed to create klog appender");
         tracing_appender::non_blocking(file_appender)
     });
 

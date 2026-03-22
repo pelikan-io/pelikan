@@ -23,6 +23,7 @@ mod stats_log;
 mod tcp;
 pub mod time;
 
+mod human_size;
 mod tls;
 mod units;
 mod worker;
@@ -31,7 +32,7 @@ pub use admin::{Admin, AdminConfig};
 pub use array::ArrayConfig;
 pub use buf::{Buf, BufConfig};
 pub use dbuf::DbufConfig;
-pub use debug::{Debug, DebugConfig};
+pub use debug::{Debug, DebugConfig, LogRotationInterval};
 pub use klog::{Klog, KlogConfig};
 pub use pingproxy::PingproxyConfig;
 pub use pingserver::PingserverConfig;

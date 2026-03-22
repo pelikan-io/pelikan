@@ -83,8 +83,10 @@ pub struct Seg {
     #[serde(default = "overflow_factor")]
     overflow_factor: f64,
     #[serde(default = "heap_size")]
+    #[serde(with = "crate::human_size::as_usize")]
     heap_size: usize,
     #[serde(default = "segment_size")]
+    #[serde(with = "crate::human_size::as_i32")]
     segment_size: i32,
     #[serde(default = "eviction")]
     eviction: Eviction,

@@ -50,6 +50,7 @@ datatier = { path = "./src/storage/datatier", version = "0.1.0" }
 httparse = "1.10.1"
 libc = "0.2.183"
 log = "0.4.29"
+logroller = "0.1"
 memmap2 = "0.9.10"
 metriken = "0.7.0"
 metrohash = "1.0.7"

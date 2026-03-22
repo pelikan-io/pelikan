@@ -24,10 +24,10 @@ threads = 1
 [segcache]
 # hash power adjusts how many items can be held in the hashtable
 hash_power = 16
-# total bytes to use for item storage - 4GiB
-heap_size = 4294967296
-# size of each segment in bytes - 1MiB
-segment_size = 1048576
+# total bytes to use for item storage
+heap_size = "4GB"
+# size of each segment
+segment_size = "1MB"
 # eviction policy is segment random, similar to slab random for Twemcache
 eviction = "Random"
 

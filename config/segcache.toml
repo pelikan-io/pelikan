@@ -35,10 +35,10 @@ threads = 1
 [seg]
 # hash power adjusts how many items can be held in the hashtable
 hash_power = 22
-# total bytes to use for item storage - 4GiB
-heap_size = 4294967296
-# size of each segment in bytes - 1MiB
-segment_size = 1048576
+# total bytes to use for item storage
+heap_size = "4GB"
+# size of each segment
+segment_size = "1MB"
 # number of segments for a non-evict compaction
 compact_target = 2
 # number of segments to merge in one merge eviction pass
@@ -60,20 +60,18 @@ time_type = "Memcache"
 log_level = "info"
 # optionally, log to the file below instead of standard out
 # log_file = "segcache.log"
-# backup file name for use with log rotation
-log_backup = "segcache.log.old"
-# trigger log rotation when the file grows beyond this size (in bytes). Set this
-# option to '0' to disable log rotation.
-log_max_size = 1073741824
+# rotation interval: none, minutely, hourly, daily
+# log_rotation_interval = "daily"
+# max number of rotated log files to keep
+# log_max_keep_files = 7
 
 [klog]
 # optionally, log commands to the file below
 # file = "segcache.cmd"
-# backup file name for use with log rotation
-backup = "segcache.cmd.old"
-# trigger log rotation when the file grows beyond this size (in bytes). Set this
-# option to '0' to disable log rotation.
-max_size = 1073741824
+# trigger log rotation when the file grows beyond this size (in bytes)
+max_size = "1GB"
+# max number of rotated log files to keep
+# max_keep_files = 3
 # specify the sampling ratio, 1 in N commands will be logged. Setting to '0'
 # will disable command logging.
 sample = 100
