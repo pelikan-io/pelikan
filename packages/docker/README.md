@@ -1,60 +1,44 @@
-## Images
-Docker images are currently hosted on [Docker hub](https://hub.docker.com/r/thinkingfish/pelikan/)
+## Docker
 
-## Pull
-To pull the docker image created from this Dockerfile, run:
+### Build
+
+Build from the repository root:
 ```sh
-docker pull thinkingfish/pelikan
+docker build -f packages/docker/Dockerfile -t pelikan .
 ```
 
-The docker image hub also include previous versions, tagged by version number.
+### Run
 
-## Run
-The image contains all the binaries built from Pelikan. To invoke a specific
-binary with a specific config, you will need to:
-- log into a running container, OR
-- override the `CMD` variable
-
-### Interactive
-To enter a running container of the pelikan image:
+The default command runs `pelikan-segcache` with a config that binds both the
+data port (12321) and admin port (9999) to all interfaces:
 ```sh
-docker run -it --entrypoint=/bin/bash thinkingfish/pelikan
+docker run -p 12321:12321 -p 9999:9999 pelikan
 ```
 
-From here you can run any command you want, for example:
+### Run a different binary
+
+Override the command to run any of the included binaries:
 ```sh
-pelikan@a9eabfea0cee:/pelikan$ pelikan_twemcache -v
-Version: 0.1.1
+docker run -p 12321:12321 pelikan pelikan-pingserver
+docker run -p 12321:12321 pelikan pelikan-rds
+docker run -p 12321:12321 pelikan pelikan-pingproxy
 ```
 
-To run a binary with a pre-installed config file, you can run:
+### Custom config
+
+Mount your own config file:
 ```sh
-pelikan@a9eabfea0cee:/pelikan$ pelikan_slimcache /etc/pelikan/slimcache.conf
+docker run -p 12321:12321 -v /path/to/my.toml:/etc/pelikan/segcache.toml pelikan
 ```
 
-And exit when you are done.
-
-### Override CMD
-You can also override `CMD` when launching the container:
+Or pass it as an argument:
 ```sh
-docker run --name pelikan thinkingfish/pelikan pelikan_slimcache /etc/pelikan/slimcache.conf
+docker run -p 12321:12321 -v /path/to/my.toml:/tmp/my.toml pelikan pelikan-segcache /tmp/my.toml
 ```
 
-And when done, kill the container:
-```sh
-docker kill pelikan
-```
+### Included binaries
 
-## Note
-
-### docker daemon not found (OSX)
-On Mac OSX, if docker commands fail and throw the following message:
-```sh
-Cannot connect to the Docker daemon. Is the docker daemon running on this host?
-```
-
-Add the following line to your `bash` start script (or equivalent):
-```
-eval $(docker-machine env default)
-```
-
+- `pelikan-segcache` — memcache-compatible cache with segment-based storage
+- `pelikan-rds` — Redis-compatible cache
+- `pelikan-pingserver` — minimal ping/pong server for testing
+- `pelikan-pingproxy` — ping protocol proxy
