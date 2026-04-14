@@ -60,7 +60,7 @@ parking_lot = "0.12.5"
 pelikan-net = { path = "./src/net", version = "0.5.0" }
 phf = "0.13.1"
 queues = { path = "./src/queues", version = "0.3.2" }
-rand = "0.10.0"
+rand = "0.10.1"
 rand_xoshiro = "0.8.0"
 serde = "1.0.228"
 serde_json = "1.0.149"
