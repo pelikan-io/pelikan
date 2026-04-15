@@ -31,7 +31,7 @@ jobs:
         run: |
           export CARGO_TARGET_DIR=$(pwd)/target
 
-          for target in protocol/admin protocol/memcache protocol/ping storage/segcache; do
+          for target in protocol/admin protocol/memcache protocol/ping; do
             cd src/$target
             echo "::group::Building $target"
             cargo fuzz build
@@ -48,7 +48,6 @@ jobs:
           protocol/memcache,
           protocol/ping,
           protocol/resp,
-          storage/segcache,
         ]
     name: fuzz-${{ matrix.os }}-${{ matrix.target }}
     runs-on: ${{ matrix.os }}

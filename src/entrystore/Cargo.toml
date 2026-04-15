@@ -19,4 +19,4 @@ protocol-common = { path = "../protocol/common" }
 protocol-memcache = { path = "../protocol/memcache" }
 protocol-ping = { path = "../protocol/ping" }
 protocol-resp = { path = "../protocol/resp" }
-segcache = { path = "../storage/segcache" }
+segcache = { workspace = true }

@@ -41,6 +41,9 @@ impl Seg {
                 merge: config.merge_target(),
                 compact: config.compact_target(),
             },
+            Eviction::S3Fifo => Policy::S3Fifo {
+                admission_ratio: config.admission_ratio(),
+            },
         };
 
         // build the datastructure from the config
@@ -50,7 +53,6 @@ impl Seg {
             .heap_size(config.heap_size())
             .segment_size(config.segment_size())
             .eviction(eviction)
-            .datapool_path(config.datapool_path())
             .build()?;
 
         Ok(Self { data })
