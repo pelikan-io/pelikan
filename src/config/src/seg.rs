@@ -2,8 +2,6 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::path::{Path, PathBuf};
-
 use serde::{Deserialize, Serialize};
 
 const MB: usize = 1024 * 1024;
@@ -24,8 +22,8 @@ const COMPACT_TARGET: usize = 2;
 const MERGE_TARGET: usize = 4;
 const MERGE_MAX: usize = 8;
 
-// datapool
-const DATAPOOL_PATH: Option<&str> = None;
+// s3fifo
+const ADMISSION_RATIO: f64 = 0.10;
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Eviction {
@@ -36,6 +34,7 @@ pub enum Eviction {
     Cte,
     Util,
     Merge,
+    S3Fifo,
 }
 
 // helper functions for default values
@@ -71,8 +70,8 @@ fn compact_target() -> usize {
     COMPACT_TARGET
 }
 
-fn datapool_path() -> Option<String> {
-    DATAPOOL_PATH.map(|v| v.to_string())
+fn admission_ratio() -> f64 {
+    ADMISSION_RATIO
 }
 
 // definitions
@@ -96,8 +95,8 @@ pub struct Seg {
     merge_max: usize,
     #[serde(default = "compact_target")]
     compact_target: usize,
-    #[serde(default = "datapool_path")]
-    datapool_path: Option<String>,
+    #[serde(default = "admission_ratio")]
+    admission_ratio: f64,
 }
 
 impl Default for Seg {
@@ -111,7 +110,7 @@ impl Default for Seg {
             merge_target: merge_target(),
             merge_max: merge_max(),
             compact_target: compact_target(),
-            datapool_path: datapool_path(),
+            admission_ratio: admission_ratio(),
         }
     }
 }
@@ -150,8 +149,8 @@ impl Seg {
         self.compact_target
     }
 
-    pub fn datapool_path(&self) -> Option<PathBuf> {
-        self.datapool_path.as_ref().map(|v| Path::new(v).to_owned())
+    pub fn admission_ratio(&self) -> f64 {
+        self.admission_ratio
     }
 }
 
