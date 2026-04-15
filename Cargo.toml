@@ -28,7 +28,6 @@ members = [
     "src/server/segcache",
     "src/session",
     "src/storage/bloom",
-    "src/storage/datatier",
     "src/storage/segcache",
     "src/queues",
     "src/storage/types",
@@ -46,7 +45,7 @@ clap = "4.6.0"
 clocksource = "0.8.3"
 criterion = "0.8.2"
 crossbeam-channel = "0.5.15"
-datatier = { path = "./src/storage/datatier", version = "0.1.0" }
+datatier = { git = "https://github.com/pelikan-io/cache-rs", version = "0.1.0" }
 httparse = "1.10.1"
 libc = "0.2.183"
 log = "0.4.29"
