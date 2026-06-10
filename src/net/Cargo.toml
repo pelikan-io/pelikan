@@ -14,7 +14,7 @@ libc = { workspace = true }
 metriken = { workspace = true, optional = true }
 mio = { workspace = true, features = ["os-poll", "net"] }
 rustls = { workspace = true }
-rustls-pemfile = { workspace = true }
+rustls-pki-types = { workspace = true }
 webpki-roots = { workspace = true }
 
 [features]
