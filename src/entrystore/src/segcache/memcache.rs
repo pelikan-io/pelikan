@@ -325,7 +325,7 @@ impl Storage for Seg {
                     v,
                     Some(&cas.flags().to_be_bytes()),
                     ttl,
-                    cas.cas() as u32,
+                    cas.cas(),
                 ) {
                     Ok(_) => Response::stored(cas.noreply()),
                     Err(SegcacheError::NotFound) => Response::not_found(cas.noreply()),
@@ -338,7 +338,7 @@ impl Storage for Seg {
                     cas.value(),
                     Some(&cas.flags().to_be_bytes()),
                     ttl,
-                    cas.cas() as u32,
+                    cas.cas(),
                 ) {
                     Ok(_) => Response::stored(cas.noreply()),
                     Err(SegcacheError::NotFound) => Response::not_found(cas.noreply()),
@@ -352,7 +352,7 @@ impl Storage for Seg {
                 cas.value(),
                 Some(&cas.flags().to_be_bytes()),
                 ttl,
-                cas.cas() as u32,
+                cas.cas(),
             ) {
                 Ok(_) => Response::stored(cas.noreply()),
                 Err(SegcacheError::NotFound) => Response::not_found(cas.noreply()),
