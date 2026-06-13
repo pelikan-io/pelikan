@@ -73,13 +73,13 @@ impl Storage for Seg {
                 let flags = u32::from_be_bytes([o[0], o[1], o[2], o[3]]);
                 match item.value() {
                     segcache::Value::Bytes(b) => {
-                        values.push(Value::new(item.key(), flags, Some(item.cas().into()), b));
+                        values.push(Value::new(item.key(), flags, Some(item.cas()), b));
                     }
                     segcache::Value::U64(v) => {
                         values.push(Value::new(
                             item.key(),
                             flags,
-                            Some(item.cas().into()),
+                            Some(item.cas()),
                             format!("{v}").as_bytes(),
                         ));
                     }
