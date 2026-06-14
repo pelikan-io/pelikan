@@ -53,17 +53,9 @@ pub fn tests() {
         ],
     );
 
-    test(
-        "cas stored",
-        &[
-            // store the key
-            ("set 4 0 0 1\r\n4\r\n", Some("STORED\r\n")),
-            // cas with the correct cas value
-            ("cas 4 0 0 1 1\r\n0\r\n", Some("STORED\r\n")),
-            // check that the value was updated
-            ("get 4\r\n", Some("VALUE 4 0 1\r\n0\r\nEND\r\n")),
-        ],
-    );
+    // the cas token is opaque to the client and must be retrieved with a
+    // `gets` before issuing the `cas` command
+    test_cas_stored();
 
     test(
         "add not_stored",
@@ -203,6 +195,77 @@ pub fn tests() {
     );
 
     std::thread::sleep(Duration::from_millis(500));
+}
+
+// stores a key, retrieves its cas token with `gets`, and checks that a `cas`
+// with that token succeeds and updates the value
+fn test_cas_stored() {
+    info!("testing: cas stored");
+    debug!("connecting to server");
+    let mut stream = TcpStream::connect("127.0.0.1:12321").expect("failed to connect");
+    stream
+        .set_read_timeout(Some(Duration::from_millis(250)))
+        .expect("failed to set read timeout");
+    stream
+        .set_write_timeout(Some(Duration::from_millis(250)))
+        .expect("failed to set write timeout");
+
+    let exchange = |stream: &mut TcpStream, request: &str| -> String {
+        debug!("sending request");
+        if !matches!(stream.write(request.as_bytes()), Ok(n) if n == request.len()) {
+            error!("error sending request");
+            panic!("status: failed\n");
+        }
+        std::thread::sleep(Duration::from_millis(10));
+        let mut buf = vec![0; 4096];
+        let bytes = stream.read(&mut buf).unwrap_or_else(|_| {
+            std::thread::sleep(Duration::from_millis(500));
+            panic!("error reading response");
+        });
+        String::from_utf8_lossy(&buf[0..bytes]).into_owned()
+    };
+
+    // store the key
+    let response = exchange(&mut stream, "set 4 0 0 1\r\n4\r\n");
+    if response != "STORED\r\n" {
+        error!("expected: {:?}", "STORED\r\n");
+        error!("received: {response:?}");
+        std::thread::sleep(Duration::from_millis(500));
+        panic!("status: failed\n");
+    }
+
+    // retrieve the cas token with gets: `VALUE <key> <flags> <bytes> <cas>`
+    let response = exchange(&mut stream, "gets 4\r\n");
+    let cas = response
+        .strip_prefix("VALUE 4 0 1 ")
+        .and_then(|r| r.split_whitespace().next())
+        .unwrap_or_else(|| {
+            error!("expected gets response with cas token");
+            error!("received: {response:?}");
+            std::thread::sleep(Duration::from_millis(500));
+            panic!("status: failed\n");
+        })
+        .to_owned();
+
+    // cas with the correct cas value
+    let response = exchange(&mut stream, &format!("cas 4 0 0 1 {cas}\r\n0\r\n"));
+    if response != "STORED\r\n" {
+        error!("expected: {:?}", "STORED\r\n");
+        error!("received: {response:?}");
+        std::thread::sleep(Duration::from_millis(500));
+        panic!("status: failed\n");
+    }
+
+    // check that the value was updated
+    let response = exchange(&mut stream, "get 4\r\n");
+    if response != "VALUE 4 0 1\r\n0\r\nEND\r\n" {
+        error!("expected: {:?}", "VALUE 4 0 1\r\n0\r\nEND\r\n");
+        error!("received: {response:?}");
+        std::thread::sleep(Duration::from_millis(500));
+        panic!("status: failed\n");
+    }
+
+    info!("status: passed\n");
 }
 
 // opens a new connection, operating on request + response pairs from the
