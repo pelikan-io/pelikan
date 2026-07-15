@@ -214,4 +214,11 @@ pub static FLUSH_ALL_EX: Counter = Counter::new();
 #[metric(name = "quit")]
 pub static QUIT: Counter = Counter::new();
 
+/*
+ * VERSION
+ */
+
+#[metric(name = "version")]
+pub static VERSION: Counter = Counter::new();
+
 common::metrics::test_no_duplicates!();

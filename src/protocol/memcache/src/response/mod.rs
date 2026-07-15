@@ -15,6 +15,7 @@ mod numeric;
 mod server_error;
 mod stored;
 mod values;
+mod version;
 
 pub use client_error::ClientError;
 pub use deleted::Deleted;
@@ -26,6 +27,7 @@ pub use numeric::Numeric;
 pub use server_error::ServerError;
 pub use stored::Stored;
 pub use values::{Value, Values};
+pub use version::Version as VersionResponse;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Response {
@@ -39,6 +41,7 @@ pub enum Response {
     Values(Values),
     Numeric(Numeric),
     Deleted(Deleted),
+    Version(VersionResponse),
     Hangup,
 }
 
@@ -55,6 +58,7 @@ impl std::fmt::Display for Response {
             Self::Values(_) => write!(f, "VALUES"),
             Self::Numeric(_) => write!(f, "NUMERIC"),
             Self::Deleted(_) => write!(f, "DELETED"),
+            Self::Version(_) => write!(f, "VERSION"),
             Self::Hangup => write!(f, "HANGUP"),
         }
     }
@@ -114,6 +118,12 @@ impl Response {
     pub fn deleted(noreply: bool) -> Self {
         Self::Deleted(Deleted::new(noreply))
     }
+
+    pub fn version<T: ToString>(version: T) -> Self {
+        Self::Version(VersionResponse {
+            inner: version.to_string(),
+        })
+    }
 }
 
 impl From<Values> for Response {
@@ -135,6 +145,7 @@ impl Compose for Response {
             Self::Values(e) => e.compose(session),
             Self::Numeric(e) => e.compose(session),
             Self::Deleted(e) => e.compose(session),
+            Self::Version(e) => e.compose(session),
             Self::Hangup => 0,
         }
     }
@@ -157,6 +168,7 @@ pub enum ResponseType {
     Empty,
     Numeric(u64),
     Deleted,
+    Version,
 }
 
 pub struct ResponseParser {}
@@ -174,6 +186,7 @@ pub(crate) fn response_type(input: &[u8]) -> IResult<&[u8], ResponseType> {
         b"VALUE" => ResponseType::Values,
         b"END" => ResponseType::Empty,
         b"DELETED" => ResponseType::Deleted,
+        b"VERSION" => ResponseType::Version,
         _ => {
             if let Ok(s) = std::str::from_utf8(response_type_token) {
                 if let Ok(value) = s.parse::<u64>() {
@@ -248,6 +261,10 @@ pub(crate) fn response(input: &[u8]) -> IResult<&[u8], Response> {
         (input, ResponseType::Deleted) => {
             let (input, response) = deleted::parse(input)?;
             Ok((input, Response::Deleted(response)))
+        }
+        (input, ResponseType::Version) => {
+            let (input, response) = version::parse(input)?;
+            Ok((input, Response::Version(response)))
         }
     }
 }

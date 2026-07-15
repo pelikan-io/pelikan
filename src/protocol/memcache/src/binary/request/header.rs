@@ -123,4 +123,10 @@ impl RequestHeader {
 
         header
     }
+
+    /// Create a header for a `version` request. Version takes no key, value, or
+    /// extras.
+    pub fn version() -> Self {
+        Self::with_opcode(Opcode::Version)
+    }
 }
