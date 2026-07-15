@@ -69,6 +69,7 @@ fuzz_target!(|data: &[u8]| {
             }
             Request::FlushAll(_) => {}
             Request::Quit(_) => {}
+            Request::Version(_) => {}
         }
     }
 });
