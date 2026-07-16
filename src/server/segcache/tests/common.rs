@@ -194,6 +194,15 @@ pub fn tests() {
         &[("prepend 8 0 0 1\r\n0\r\n", Some("ERROR\r\n"))],
     );
 
+    // version command on the data listener
+    test(
+        "version",
+        &[(
+            "version\r\n",
+            Some(&format!("VERSION {}\r\n", env!("CARGO_PKG_VERSION"))),
+        )],
+    );
+
     std::thread::sleep(Duration::from_millis(500));
 }
 

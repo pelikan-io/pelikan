@@ -17,3 +17,4 @@ mod prepend;
 mod quit;
 mod replace;
 mod set;
+mod version;

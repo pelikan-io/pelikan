@@ -69,6 +69,7 @@ impl TextProtocol {
             b"quit" | b"QUIT" => Command::Quit,
             b"replace" | b"REPLACE" => Command::Replace,
             b"set" | b"SET" => Command::Set,
+            b"version" | b"VERSION" => Command::Version,
             _ => {
                 // TODO(bmartin): we can return an unknown command error here
                 return Err(nom::Err::Failure(nom::error::Error::new(
@@ -134,6 +135,10 @@ impl TextProtocol {
                 let (input, request) = self.parse_set_request(input)?;
                 Ok((input, Request::Set(request)))
             }
+            (input, Command::Version) => {
+                let (input, request) = self.parse_version_request(input)?;
+                Ok((input, Request::Version(request)))
+            }
         }
     }
 
@@ -155,6 +160,7 @@ impl TextProtocol {
             Request::Quit(_) => self._compose_quit_request(buffer),
             Request::Replace(r) => self._compose_replace_request(r, buffer),
             Request::Set(r) => self._compose_set_request(r, buffer),
+            Request::Version(_) => self._compose_version_request(buffer),
         };
 
         Ok(len)
@@ -177,6 +183,7 @@ impl TextProtocol {
             Request::Prepend(r) => self.parse_prepend_response(r, buffer),
             Request::Replace(r) => self.parse_replace_response(r, buffer),
             Request::Set(r) => self.parse_set_response(r, buffer),
+            Request::Version(r) => self.parse_version_response(r, buffer),
             _ => todo!(),
         }
     }
@@ -202,6 +209,7 @@ impl TextProtocol {
             // Request::Quit(request) => self.compose_quit_response(request, response, buffer),
             Request::Replace(request) => self.compose_replace_response(request, response, buffer),
             Request::Set(request) => self.compose_set_response(request, response, buffer),
+            Request::Version(request) => self.compose_version_response(request, response, buffer),
             _ => todo!(),
         }
 

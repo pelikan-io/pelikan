@@ -21,6 +21,7 @@ mod prepend;
 mod quit;
 mod replace;
 mod set;
+mod version;
 
 pub use add::Add;
 pub use append::Append;
@@ -34,6 +35,7 @@ pub use prepend::Prepend;
 pub use quit::Quit;
 pub use replace::Replace;
 pub use set::Set;
+pub use version::Version;
 
 pub const DEFAULT_MAX_BATCH_SIZE: usize = 1024;
 pub const DEFAULT_MAX_KEY_LEN: usize = 250;
@@ -66,6 +68,7 @@ pub enum Request {
     Quit(Quit),
     Replace(Replace),
     Set(Set),
+    Version(Version),
 }
 
 impl Request {
@@ -182,6 +185,7 @@ impl Display for Request {
             Request::Quit(_) => write!(f, "quit"),
             Request::Replace(_) => write!(f, "replace"),
             Request::Set(_) => write!(f, "set"),
+            Request::Version(_) => write!(f, "version"),
         }
     }
 }
@@ -203,6 +207,7 @@ impl Klog for Request {
             Self::Quit(r) => r.klog(response),
             Self::Replace(r) => r.klog(response),
             Self::Set(r) => r.klog(response),
+            Self::Version(r) => r.klog(response),
         }
     }
 }
@@ -222,6 +227,7 @@ pub enum Command {
     Quit,
     Replace,
     Set,
+    Version,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

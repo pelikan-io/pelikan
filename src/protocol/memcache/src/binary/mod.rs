@@ -55,6 +55,10 @@ impl BinaryProtocol {
                 let (input, request) = self.parse_delete_request(input, header)?;
                 Ok((input, Request::Delete(request)))
             }
+            Opcode::Version => {
+                let (input, request) = self.parse_version_request(input, header)?;
+                Ok((input, Request::Version(request)))
+            }
             _ => Err(nom::Err::Failure(nom::error::Error::new(
                 input,
                 nom::error::ErrorKind::Tag,
@@ -71,6 +75,7 @@ impl BinaryProtocol {
             Request::Delete(r) => self.compose_delete_request(r, buffer),
             Request::Get(r) => self.compose_get_request(r, buffer),
             Request::Set(r) => self.compose_set_request(r, buffer),
+            Request::Version(r) => self.compose_version_request(r, buffer),
             _ => Err(std::io::Error::other(
                 "request unsupported for binary protocol",
             )),
@@ -103,23 +108,21 @@ impl BinaryProtocol {
         }
 
         match request {
-            Request::Delete(request) => {
-                if header.opcode == Opcode::Delete {
-                    let (input, response) = self.parse_delete_response(request, input, header)?;
-                    return Ok((input, response));
-                }
+            Request::Delete(request) if header.opcode == Opcode::Delete => {
+                let (input, response) = self.parse_delete_response(request, input, header)?;
+                return Ok((input, response));
             }
-            Request::Get(request) => {
-                if header.opcode == Opcode::Get {
-                    let (input, response) = self.parse_get_response(request, input, header)?;
-                    return Ok((input, response));
-                }
+            Request::Get(request) if header.opcode == Opcode::Get => {
+                let (input, response) = self.parse_get_response(request, input, header)?;
+                return Ok((input, response));
             }
-            Request::Set(request) => {
-                if header.opcode == Opcode::Set {
-                    let (input, response) = self.parse_set_response(request, input, header)?;
-                    return Ok((input, response));
-                }
+            Request::Set(request) if header.opcode == Opcode::Set => {
+                let (input, response) = self.parse_set_response(request, input, header)?;
+                return Ok((input, response));
+            }
+            Request::Version(request) if header.opcode == Opcode::Version => {
+                let (input, response) = self.parse_version_response(request, input, header)?;
+                return Ok((input, response));
             }
             _ => {}
         }
@@ -140,6 +143,7 @@ impl BinaryProtocol {
             Request::Delete(request) => self.compose_delete_response(request, response, buffer),
             Request::Get(request) => self.compose_get_response(request, response, buffer),
             Request::Set(request) => self.compose_set_response(request, response, buffer),
+            Request::Version(request) => self.compose_version_response(request, response, buffer),
             _ => {
                 unimplemented!()
             }
@@ -236,6 +240,7 @@ pub enum Opcode {
     Get,
     Set,
     Delete,
+    Version,
 }
 
 impl Opcode {
@@ -244,6 +249,7 @@ impl Opcode {
             0x00 => Opcode::Get,
             0x01 => Opcode::Set,
             0x04 => Opcode::Delete,
+            0x0b => Opcode::Version,
             other => Opcode::Unknown(other),
         }
     }
@@ -254,6 +260,7 @@ impl Opcode {
             Opcode::Get => 0x00,
             Opcode::Set => 0x01,
             Opcode::Delete => 0x04,
+            Opcode::Version => 0x0b,
         }
     }
 }

@@ -34,6 +34,7 @@ impl Execute<Request, Response> for Seg {
             Request::Delete(delete) => self.delete(delete),
             Request::FlushAll(flush_all) => self.flush_all(flush_all),
             Request::Quit(quit) => self.quit(quit),
+            Request::Version(_) => Response::version(env!("CARGO_PKG_VERSION")),
         }
     }
 }

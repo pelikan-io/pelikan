@@ -16,3 +16,4 @@ mod incr;
 mod prepend;
 mod replace;
 mod set;
+mod version;
