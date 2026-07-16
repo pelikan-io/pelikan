@@ -108,29 +108,21 @@ impl BinaryProtocol {
         }
 
         match request {
-            Request::Delete(request) => {
-                if header.opcode == Opcode::Delete {
-                    let (input, response) = self.parse_delete_response(request, input, header)?;
-                    return Ok((input, response));
-                }
+            Request::Delete(request) if header.opcode == Opcode::Delete => {
+                let (input, response) = self.parse_delete_response(request, input, header)?;
+                return Ok((input, response));
             }
-            Request::Get(request) => {
-                if header.opcode == Opcode::Get {
-                    let (input, response) = self.parse_get_response(request, input, header)?;
-                    return Ok((input, response));
-                }
+            Request::Get(request) if header.opcode == Opcode::Get => {
+                let (input, response) = self.parse_get_response(request, input, header)?;
+                return Ok((input, response));
             }
-            Request::Set(request) => {
-                if header.opcode == Opcode::Set {
-                    let (input, response) = self.parse_set_response(request, input, header)?;
-                    return Ok((input, response));
-                }
+            Request::Set(request) if header.opcode == Opcode::Set => {
+                let (input, response) = self.parse_set_response(request, input, header)?;
+                return Ok((input, response));
             }
-            Request::Version(request) => {
-                if header.opcode == Opcode::Version {
-                    let (input, response) = self.parse_version_response(request, input, header)?;
-                    return Ok((input, response));
-                }
+            Request::Version(request) if header.opcode == Opcode::Version => {
+                let (input, response) = self.parse_version_response(request, input, header)?;
+                return Ok((input, response));
             }
             _ => {}
         }
