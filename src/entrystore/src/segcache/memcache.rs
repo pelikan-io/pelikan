@@ -73,13 +73,13 @@ impl Storage for Seg {
                 let flags = u32::from_be_bytes([o[0], o[1], o[2], o[3]]);
                 match item.value() {
                     segcache::Value::Bytes(b) => {
-                        values.push(Value::new(item.key(), flags, Some(item.cas().into()), b));
+                        values.push(Value::new(item.key(), flags, Some(item.cas()), b));
                     }
                     segcache::Value::U64(v) => {
                         values.push(Value::new(
                             item.key(),
                             flags,
-                            Some(item.cas().into()),
+                            Some(item.cas()),
                             format!("{v}").as_bytes(),
                         ));
                     }
@@ -325,7 +325,7 @@ impl Storage for Seg {
                     v,
                     Some(&cas.flags().to_be_bytes()),
                     ttl,
-                    cas.cas() as u32,
+                    cas.cas(),
                 ) {
                     Ok(_) => Response::stored(cas.noreply()),
                     Err(SegcacheError::NotFound) => Response::not_found(cas.noreply()),
@@ -338,7 +338,7 @@ impl Storage for Seg {
                     cas.value(),
                     Some(&cas.flags().to_be_bytes()),
                     ttl,
-                    cas.cas() as u32,
+                    cas.cas(),
                 ) {
                     Ok(_) => Response::stored(cas.noreply()),
                     Err(SegcacheError::NotFound) => Response::not_found(cas.noreply()),
@@ -352,7 +352,7 @@ impl Storage for Seg {
                 cas.value(),
                 Some(&cas.flags().to_be_bytes()),
                 ttl,
-                cas.cas() as u32,
+                cas.cas(),
             ) {
                 Ok(_) => Response::stored(cas.noreply()),
                 Err(SegcacheError::NotFound) => Response::not_found(cas.noreply()),

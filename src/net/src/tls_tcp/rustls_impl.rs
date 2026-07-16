@@ -2,12 +2,13 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-use std::io::{BufReader, ErrorKind};
+use std::io::ErrorKind;
 use std::os::unix::prelude::AsRawFd;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
 use rustls::{ClientConnection, ServerConfig, ServerConnection, StreamOwned};
 
@@ -384,11 +385,10 @@ impl TlsTcpConnector {
         root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
         if let Some(f) = &builder.ca_file {
-            let ca_file = std::fs::File::open(f).map_err(|e| {
-                Error::other(format!("failed to open CA file: {}: {}", f.display(), e))
-            })?;
-            let mut ca_reader = BufReader::new(ca_file);
-            let ca_certs: Vec<CertificateDer<'static>> = rustls_pemfile::certs(&mut ca_reader)
+            let ca_certs: Vec<CertificateDer<'static>> = CertificateDer::pem_file_iter(f)
+                .map_err(|e| {
+                    Error::other(format!("failed to open CA file: {}: {}", f.display(), e))
+                })?
                 .collect::<std::result::Result<Vec<_>, _>>()
                 .map_err(|e| {
                     Error::other(format!("failed to parse CA file: {}: {}", f.display(), e))
@@ -489,15 +489,14 @@ fn load_certs(
 }
 
 fn read_certs_from_file(path: &Path) -> Result<Vec<CertificateDer<'static>>> {
-    let file = std::fs::File::open(path).map_err(|e| {
-        Error::other(format!(
-            "failed to open certificate file: {}: {}",
-            path.display(),
-            e
-        ))
-    })?;
-    let mut reader = BufReader::new(file);
-    rustls_pemfile::certs(&mut reader)
+    CertificateDer::pem_file_iter(path)
+        .map_err(|e| {
+            Error::other(format!(
+                "failed to open certificate file: {}: {}",
+                path.display(),
+                e
+            ))
+        })?
         .collect::<std::result::Result<Vec<_>, _>>()
         .map_err(|e| {
             Error::other(format!(
@@ -513,40 +512,11 @@ fn load_private_key(key_file: &Option<PathBuf>) -> Result<PrivateKeyDer<'static>
         .as_ref()
         .ok_or_else(|| Error::other("no private key file provided"))?;
 
-    let file = std::fs::File::open(f).map_err(|e| {
+    PrivateKeyDer::from_pem_file(f).map_err(|e| {
         Error::other(format!(
-            "failed to open private key file: {}: {}",
+            "failed to load private key file: {}: {}",
             f.display(),
             e
         ))
-    })?;
-    let mut reader = BufReader::new(file);
-
-    let mut keys = Vec::new();
-    loop {
-        match rustls_pemfile::read_one(&mut reader) {
-            Ok(Some(rustls_pemfile::Item::Pkcs1Key(key))) => {
-                keys.push(PrivateKeyDer::Pkcs1(key));
-            }
-            Ok(Some(rustls_pemfile::Item::Pkcs8Key(key))) => {
-                keys.push(PrivateKeyDer::Pkcs8(key));
-            }
-            Ok(Some(rustls_pemfile::Item::Sec1Key(key))) => {
-                keys.push(PrivateKeyDer::Sec1(key));
-            }
-            Ok(Some(_)) => continue,
-            Ok(None) => break,
-            Err(e) => {
-                return Err(Error::other(format!(
-                    "failed to parse private key file: {}: {}",
-                    f.display(),
-                    e
-                )));
-            }
-        }
-    }
-
-    keys.into_iter()
-        .next()
-        .ok_or_else(|| Error::other(format!("no private key found in file: {}", f.display())))
+    })
 }
