@@ -2,11 +2,16 @@ name: cargo-build
 
 on:
   push:
+    branches: [ main ]
   pull_request:
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: full
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
   # First stage: these are quick jobs that give immediate feedback on a PR.
@@ -71,7 +76,7 @@ jobs:
     - uses: actions/download-artifact@v4
       with:
         name: clippy-sarif
-    - uses: github/codeql-action/upload-sarif@v2
+    - uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: clippy.sarif
 
@@ -79,10 +84,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: check-ubuntu-latest
-          save-if: false
       - uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-audit
