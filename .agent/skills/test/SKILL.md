@@ -8,7 +8,6 @@ Run tests across the pelikan workspace.
 ## Unit tests
 
 Alongside source files in each crate:
-
 ```bash
 cargo test --workspace          # everything
 cargo test -p pelikan-segcache  # one product crate, e.g. segcache
