@@ -38,6 +38,20 @@ cargo +nightly fuzz list          # see available targets
 cargo +nightly fuzz run <target>
 ```
 
+## Benchmarks
+
+Benchmarks exist for six crates:
+- `protocol-admin`
+- `protocol-memcache`
+- `protocol-ping`
+- `bloom`
+- `pelikan-segcache`
+- `pelikan-rds`
+
+```bash
+cargo bench -p <crate>  # e.g. cargo bench -p pelikan-segcache
+```
+
 ## Notes
 
 - The segment-based storage engine itself now lives in the external `cache-rs` repository (consumed as the `segcache` dependency by `src/entrystore/`) — it has no fuzz targets or tests in this repo.
