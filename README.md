@@ -51,8 +51,12 @@ Pelikan contains the following products:
   storage, a TTL-centric design offering extremely high memory efficiency and
   excellent core scalability. See our [NSDI'21 paper] for design
   and evaluation details.
+- `pelikan-rds`: a server speaking the RESP (Redis Serialization Protocol)
+  wire format.
 - `pelikan-pingserver`: a minimal ping/pong server useful as a tutorial and
   for measuring baseline RPC performance.
+- `pelikan-pingproxy`: a proxy for the ping protocol, useful as a starting
+  point for building cache proxies.
 
 ## Legacy
 
@@ -76,11 +80,8 @@ is not actively worked on. We do not recommend it for production deployments.
 ## Requirement
 
 - Rust [stable toolchain](https://www.rust-lang.org/learn/get-started)
-- C toolchain: `llvm/clang (>= 7.0)`
-- Build tools: `cmake (>= 3.2)`
-
-The C/C++ tools are used by Pelikan dependencies such as BoringSSL, and also
-necessary if you are building legacy Pelikan which is written in C.
+- C toolchain and `cmake`: used to build [AWS-LC](https://github.com/aws/aws-lc),
+  the cryptography library backing our TLS support via `rustls`
 
 ## Build
 
@@ -95,6 +96,9 @@ cargo build --release
 ```sh
 cargo test
 ```
+
+Integration tests bind the default ports (`12321` data, `9999` admin); stop
+any running pelikan server instance before running the test suite.
 
 # Usage
 
@@ -118,6 +122,13 @@ To launch the service with the sample config file, run:
 target/release/pelikan-segcache config/segcache.toml
 ```
 
+By default, the server listens on port `12321` for data commands and port
+`9999` for admin commands. The sample config additionally enables an HTTP
+admin endpoint on port `9998`.
+
+To stop the server, use `Ctrl-C` in its terminal, or send it `SIGTERM`;
+the server shuts down gracefully.
+
 You should be able to try out the server using an existing memcached client,
 or simply with `telnet`.
 
@@ -129,6 +140,10 @@ Escape character is '^]'.
 set foo 0 0 3
 bar
 STORED
+get foo
+VALUE foo 0 3
+bar
+END
 ```
 
 **Attention**: use `admin` port for all non-data commands.
@@ -139,14 +154,14 @@ Trying 127.0.0.1...
 Connected to localhost.
 Escape character is '^]'.
 version
-VERSION 0.1.0
+VERSION 0.3.2
 stats
-STAT pid 54937
-STAT time 1459634909
-STAT uptime 22
-STAT version 100
-STAT ru_stime 0.019172
+STAT add 0
+STAT add_ex 0
+STAT add_not_stored 0
+STAT append 0
 ...
+END
 ```
 
 ## Configuration
@@ -165,9 +180,6 @@ included under the `config` directory.
 
 ## Contributing
 
-Please take a look at our [community manifesto](https://github.com/pelikan-io/pelikan/blob/main/docs/manifesto.rst)
-and [coding style guide](https://github.com/pelikan-io/pelikan/blob/main/docs/coding_style.rst).
-
 If you want to submit a patch, please follow these steps:
 
 1. create a new issue
@@ -178,8 +190,11 @@ If you want to submit a patch, please follow these steps:
 
 # Documentation
 
-We have made progress and are actively working on documentation, and will put it
-on our website. Meanwhile, check out the current material under `docs/`
+- [Architecture](docs/ARCHITECTURE.md): how the workspace is layered, from
+  reusable components to server products
+- Example configs for every product live under [`config/`](config/)
+- Design notes and engineering records live under `docs/`; more material is on
+  our [website](http://pelikan.io)
 
 ## License
 
@@ -190,11 +205,7 @@ This software is licensed under the Apache 2.0 license, see [LICENSE](LICENSE) f
 [cargo-build-url]: https://github.com/pelikan-io/pelikan/actions/workflows/cargo.yml?query=branch%3Amain+event%3Apush
 [cargo-fuzz-badge]: https://img.shields.io/github/actions/workflow/status/pelikan-io/pelikan/fuzz.yml?branch=main
 [cargo-fuzz-url]: https://github.com/pelikan-io/pelikan/actions/workflows/fuzz.yml?query=branch%3Amain+event%3Apush
-[check]: http://libcheck.github.io/check/
-[check-linker-bug]: https://sourceforge.net/p/check/mailman/message/32835594/
 [license-badge]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
 [license-url]: https://github.com/pelikan-io/pelikan/blob/main/LICENSE
 [nsdi'21 paper]: https://www.usenix.org/conference/nsdi21/presentation/yang-juncheng
-[zulip-badge]: https://img.shields.io/badge/zulip-join_chat-blue.svg
-[zulip-url]: https://pelikan.zulipchat.com/
 [discord-url]: https://discord.gg/yUBWHqxGUR
