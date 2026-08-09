@@ -1,5 +1,5 @@
 [package]
-name = "pingproxy"
+name = "pelikan-pingproxy"
 authors = ["Brian Martin <brian@pelikan.io>"]
 
 version = { workspace = true }
