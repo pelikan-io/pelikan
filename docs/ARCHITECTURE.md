@@ -9,6 +9,7 @@ The workspace is organized in layers:
 - `config/` - TOML-based configuration parsing
 - `logger/` - Centralized logging with tracing
 - `net/` - Networking abstractions, event loops, TLS support
+- `queues/` - Inter-thread communication via queues and wakers
 - `session/` - Session management
 - `entrystore/` - Entry storage type collection; wraps the external `cache-rs` `segcache`
   crate (segment-based storage engine, NSDI'21 paper) as its backing store
