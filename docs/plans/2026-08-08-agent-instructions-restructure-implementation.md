@@ -360,19 +360,24 @@ Expected: pretty-printed JSON, no parse error.
 Case A — non-trivial src/ change, no journal entry staged, expect a reminder:
 
 ```bash
-git add -N src/common/src/lib.rs   # or any tracked src/ file, intent-to-add is enough for --name-only
+echo '// scratch' > src/common/src/.hook-test-scratch.rs   # new file, so `git add` actually stages it
+git add src/common/src/.hook-test-scratch.rs
 echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | .agent/hooks/pre-commit-check.sh
-git reset src/common/src/lib.rs
+git reset src/common/src/.hook-test-scratch.rs
+rm src/common/src/.hook-test-scratch.rs
 ```
 Expected: the reminder line prints to stderr, exit code 0.
 
 Case B — same src/ change, but a journal entry is also staged, expect silence:
 
 ```bash
-git add -N src/common/src/lib.rs
-git add docs/journal/README.md
+echo '// scratch' > src/common/src/.hook-test-scratch.rs
+git add src/common/src/.hook-test-scratch.rs
+touch docs/journal/.hook-test-scratch.md
+git add docs/journal/.hook-test-scratch.md
 echo '{"tool_name":"Bash","tool_input":{"command":"git commit -m test"}}' | .agent/hooks/pre-commit-check.sh
-git reset src/common/src/lib.rs docs/journal/README.md
+git reset src/common/src/.hook-test-scratch.rs docs/journal/.hook-test-scratch.md
+rm src/common/src/.hook-test-scratch.rs docs/journal/.hook-test-scratch.md
 ```
 Expected: no output, exit code 0.
 

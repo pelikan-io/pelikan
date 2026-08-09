@@ -81,7 +81,8 @@ won't have it) and requires an in-repo, vault-independent mechanism.
 - **`journal` skill**: scaffolds a new entry. Covers the same triggers as the
   MCP `engineering-journal` skill (start/continue/handoff/close a non-trivial
   effort, preserve a negative result) but writes to the repo, not the vault.
-- **Hook**: `PreToolUse` on `git commit` / PR-open. Heuristic: diff touches
+- **Hook**: `PreToolUse` on `git commit` (covers PR-open transitively, since
+  the `pr` skill always commits before opening a PR). Heuristic: diff touches
   `src/` beyond a trivial dependency bump or CI-only change, and no
   `docs/journal/*.md` file is part of the change → nudge via stderr,
   **non-blocking**, matching grow-a-cache's existing precedent rather than a
