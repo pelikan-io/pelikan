@@ -12,7 +12,9 @@ charter before every material documentation effort.
 - Documentation scope: `README.md` (primary), example configs under `config/`,
   and the rendered `--help` of the product binaries.
 - Established conventions and guidance: `CLAUDE.md` (repository instructions),
-  `.claude/skills/` (project skills: `pr`, `release`, `document-feature`),
+  `.agent/skills/` as skill source of truth symlinked into `.claude/skills/`
+  (project skills: `run`, `test`, `journal`, `pr`, `release`,
+  `document-feature`), `docs/ARCHITECTURE.md` (workspace layout),
   conventional-commit style per `git log`.
 - Shared terminology: products (`pelikan-segcache`, `pelikan-pingserver`,
   `pelikan-rds`, `pelikan-pingproxy`); admin port (default 9999, stats and
@@ -57,7 +59,7 @@ Ask the human owner when priorities conflict materially; do not guess a winner.
 
 ## Synchronized Surfaces
 
-- README and deeper guides: `README.md`, `docs/`
+- README and deeper guides: `README.md`, `docs/ARCHITECTURE.md`, `docs/journal/`
 - Code documentation: crate-level docs in `src/*/src/lib.rs` boundaries
 - CLI help and generated references: `target/release/<binary> --help`
 - Examples and configuration references: `config/*.toml`
