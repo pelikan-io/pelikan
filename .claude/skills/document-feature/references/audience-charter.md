@@ -1,0 +1,111 @@
+# Feature Documentation Audience Charter
+
+Fill this file from project evidence before using the installed skill. Replace
+all placeholders, cite the repository sources for each choice, and recheck the
+charter before every material documentation effort.
+
+## Project Context
+
+- Project name and project type: Pelikan — Rust framework for developing
+  high-performance cache services, organized as a multi-crate Cargo workspace
+  producing several server/proxy product binaries.
+- Documentation scope: `README.md` (primary), example configs under `config/`,
+  and the rendered `--help` of the product binaries.
+- Established conventions and guidance: `CLAUDE.md` (repository instructions),
+  `.claude/skills/` (project skills: `pr`, `release`, `document-feature`),
+  conventional-commit style per `git log`.
+- Shared terminology: products (`pelikan-segcache`, `pelikan-pingserver`,
+  `pelikan-rds`, `pelikan-pingproxy`); admin port (default 9999, stats and
+  management) vs. data port; Segcache (segment-based storage, NSDI'21 paper).
+
+## Audience Priorities and Success
+
+Use the same priority scale for each audience:
+
+- `P0` — primary audience; required tasks must pass before completion.
+- `P1` — important audience; satisfy its criteria unless an explicit documented
+  tradeoff is approved.
+- `P2` — secondary audience; preserve correctness and meet criteria where they
+  do not compromise P0 or P1.
+- `out of scope` — not targeted by this effort; shared authoritative facts still
+  must not be false for this audience.
+
+For each in-scope audience, record at least one frozen representative task and a
+measurable success criterion in addition to prior knowledge and constraints.
+
+| Audience | Priority | Frozen representative task | Measurable success criterion | Prior knowledge | Constraints |
+| --- | --- | --- | --- | --- | --- |
+| Human users | P0 | Operator evaluates pelikan: clone, build release, launch `pelikan-segcache` with the sample config, store and retrieve a value via a memcached client or telnet, read stats from the admin port. | Every command in the README quick path runs as written; set/get round-trips; `stats` on the admin port returns output. | Comfortable with a shell and cargo; no prior pelikan knowledge. | Linux/macOS; Rust stable toolchain only. |
+| Agent users | out of scope | — | — (no agent-callable runtime interface in this repo) | — | Shared facts must still not be false. |
+| Human developers | P1 | Contributor finds how to run the test suite, which products exist and where they live, and how to submit a change. | Test command works as documented; every contributing link resolves (no dead paths); product list matches the workspace. | Rust experience; new to this codebase. | Must not contradict `CLAUDE.md`. |
+| Coding agents | P2 | Agent enumerates the products and their run/test commands from README without contradicting `CLAUDE.md` or `Cargo.toml`. | README product list and commands agree with `[[bin]]` names in the workspace and with `CLAUDE.md`. | Reads `CLAUDE.md` first per harness convention. | README is secondary to `CLAUDE.md` for agents; keep them consistent. |
+
+Rank and success criteria drive content order, examples, visual and textual
+emphasis, and verification. Resolve audience conflicts by preserving shared
+authoritative facts and satisfying the higher-priority criterion without making
+lower-priority contracts false. Document the tradeoff and every unmet criterion.
+Ask the human owner when priorities conflict materially; do not guess a winner.
+
+## Sources of Truth
+
+| Claim type | Authoritative source | Verification method |
+| --- | --- | --- |
+| CLI syntax, defaults, and modes | clap parsers in each product's `src/main.rs` | `target/release/<binary> --help` (rendered output) |
+| Configuration and schemas | `config/*.toml` examples, `src/config/` | run binary with the example config; `cargo test -p config` |
+| Runtime contracts and failures | `src/`, integration tests in `src/server/*/tests/` | `cargo test --workspace` |
+| Architecture and lifecycle | `Cargo.toml` workspace members, `CLAUDE.md` | cross-check lists against `[workspace] members` and `[[bin]]` entries |
+
+## Synchronized Surfaces
+
+- README and deeper guides: `README.md`, `docs/`
+- Code documentation: crate-level docs in `src/*/src/lib.rs` boundaries
+- CLI help and generated references: `target/release/<binary> --help`
+- Examples and configuration references: `config/*.toml`
+- Diagrams and textual equivalents: `docs/*.dot` + adjacent `docs/*.svg` (none
+  yet; create only when relationships exceed prose)
+
+## Verification Commands
+
+- Build or rendered output: `cargo build --workspace --release`
+- Documentation, link, and example checks: verify each README-referenced path
+  exists in the repo (`ls`/`git ls-files`); run each README command block
+- CLI help and behavior checks: `target/release/<binary> --help`; launch with
+  `config/<name>.toml` and exercise the data + admin ports
+- Code and schema tests: `cargo test --workspace`, `cargo fmt --all --check`,
+  `cargo clippy --all-targets`
+
+## Diagram Tooling
+
+- DOT executable and expected version: `dot` (graphviz) 2.43.0 at `/usr/bin/dot`
+- Parse/render command: `dot -Tsvg <file>.dot -o <file>.svg`
+- Freshness check: re-render and diff the committed SVG against the output
+- Source/SVG placement: `.dot` source and rendered `.svg` side by side under `docs/`
+- Textual-equivalent convention: component table or ordered workflow adjacent to
+  every diagram
+
+## Review Gates
+
+Record the project-specific risk thresholds and reviewers. Architecture/workflow
+diagrams, visual hierarchy/navigation, major README restructures, onboarding
+narratives, and other primarily perceptual or subjective features always require
+human review.
+
+| Change category | Required review | Reviewer or owner | Evidence location |
+| --- | --- | --- | --- |
+| Deterministic factual update | automated + peer | Yao Yue (maintainer) | PR review on pelikan-io/pelikan |
+| Architecture or workflow diagram | human | Yao Yue (maintainer) | PR review |
+| Visual hierarchy or navigation | human | Yao Yue (maintainer) | PR review |
+| Major README restructure | human | Yao Yue (maintainer) | PR review |
+| Onboarding narrative | human | Yao Yue (maintainer) | PR review |
+
+## Charter Evidence
+
+- Filled by and date: Claude (agent), reviewed with maintainer, 2026-08-09
+- Evidence inspected: `README.md`, `Cargo.toml` (workspace members, `[[bin]]`
+  entries), `config/` listing, `CLAUDE.md`, `git log` (rustls migration
+  `d7747be`, C-era docs removal `78cc0ef`), `docs/` listing, `command -v dot`
+- Unknowns or conflicts: README currently claims a C toolchain/cmake requirement
+  (stale since the rustls migration) and links two removed docs
+  (`docs/manifesto.rst`, `docs/coding_style.rst`); products list omits
+  `pelikan-rds` and `pelikan-pingproxy` — all to be fixed in the README effort
+  this charter frames.
