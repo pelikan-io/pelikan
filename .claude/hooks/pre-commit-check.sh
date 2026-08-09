@@ -1,0 +1,1 @@
+../../.agent/hooks/pre-commit-check.sh
