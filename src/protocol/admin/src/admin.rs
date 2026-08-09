@@ -190,12 +190,31 @@ pub fn memcache_stats() -> String {
     }
 
     data.sort();
-    data.join("\r\n") + "END\r\n"
+    data.concat() + "END\r\n"
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[metric(name = "stats_format_test_a")]
+    static STATS_FORMAT_TEST_A: Counter = Counter::new();
+
+    #[metric(name = "stats_format_test_b")]
+    static STATS_FORMAT_TEST_B: Counter = Counter::new();
+
+    #[test]
+    fn stats_output_has_no_blank_lines() {
+        // the two counters registered above guarantee at least two STAT lines
+        let stats = memcache_stats();
+        assert!(stats.contains("STAT stats_format_test_a"));
+        assert!(stats.contains("STAT stats_format_test_b"));
+        assert!(
+            !stats.contains("\r\n\r\n"),
+            "stats output must not contain blank lines"
+        );
+        assert!(stats.ends_with("END\r\n"));
+    }
 
     #[test]
     fn parse_incomplete() {
