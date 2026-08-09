@@ -1,143 +1,57 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in
+this repository.
 
 ## Project Overview
 
-Pelikan is a Rust framework for developing high-performance cache services. It emphasizes modularity through reusable components, enabling rapid development of different caching solutions. The project includes multiple server products that share common infrastructure.
-
-## Build Commands
-
-```bash
-# Build entire workspace (release)
-cargo build --workspace --release
-
-# Build debug mode
-cargo build --workspace
-
-# Run all tests
-cargo test --workspace
-
-# Run tests for a specific package
-cargo test -p segcache
-
-# Format code
-cargo fmt --all
-
-# Lint with clippy
-cargo clippy --all-targets --all-features
-
-# Run benchmarks for a specific package
-cargo bench -p segcache
-
-# Run fuzz tests (requires nightly)
-cargo +nightly fuzz run <target>
-```
+Pelikan is a Rust framework for developing high-performance cache services. It
+emphasizes modularity through reusable components, enabling rapid development of
+different caching solutions. The project includes multiple server products that share
+common infrastructure.
 
 ## Products
 
-- `pelikan-segcache` - Memcached-compatible server with Segcache storage (TTL-centric, high memory efficiency)
+- `pelikan-segcache` - Memcached-compatible server with Segcache storage (TTL-centric,
+  high memory efficiency)
 - `pelikan-pingserver` - Ping server for testing and benchmarking
 - `pelikan-rds` - RESP (Redis protocol) server
 - `pelikan-pingproxy` - Ping protocol proxy
 
-### Running Products
+See the `run` skill for how to launch them and the `test` skill for how to test them.
+
+## Build Commands
 
 ```bash
-# Run with default settings
-target/release/pelikan-segcache
-
-# Run with config file
-target/release/pelikan-segcache config/segcache.toml
-
-# Get help and options
-target/release/pelikan-segcache --help
+cargo build --workspace --release   # release build
+cargo build --workspace             # debug build
+cargo test --workspace              # all tests
+cargo fmt --all                     # format
+cargo clippy --all-targets --all-features   # lint
 ```
 
 ## Architecture
 
-### Workspace Structure
+Multi-crate Cargo workspace, layered: core infrastructure, protocol layer, storage
+support, server core, server products, proxies. See `docs/ARCHITECTURE.md` for the full
+breakdown.
 
-The workspace is organized in layers:
+## Skills
 
-**Core Infrastructure** (`src/`)
-- `common/` - Shared types and traits across servers
-- `config/` - TOML-based configuration parsing
-- `logger/` - Centralized logging with tracing
-- `net/` - Networking abstractions, event loops, TLS support
-- `session/` - Session management
-- `entrystore/` - Entry storage type collection
+Essential (shipped in `.agent/skills/`, symlinked into `.claude/skills/`, always
+available regardless of MCP setup):
+- `run` — launch a product binary with its example config
+- `test` — run unit, integration, and fuzz tests
+- `journal` — scaffold a `docs/journal/` entry for a non-trivial engineering effort
+  (nudged, non-blocking, by `.agent/hooks/pre-commit-check.sh`)
+- `pr` — create a feature branch, commit, push, open a PR
+- `release` — create a release PR with version bump and changelog update
 
-**Protocol Layer** (`src/protocol/`)
-- `admin/` - Admin ASCII protocol for stats and management
-- `memcache/` - Memcache ASCII protocol
-- `ping/` - Simple ping/pong protocol
-- `resp/` - Redis RESP protocol with sorted set support
-- `http/` - HTTP protocol parser
-- `common/` - Shared protocol traits
-
-**Storage Backends** (`src/storage/`)
-- `segcache/` - Segment-based storage engine optimized for TTL workloads (NSDI'21 paper)
-- `datatier/` - Byte storage pool abstractions (memmap-based)
-- `bloom/` - Bloom filter implementations
-- `types/` - Shared storage type definitions
-
-**Server Core** (`src/core/`)
-- `admin/` - Admin thread infrastructure
-- `server/` - Event loops, thread management, signal handling
-- `proxy/` - Proxy thread infrastructure
-
-**Server Products** (`src/server/`)
-- `segcache/` - Memcache-compatible server
-- `pingserver/` - Multi-protocol ping server
-- `rds/` - RESP protocol server
-
-**Proxies** (`src/proxy/`)
-- `ping/` - Ping protocol proxy
-
-### Key Design Patterns
-
-- **Lockless data structures**: Worker threads never block
-- **Control/data plane separation**: Admin port (default 9999) for management, data port for cache operations
-- **Per-module config and metrics**: Each component has independent configuration and observability
-- **Protocol/storage pluggability**: Easy to add new protocols or storage backends
-
-## Configuration
-
-Configuration is TOML-based with example files in `config/`:
-- `segcache.toml` - Segcache server config
-- `pingserver.toml` - Pingserver config
-- `pingserver-tls.toml` - TLS-enabled pingserver
-- `rds.toml` - RDS server config
-- `pingproxy.toml` - Ping proxy config
-
-## Testing
-
-### Test Organization
-
-- Unit tests alongside source files
-- Integration tests in `tests/` directories using custom harnesses
-- `integration.rs` - Single-threaded instance testing
-- `integration_multi.rs` - Multi-threaded instance testing
-- Common test utilities in `tests/common.rs`
-
-### Fuzz Testing
-
-Fuzz targets exist for protocols and storage:
-- `src/protocol/admin/fuzz/`
-- `src/protocol/memcache/fuzz/`
-- `src/protocol/ping/fuzz/`
-- `src/protocol/resp/fuzz/`
-- `src/storage/segcache/fuzz/`
-
-## Dependencies
-
-Key dependencies:
-- **Networking**: mio (event loop), rustls (TLS)
-- **Metrics**: metriken
-- **Logging**: tracing
-- **Parsing**: nom (parser combinators)
-- **Serialization**: serde, toml
+Recommended (used only if your environment has `skills-mcp` connected; never assume
+they're present):
+- `catchup`, `sweep-comments`, `plan-feature` — general repo/dev habit skills
+- knowledge-iop vault bundle (`engineering-journal`, `frame-problem`, `propose-design`,
+  `record-decision`, `vault-search`) — additionally requires the user's personal vault
 
 ## Build Requirements
 
