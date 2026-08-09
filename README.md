@@ -180,6 +180,9 @@ included under the `config` directory.
 
 ## Contributing
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, build and test
+commands, and the checks CI enforces.
+
 If you want to submit a patch, please follow these steps:
 
 1. create a new issue
