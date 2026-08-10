@@ -43,6 +43,12 @@ software designed for large-scale deployment.
 
 The framework approach allows us to develop new features and protocols quickly.
 
+![Pelikan workspace architecture](docs/diagrams/architecture.svg)
+
+Each service composes a protocol, a storage engine, and a runtime core from
+the shared libraries below it; see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+for the full breakdown.
+
 ## Products
 
 Pelikan contains the following products:

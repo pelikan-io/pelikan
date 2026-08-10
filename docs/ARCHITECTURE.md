@@ -50,3 +50,31 @@ The workspace is organized in layers:
 - **Per-module config and metrics**: Each component has independent configuration and
   observability
 - **Protocol/storage pluggability**: Easy to add new protocols or storage backends
+
+## Diagrams
+
+Generated from the cargo workspace by `scripts/gen-arch-diagrams.py`;
+regenerate after changing crate dependencies — do not edit the SVG.
+
+![Pelikan workspace architecture](diagrams/architecture.svg)
+
+- [Full workspace](diagrams/architecture.svg) — layer-cake block diagram in
+  the style of the classic Pelikan architecture figure: three bands
+  (Services / Cache libraries / Runtime libraries), no arrows — position
+  encodes layering, and each service box shows its composition by nesting
+  its protocol, storage engine, and core bars. External crates (segcache,
+  rustls, metriken) are placed by their role in the stack, not their repo
+  of origin, and are underlined with links to their crate pages.
+
+Textual equivalent — every product directly depends on the foundation crates
+(`common`, `config`, `logger`); what distinguishes them:
+
+| Product | Protocol spoken | Core | Storage |
+| --- | --- | --- | --- |
+| `pelikan-segcache` | `protocol-memcache` | `server` | `entrystore` (direct) |
+| `pelikan-rds` | `protocol-resp` | `server` | `entrystore` (direct) |
+| `pelikan-pingserver` | `protocol-ping` | `server` | `entrystore` (direct) |
+| `pelikan-pingproxy` | `protocol-ping` (client + server) | `proxy` | none direct (`entrystore` reached only transitively via `proxy`) |
+
+Two library crates currently have no dependents in the workspace:
+`bloom` and `protocol-http`.
