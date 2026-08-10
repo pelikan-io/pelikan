@@ -133,3 +133,10 @@ architecture-diagram skill.
   queue wiring, not the crate graph).
 - Decide whether `bloom`/`protocol-http` orphan status warrants action
   (removal, promotion, or documentation of intended future use).
+- Port the generator from Python to a Rust `cargo xtask` once the chart
+  conventions stabilize (after the threading/dataflow charts land):
+  `cargo_metadata` gives the ground-truth extraction a typed API, and a
+  pure-Rust repo shouldn't carry a Python tooling dependency. If deep D2
+  integration is ever wanted (programmatic layout rather than emitting
+  text), Go's `oss.terrastruct.com/d2` library is the alternative;
+  Python stays only while the diagram language is still in flux.
