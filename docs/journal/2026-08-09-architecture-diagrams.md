@@ -244,3 +244,20 @@ charter pattern, plus trigger evals. The pelikan copy ships with the
 charter filled. Failed graphviz layouts, unicode digit fallback, and the
 minichart scrapping are preserved in the skill as "known dead ends" so
 they are not re-attempted; everything else stayed here as history.
+
+## Legibility and width normalization (2026-08-12 addendum)
+
+Markdown renderers normalize images to the column width, so a chart's
+effective text size is its font-to-canvas-width ratio, not its nominal font
+size. The runtime charts (~1950px) render ~35% smaller than the build chart
+(1280px) on the same page. Two findings for the skill:
+
+- **Font scaling cannot fix a width-normalized chart whose layout is
+  text-driven**: growing the type grows the boxes, which grows the canvas
+  almost proportionally — the ratio barely moves (computed: 0.72% -> 0.74%
+  at 1.5x fonts). The levers that work are structural narrowing or
+  embedding that offers the natural-size view.
+- **Chosen fix: click-through embedding** — each chart links to its raw
+  SVG, which browsers render at natural size with scroll/zoom (#183).
+  Also collapsed the runtime charts' off-scale 13/15/16px sizes into the
+  set's 14/17/20 scale; one type scale is now literal, not aspirational.
