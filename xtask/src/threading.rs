@@ -121,13 +121,13 @@ const CHIP_SEGCACHE: Chip = ("segcache", FILL_STORAGE);
 
 // uniform geometry: every thread container is the same size; externals
 // share their own smaller dashed size
-const TB_W: f64 = 370.0;
-const TB_H: f64 = 112.0;
+const TB_W: f64 = 230.0;
+const TB_H: f64 = 156.0;
 const EXT_W: f64 = 110.0;
 const EXT_H: f64 = 64.0;
 const GAP: f64 = 40.0; // minimum arrow length between columns
 const ELBOW: f64 = 56.0; // elbow verticals sit this far from a queue
-const PANEL_W: f64 = 2210.0;
+const PANEL_W: f64 = 1700.0;
 
 const TS: TypeScale = TYPE_RUNTIME;
 
@@ -176,13 +176,16 @@ fn thread_box(
         parts.push(t.build());
     }
     if !chips.is_empty() {
-        let cw = (TB_W - 16.0 - 6.0 * (chips.len() - 1) as f64) / chips.len() as f64;
-        let mut cx = x + 8.0;
-        let cy = y + TB_H - 40.0;
+        // one column: full-width bars stacked bottom-up, the same idiom as
+        // the architecture chart's composition bars — width stays constant
+        // no matter how many modules a thread runs
+        let bw = TB_W - 20.0;
+        let bh = 30.0;
+        let mut cy = y + TB_H - 10.0 - (chips.len() as f64 * (bh + 6.0) - 6.0);
         for (label, cfill) in chips {
-            parts.push(rect(cx, cy, cw, 30.0, cfill).sw(1.0).build());
-            parts.push(text(cx + cw / 2.0, cy + 15.0, label).build());
-            cx += cw + 6.0;
+            parts.push(rect(x + 10.0, cy, bw, bh, cfill).sw(1.0).build());
+            parts.push(text(x + TB_W / 2.0, cy + bh / 2.0, label).build());
+            cy += bh + 6.0;
         }
     }
 }
@@ -261,7 +264,7 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
 
 fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = if multi { 526.0 } else { 374.0 };
+    let h = if multi { 658.0 } else { 462.0 };
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -305,7 +308,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
 
     let wk_x = q_x + q_w + qg;
     let top_y = y0 + 30.0;
-    let row_b = y0 + h - 122.0;
+    let row_b = y0 + h - 166.0;
 
     let (wk_bottom, st): (f64, Option<(f64, f64)>) = if !multi {
         thread_box(
@@ -480,7 +483,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
 
 fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = 526.0;
+    let h = 658.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -649,7 +652,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     );
 
     // control plane: signal left of admin, admin aligned under listener
-    let row_b = y0 + h - 122.0;
+    let row_b = y0 + h - 166.0;
     let sg_x = X0 + 26.0;
     thread_box(
         &mut parts,

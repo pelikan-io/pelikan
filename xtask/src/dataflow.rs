@@ -81,14 +81,13 @@ const CHIP_SEGCACHE: Chip = ("segcache", FILL_STORAGE);
 const LANE_LINE: &str = "#DDDDDD";
 
 // geometry: uniform chips size the stage; one uniform inter-column gap
-const CHIP_W: f64 = 112.0;
 const CHIP_H: f64 = 30.0;
-const ST_W: f64 = 246.0;
-const ST_H: f64 = 92.0;
+const ST_W: f64 = 170.0;
+const ST_H: f64 = 120.0;
 const GAP: f64 = 96.0;
-const LANE_H: f64 = 150.0;
+const LANE_H: f64 = 160.0;
 const LANE_LABEL_W: f64 = 210.0;
-const PANEL_W: f64 = 2240.0;
+const PANEL_W: f64 = 1790.0;
 
 const TS: TypeScale = TYPE_RUNTIME;
 
@@ -113,13 +112,14 @@ fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &
             .bold()
             .build(),
     );
-    let group_w = CHIP_W * chips.len() as f64 + 6.0 * (chips.len() - 1) as f64;
-    let mut cx = x + (ST_W - group_w) / 2.0;
-    let cy = y + ST_H - 40.0;
+    // one column: full-width bars stacked bottom-up (see the threading
+    // chart's thread boxes and the architecture chart's composition bars)
+    let bw = ST_W - 20.0;
+    let mut cy = y + ST_H - 10.0 - (chips.len() as f64 * (CHIP_H + 6.0) - 6.0);
     for (label, cfill) in chips {
-        parts.push(rect(cx, cy, CHIP_W, CHIP_H, cfill).sw(1.0).build());
-        parts.push(text(cx + CHIP_W / 2.0, cy + CHIP_H / 2.0, label).build());
-        cx += CHIP_W + 6.0;
+        parts.push(rect(x + 10.0, cy, bw, CHIP_H, cfill).sw(1.0).build());
+        parts.push(text(x + ST_W / 2.0, cy + CHIP_H / 2.0, label).build());
+        cy += CHIP_H + 6.0;
     }
 }
 
