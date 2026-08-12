@@ -179,11 +179,15 @@
 <text x="1643" y="896" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">servers</text>
 <path d="M 1518 896 L 1598 896" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)" marker-start="url(#a)"/>
 <text x="1558" y="886" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">connect</text>
+<rect x="50" y="1108" width="270" height="92" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
+<text x="185" y="1128" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#000" text-anchor="middle">pelikan_signal</text>
+<text x="185" y="1154" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#333" font-style="italic" text-anchor="middle">SIGINT/TERM/QUIT</text>
 <rect x="354" y="1108" width="270" height="92" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
 <text x="489" y="1128" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#000" text-anchor="middle">pelikan_admin</text>
 <text x="489" y="1154" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="normal" fill="#333" text-anchor="middle">:9999</text>
 <rect x="362" y="1168" width="254" height="24" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <text x="489" y="1180" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#000" text-anchor="middle">protocol-admin</text>
+<path d="M 320 1154 L 354 1154" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <path d="M 394 1108 L 394 942" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <text x="368" y="1025" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#777" text-anchor="middle">signals</text>
 <path d="M 624 1154 L 927 1154 L 927 1068" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>

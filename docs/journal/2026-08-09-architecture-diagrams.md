@@ -175,7 +175,10 @@ runtime half:
 - **Negative claims matter**: the proxy core spawns no signal-handler
   thread — asserted as an absence check, and visible as the missing box.
   Possible real gap: pingproxy ignores SIGTERM (no graceful shutdown path
-  from OS signals).
+  from OS signals). *Update 2026-08-12: confirmed real and fixed — the
+  proxy core now spawns `pelikan_signal` mirroring the server core; the
+  fix tripped the absence claim exactly as designed, and the claim
+  flipped to a positive one.*
 - **Source anchoring for runtime charts**: 17 grep assertions (thread
   spawns, queue wiring, signal set, ports, upstream connect) abort
   generation on drift — the runtime analog of deriving from cargo

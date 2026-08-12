@@ -70,6 +70,16 @@ const CLAIMS: &[Claim] = &[
     },
     Claim {
         path: "src/core/proxy/src/process.rs",
+        pattern: r#"name\(format!\("\{THREAD_PREFIX\}_signal"\)\)"#,
+        what: "proxy signal handler thread spawn",
+    },
+    Claim {
+        path: "src/core/proxy/src/process.rs",
+        pattern: r"SIGHUP, SIGINT, SIGTERM, SIGQUIT",
+        what: "proxy signal handler signal set",
+    },
+    Claim {
+        path: "src/core/proxy/src/process.rs",
         pattern: r#"name\(format!\("\{THREAD_PREFIX\}_fe_\{i\}"\)\)"#,
         what: "proxy frontend worker spawn",
     },
@@ -101,11 +111,7 @@ const CLAIMS: &[Claim] = &[
 ];
 
 /// Claims of absence: the diagram relies on these NOT existing.
-const NEG_CLAIMS: &[Claim] = &[Claim {
-    path: "src/core/proxy/src/process.rs",
-    pattern: r"\{THREAD_PREFIX\}_signal",
-    what: "proxy core has no OS signal-handler thread",
-}];
+const NEG_CLAIMS: &[Claim] = &[];
 
 type Chip = (&'static str, &'static str);
 const CHIP_PROTOCOL: Chip = ("protocol-*", FILL_PROTOCOL);
@@ -647,9 +653,18 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
 
-    // control plane: admin only — the proxy core installs no OS signal
-    // handler (see NEG_CLAIMS)
+    // control plane: signal left of admin, admin aligned under listener
     let row_b = y0 + h - 100.0;
+    let sg_x = X0 + 26.0;
+    thread_box(
+        &mut parts,
+        sg_x,
+        row_b,
+        "pelikan_signal",
+        Some("SIGINT/TERM/QUIT"),
+        &[],
+        true,
+    );
     thread_box(
         &mut parts,
         li_x,
@@ -660,6 +675,11 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
         false,
     );
     let mid_b = row_b + TB_H / 2.0;
+    parts.push(
+        ortho(&[(sg_x + TB_W, mid_b), (li_x, mid_b)])
+            .signal()
+            .build(),
+    );
     parts.push(
         ortho(&[(li_x + 40.0, row_b), (li_x + 40.0, row_a + TB_H)])
             .signal()

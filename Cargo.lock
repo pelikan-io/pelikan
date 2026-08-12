@@ -1429,6 +1429,7 @@ dependencies = [
  "config",
  "crossbeam-channel",
  "entrystore",
+ "libc",
  "logger",
  "metriken",
  "pelikan-net",
@@ -1436,6 +1437,7 @@ dependencies = [
  "protocol-common",
  "queues",
  "session",
+ "signal-hook",
  "slab",
 ]
 
