@@ -1,0 +1,81 @@
+{
+  "evals": [
+    {
+      "name": "activate for new build-time chart",
+      "prompt": "Draw an architecture diagram of this workspace showing the layers and what each shipped binary is composed of.",
+      "should_trigger": true,
+      "required_outcomes": [
+        "Read the diagram charter before drawing",
+        "Derive units and composition from the build manifest, not a hand-kept list",
+        "Abort on any unclassified unit or stale classification",
+        "Obtain human review of the rendered chart"
+      ],
+      "prohibited_outcomes": [
+        "Hand-author node or edge lists beside the code",
+        "Draw per-unit arrows at whole-system scale"
+      ]
+    },
+    {
+      "name": "activate for runtime thread chart",
+      "prompt": "Create a threading diagram showing which threads each binary spawns and how they are connected.",
+      "should_trigger": true,
+      "required_outcomes": [
+        "Write positive and negative source assertions before any geometry",
+        "Use literal runtime thread names in monospace, grep-asserted against spawn sites",
+        "Bridge to the build chart with module chips in the build chart's colors"
+      ],
+      "prohibited_outcomes": [
+        "Invent thread names or omit a variant without an absence claim",
+        "Ship without the freshness check covering the new chart"
+      ]
+    },
+    {
+      "name": "activate for diagram drift",
+      "prompt": "CI says the diagram freshness check is failing after my refactor of the worker thread pool.",
+      "should_trigger": true,
+      "required_outcomes": [
+        "Treat the failing source claim as a finding about the change, not the chart",
+        "Update claims and regenerate via the single regeneration command",
+        "Re-obtain human review if the rendered output changed"
+      ],
+      "prohibited_outcomes": [
+        "Hand-edit the committed SVG to make the diff pass",
+        "Delete or loosen a failing claim without recording why"
+      ]
+    },
+    {
+      "name": "do not activate for conceptual explanation",
+      "prompt": "Explain the difference between a thread-per-core and a work-stealing runtime.",
+      "should_trigger": false,
+      "required_outcomes": [
+        "Answer without activating the architecture-diagram workflow"
+      ],
+      "prohibited_outcomes": [
+        "Create or modify any diagram or charter"
+      ]
+    },
+    {
+      "name": "do not activate for prose documentation",
+      "prompt": "Rewrite the README quick-start section for clarity.",
+      "should_trigger": false,
+      "required_outcomes": [
+        "Defer to the feature-documentation workflow instead"
+      ],
+      "prohibited_outcomes": [
+        "Regenerate or restructure the diagram set"
+      ]
+    },
+    {
+      "name": "activate but keep the halves separate",
+      "prompt": "Add arrows to the architecture diagram showing where requests flow between the components.",
+      "should_trigger": true,
+      "required_outcomes": [
+        "Route the runtime claim to a runtime chart instead of overlaying it on the build chart",
+        "Explain that structure and runtime claims need different ground truths"
+      ],
+      "prohibited_outcomes": [
+        "Mix dependency edges and request-flow edges on one chart"
+      ]
+    }
+  ]
+}

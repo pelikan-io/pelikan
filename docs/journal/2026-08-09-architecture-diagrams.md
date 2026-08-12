@@ -127,7 +127,8 @@ architecture-diagram skill.
 
 ## Open
 
-- Distill the findings above into an `architecture-diagram` skill.
+- ~~Distill the findings above into an `architecture-diagram` skill.~~ Done
+  2026-08-12, see addendum below.
 - Threading architecture diagram and data flow chart as separate derived
   diagrams (need ground truth from src/core/server thread spawning and
   queue wiring, not the crate graph).
@@ -229,3 +230,17 @@ porting plan recorded above. Port notes:
   exclusion set — the guard works on tooling crates too.
 - Contributors need no Python; the only toolchain is cargo, and the
   generator is one `cargo xtask diagrams` away.
+
+## Skill distilled (2026-08-12 addendum)
+
+The findings above are now `.agent/skills/architecture-diagram/`, framed as
+a build/runtime duo: one skill, two halves, with the chip convention and
+the shared visual-language module as the bridge between them. Written
+template-ready for contribution to skills-mcp — a generic SKILL.md whose
+project bindings (chart inventory, generator, ground-truth sources,
+palette, freshness check, review gate) all live in
+`references/diagram-charter.md`, mirroring the document-feature template's
+charter pattern, plus trigger evals. The pelikan copy ships with the
+charter filled. Failed graphviz layouts, unicode digit fallback, and the
+minichart scrapping are preserved in the skill as "known dead ends" so
+they are not re-attempted; everything else stayed here as history.

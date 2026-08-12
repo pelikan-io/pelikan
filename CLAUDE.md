@@ -46,6 +46,9 @@ available regardless of MCP setup):
   (nudged, non-blocking, by `.agent/hooks/pre-commit-check.sh`)
 - `pr` — create a feature branch, commit, push, open a PR
 - `release` — create a release PR with version bump and changelog update
+- `architecture-diagram` — create or revise the generated diagram set
+  (build-time architecture chart plus runtime threading/dataflow charts,
+  regenerated via `cargo xtask diagrams`)
 
 Recommended (used only if your environment has `skills-mcp` connected; never assume
 they're present):
