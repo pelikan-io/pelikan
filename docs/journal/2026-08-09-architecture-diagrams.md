@@ -204,3 +204,25 @@ squarely in the dataflow-diagram skill's home domain. Conventions:
 - **Per-panel stage pitch** computed so any stage count fits the shared
   panel width.
 - Control plane omitted by scope decision; the threading chart carries it.
+
+## Rust port (2026-08-12 addendum)
+
+The three Python generators are now a single Rust `cargo xtask diagrams`
+(xtask/ workspace member, alias in .cargo/config.toml), closing the
+porting plan recorded above. Port notes:
+
+- **Faithfulness proven, not assumed**: the Rust output is byte-identical
+  to the Python output for all three charts (modulo Python printing
+  `stroke-width="1.0"` where Rust prints `"1"`), verified by diffing
+  before deleting the scripts.
+- `cargo_metadata` replaces subprocess-plus-JSON for the build chart's
+  ground truth; the regex claims and the entrystore-engine source grep
+  carry over unchanged.
+- Shared visual language (palette, type scale, builders for
+  rect/text/ortho) lives once in xtask/src/svg.rs — the duplication the
+  Python trio accumulated is gone.
+- Adding xtask to the workspace immediately tripped the fail-loudly
+  classification ("xtask not classified"), forcing the explicit TOOLING
+  exclusion set — the guard works on tooling crates too.
+- Contributors need no Python; the only toolchain is cargo, and the
+  generator is one `cargo xtask diagrams` away.

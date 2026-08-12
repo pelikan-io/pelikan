@@ -30,6 +30,7 @@ members = [
     "src/storage/bloom",
     "src/queues",
     "src/storage/types",
+    "xtask",
 ]
 
 [workspace.dependencies]
