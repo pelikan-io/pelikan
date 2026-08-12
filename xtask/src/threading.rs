@@ -121,25 +121,31 @@ const CHIP_SEGCACHE: Chip = ("segcache", FILL_STORAGE);
 
 // uniform geometry: every thread container is the same size; externals
 // share their own smaller dashed size
-const TB_W: f64 = 270.0;
-const TB_H: f64 = 92.0;
-const EXT_W: f64 = 90.0;
-const EXT_H: f64 = 56.0;
-const GAP: f64 = 34.0; // minimum arrow length between columns
-const ELBOW: f64 = 45.0; // elbow verticals sit this far from a queue
-const PANEL_W: f64 = 1700.0;
+const TB_W: f64 = 370.0;
+const TB_H: f64 = 112.0;
+const EXT_W: f64 = 110.0;
+const EXT_H: f64 = 64.0;
+const GAP: f64 = 40.0; // minimum arrow length between columns
+const ELBOW: f64 = 56.0; // elbow verticals sit this far from a queue
+const PANEL_W: f64 = 2210.0;
+
+/// Chart-local default label size: the architecture chart's 14, bumped +4
+/// with the rest of this chart's type scale (18/21/24).
+fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {
+    crate::svg::text(x, y, s).size(18)
+}
 const X0: f64 = 24.0;
 
 fn gap_for(label: &str) -> f64 {
-    (label_w(label) + 10.0).max(GAP)
+    (label_w_at(label, 18.0) + 10.0).max(GAP)
 }
 
 fn queue_gap(label: &str) -> f64 {
     // labels wrap at " (" so only the longest line drives the overhang
     let longest = label.split(" (").max_by_key(|s| s.len()).unwrap();
-    (GAP + 6.0)
-        .max((label_w(longest) - 50.0) / 2.0 + 8.0)
-        .max(ELBOW + 14.0)
+    (GAP + 8.0)
+        .max((label_w_at(longest, 18.0) - 50.0) / 2.0 + 8.0)
+        .max(ELBOW + 16.0)
 }
 
 fn thread_box(
@@ -152,16 +158,16 @@ fn thread_box(
     external: bool,
 ) {
     parts.push(rect(x, y, TB_W, TB_H, "#FFFFFF").rx(10.0).build());
-    let mut ty = y + 20.0;
+    let mut ty = y + 24.0;
     parts.push(
         text(x + TB_W / 2.0, ty, name)
-            .size(17)
+            .size(21)
             .bold()
             .mono()
             .build(),
     );
     if let Some(sub) = sub {
-        ty += 26.0;
+        ty += 30.0;
         let mut t = text(x + TB_W / 2.0, ty, sub).fill("#333");
         if external {
             t = t.italic();
@@ -171,10 +177,10 @@ fn thread_box(
     if !chips.is_empty() {
         let cw = (TB_W - 16.0 - 6.0 * (chips.len() - 1) as f64) / chips.len() as f64;
         let mut cx = x + 8.0;
-        let cy = y + TB_H - 32.0;
+        let cy = y + TB_H - 40.0;
         for (label, cfill) in chips {
-            parts.push(rect(cx, cy, cw, 24.0, cfill).sw(1.0).build());
-            parts.push(text(cx + cw / 2.0, cy + 12.0, label).build());
+            parts.push(rect(cx, cy, cw, 30.0, cfill).sw(1.0).build());
+            parts.push(text(cx + cw / 2.0, cy + 15.0, label).build());
             cx += cw + 6.0;
         }
     }
@@ -191,14 +197,14 @@ fn queue_glyph(parts: &mut Vec<String>, x: f64, y: f64, w: f64, h: f64, label: &
         );
     }
     if let Some((first, rest)) = label.split_once(" (") {
-        parts.push(text(x + w / 2.0, y - 24.0, first).fill("#555").build());
+        parts.push(text(x + w / 2.0, y - 35.0, first).fill("#555").build());
         parts.push(
-            text(x + w / 2.0, y - 11.0, &format!("({rest}"))
+            text(x + w / 2.0, y - 14.0, &format!("({rest}"))
                 .fill("#555")
                 .build(),
         );
     } else {
-        parts.push(text(x + w / 2.0, y - 10.0, label).fill("#555").build());
+        parts.push(text(x + w / 2.0, y - 13.0, label).fill("#555").build());
     }
 }
 
@@ -207,7 +213,7 @@ fn ext_box(parts: &mut Vec<String>, x: f64, y_row: f64, name: &str) {
     parts.push(rect(x, y, EXT_W, EXT_H, FILL_EXTERNAL).dashed().build());
     parts.push(
         text(x + EXT_W / 2.0, y + EXT_H / 2.0, name)
-            .size(17)
+            .size(21)
             .italic()
             .build(),
     );
@@ -222,7 +228,7 @@ fn worker_column(
     names: (&str, &str),
     chips: &[Chip],
 ) -> f64 {
-    let y1 = y_top + TB_H + 34.0;
+    let y1 = y_top + TB_H + 40.0;
     thread_box(parts, x, y_top, names.0, None, chips, false);
     thread_box(parts, x, y1, names.1, None, chips, false);
     let dots_cy = (y_top + TB_H + y1) / 2.0;
@@ -239,10 +245,10 @@ fn worker_column(
 /// Right-margin block: panel title over a binary->protocol mini-table, the
 /// whole block vertically centered.
 fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[(&str, &str)]) {
-    let (row_h, title_h, gap) = (20.0, 26.0, 8.0);
+    let (row_h, title_h, gap) = (26.0, 32.0, 10.0);
     let block_h = title_h + gap + rows.len() as f64 * row_h;
     let ty = cy - block_h / 2.0 + title_h / 2.0;
-    parts.push(text(cx, ty, title).size(20).bold().build());
+    parts.push(text(cx, ty, title).size(24).bold().build());
     let mut ry = ty + title_h / 2.0 + gap + row_h / 2.0;
     for (binary, proto) in rows {
         parts.push(text(cx - 6.0, ry, binary).fill("#555").end().build());
@@ -254,16 +260,16 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
 
 fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = if multi { 414.0 } else { 316.0 };
+    let h = if multi { 526.0 } else { 374.0 };
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
             .sw(2.0)
             .build(),
     );
-    margin_block(&mut parts, X0 + PANEL_W + 100.0, y0 + h / 2.0, title, rows);
+    margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
 
-    let row_a = y0 + 56.0;
+    let row_a = y0 + 64.0;
     let mid_a = row_a + TB_H / 2.0;
 
     let cl_x = X0 + 26.0;
@@ -285,7 +291,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
             .build(),
     );
     parts.push(
-        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 10.0, "accept")
+        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 13.0, "accept")
             .fill("#555")
             .build(),
     );
@@ -293,12 +299,12 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
     let q_w = 50.0;
     let qg = queue_gap("sessions");
     let q_x = li_x + TB_W + qg;
-    queue_glyph(&mut parts, q_x, mid_a - 9.0, q_w, 18.0, "sessions");
+    queue_glyph(&mut parts, q_x, mid_a - 11.0, q_w, 22.0, "sessions");
     parts.push(ortho(&[(li_x + TB_W, mid_a), (q_x, mid_a)]).build());
 
     let wk_x = q_x + q_w + qg;
-    let top_y = y0 + 26.0;
-    let row_b = y0 + h - 100.0;
+    let top_y = y0 + 30.0;
+    let row_b = y0 + h - 122.0;
 
     let (wk_bottom, st): (f64, Option<(f64, f64)>) = if !multi {
         thread_box(
@@ -324,8 +330,8 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
         parts.push(
             ortho(&[
                 (q_x + q_w, mid_a),
-                (wk_x - 18.0, mid_a),
-                (wk_x - 18.0, wk0_y + TB_H / 2.0),
+                (wk_x - 22.0, mid_a),
+                (wk_x - 22.0, wk0_y + TB_H / 2.0),
                 (wk_x, wk0_y + TB_H / 2.0),
             ])
             .build(),
@@ -333,8 +339,8 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
         parts.push(
             ortho(&[
                 (q_x + q_w, mid_a),
-                (wk_x - 18.0, mid_a),
-                (wk_x - 18.0, wk1_y + TB_H / 2.0),
+                (wk_x - 22.0, mid_a),
+                (wk_x - 22.0, wk1_y + TB_H / 2.0),
                 (wk_x, wk1_y + TB_H / 2.0),
             ])
             .build(),
@@ -405,7 +411,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
     parts.push(
         text(
             (cl_x + wk_x + TB_W) / 2.0,
-            top_y - 10.0,
+            top_y - 13.0,
             "requests / responses (wire)",
         )
         .fill("#555")
@@ -439,12 +445,12 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
             .build(),
     );
     parts.push(
-        ortho(&[(li_x + 40.0, row_b), (li_x + 40.0, row_a + TB_H)])
+        ortho(&[(li_x + 48.0, row_b), (li_x + 48.0, row_a + TB_H)])
             .signal()
             .build(),
     );
     parts.push(
-        text(li_x + 14.0, (row_b + row_a + TB_H) / 2.0, "signals")
+        text(li_x + 16.0, (row_b + row_a + TB_H) / 2.0, "signals")
             .fill("#777")
             .build(),
     );
@@ -473,16 +479,16 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
 
 fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = 414.0;
+    let h = 526.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
             .sw(2.0)
             .build(),
     );
-    margin_block(&mut parts, X0 + PANEL_W + 100.0, y0 + h / 2.0, title, rows);
+    margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
 
-    let row_a = y0 + 56.0;
+    let row_a = y0 + 64.0;
     let mid_a = row_a + TB_H / 2.0;
 
     let cl_x = X0 + 26.0;
@@ -504,7 +510,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 10.0, "accept")
+        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 13.0, "accept")
             .fill("#555")
             .build(),
     );
@@ -512,7 +518,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     let q_w = 50.0;
     let qg = queue_gap("sessions");
     let q_x = li_x + TB_W + qg;
-    queue_glyph(&mut parts, q_x, mid_a - 9.0, q_w, 18.0, "sessions");
+    queue_glyph(&mut parts, q_x, mid_a - 11.0, q_w, 22.0, "sessions");
     parts.push(ortho(&[(li_x + TB_W, mid_a), (q_x, mid_a)]).build());
 
     let fe_x = q_x + q_w + qg;
@@ -527,8 +533,8 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     parts.push(
         ortho(&[
             (q_x + q_w, mid_a),
-            (fe_x - 16.0, mid_a),
-            (fe_x - 16.0, fe0_y + TB_H / 2.0),
+            (fe_x - 20.0, mid_a),
+            (fe_x - 20.0, fe0_y + TB_H / 2.0),
             (fe_x, fe0_y + TB_H / 2.0),
         ])
         .build(),
@@ -536,14 +542,14 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     parts.push(
         ortho(&[
             (q_x + q_w, mid_a),
-            (fe_x - 16.0, mid_a),
-            (fe_x - 16.0, fe1_y + TB_H / 2.0),
+            (fe_x - 20.0, mid_a),
+            (fe_x - 20.0, fe1_y + TB_H / 2.0),
             (fe_x, fe1_y + TB_H / 2.0),
         ])
         .build(),
     );
 
-    let top_y = y0 + 26.0;
+    let top_y = y0 + 30.0;
     parts.push(
         ortho(&[
             (cl_x + EXT_W / 2.0, row_a + (TB_H - EXT_H) / 2.0),
@@ -558,7 +564,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     parts.push(
         text(
             (cl_x + fe_x + TB_W) / 2.0,
-            top_y - 10.0,
+            top_y - 13.0,
             "requests / responses (wire)",
         )
         .fill("#555")
@@ -636,13 +642,13 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text((be_x + TB_W + sv_x) / 2.0, mid_a - 10.0, "connect")
+        text((be_x + TB_W + sv_x) / 2.0, mid_a - 13.0, "connect")
             .fill("#555")
             .build(),
     );
 
     // control plane: signal left of admin, admin aligned under listener
-    let row_b = y0 + h - 100.0;
+    let row_b = y0 + h - 122.0;
     let sg_x = X0 + 26.0;
     thread_box(
         &mut parts,
@@ -669,12 +675,12 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        ortho(&[(li_x + 40.0, row_b), (li_x + 40.0, row_a + TB_H)])
+        ortho(&[(li_x + 48.0, row_b), (li_x + 48.0, row_a + TB_H)])
             .signal()
             .build(),
     );
     parts.push(
-        text(li_x + 14.0, (row_b + row_a + TB_H) / 2.0, "signals")
+        text(li_x + 16.0, (row_b + row_a + TB_H) / 2.0, "signals")
             .fill("#777")
             .build(),
     );
@@ -719,7 +725,7 @@ pub fn generate() {
     let (p3, h3) = proxy_panel(y, "proxy", &proxy_rows);
     parts.extend(p3);
 
-    let (w, h) = (24.0 + PANEL_W + 200.0 + 24.0, y + h3 + 24.0);
+    let (w, h) = (24.0 + PANEL_W + 260.0 + 24.0, y + h3 + 24.0);
     fs::write(OUT, svg_document(w, h, "cargo xtask diagrams", &parts)).unwrap();
     println!("generated: {OUT}");
 }
