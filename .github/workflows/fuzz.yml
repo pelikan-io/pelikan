@@ -28,7 +28,11 @@ jobs:
         with:
           shared-key: fuzz
           prefix-key: v1-rust
-      - uses: dtolnay/install@cargo-fuzz
+      # cargo-install builds once and caches the binary, immune to the
+      # release-CDN 503s that dtolnay/install (prebuilt download) hit
+      - uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-fuzz
 
       - name: cargo build
         shell: bash
@@ -86,7 +90,11 @@ jobs:
           shared-key: fuzz
           prefix-key: v1-rust
           save-if: false
-      - uses: dtolnay/install@cargo-fuzz
+      # cargo-install builds once and caches the binary, immune to the
+      # release-CDN 503s that dtolnay/install (prebuilt download) hit
+      - uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-fuzz
 
       # Persist the libFuzzer corpus across runs so each run starts from
       # accumulated coverage instead of rediscovering it from scratch. The
