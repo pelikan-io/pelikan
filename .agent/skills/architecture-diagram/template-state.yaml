@@ -5,21 +5,21 @@ template:
   version: 0.1.0
 source:
   repository: https://github.com/iopsystems/skills-mcp
-  commit: 513911ddc5b0b4ce657d07e5438822b59e47ea50
+  commit: 6390b4db3a165a768b32f0c6a8690e3e0630c615
 base:
-  aggregate_sha256: 462e92d6c839a8fb65f94b569d66134c9f9d2b5710f3a0ff083d831e71cd3823
+  aggregate_sha256: 4abd16e3e2618bf6c7c24439e46283385415dc622a58f05097afee9caeecd100
   files:
     - path: SKILL.md
-      sha256: 1ce27410fd14538227aa8069488a92ea0f0ee0467ead004c18a38e56ee3f342c
+      sha256: 956ec0186b0ac7516c9f8ddb1e4574ce27749822dbe21a1573357db2db507c3f
       merge_strategy: three-way
     - path: references/diagram-charter.md
-      sha256: 26da75c2265b013a4aaea125486bc229b853096b9b5c03bde298da9f3540ad27
+      sha256: 76f3993a6822d9b39e802559fc573ae89f3d924964b7e236eb473fc38008df96
       merge_strategy: three-way
     - path: evals/trigger-evals.json
       sha256: 4a82741c243a67615906031e220f05a247b428644aef61813176cb52fd00d43d
       merge_strategy: preserve-local
 installed_at: 2026-08-12
-last_upgraded_at: null
+last_upgraded_at: 2026-08-12
 customizations:
   - path: references/diagram-charter.md
-    rationale: filled placeholder charter with pelikan bindings (three-chart inventory, cargo xtask diagrams generator, cargo_metadata + source-claim ground truth, palette/type scale, diagram-freshness CI job, maintainer review gate)
+    rationale: filled required bindings with pelikan values (three-chart inventory, cargo xtask diagrams generator, cargo_metadata + source-claim ground truth, diagram-freshness CI job, maintainer review gate); overrides section records none — the skill's defaults were derived from this project
