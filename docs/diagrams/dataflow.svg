@@ -4,20 +4,20 @@
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4D4D4D"/></marker></defs>
 <rect x="24" y="24" width="1740" height="296" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
 <text x="1864" y="138" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="bold" fill="#000" text-anchor="middle">single worker</text>
-<text x="1858" y="169" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
-<text x="1864" y="169" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="1872" y="169" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
-<text x="1858" y="189" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="end">rds</text>
-<text x="1864" y="189" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="1872" y="189" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="start">resp</text>
-<text x="1858" y="209" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="end">pingserver</text>
-<text x="1864" y="209" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="1872" y="209" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="start">ping</text>
+<text x="1858" y="169" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
+<text x="1864" y="169" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="1872" y="169" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
+<text x="1858" y="189" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="end">rds</text>
+<text x="1864" y="189" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="1872" y="189" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="start">resp</text>
+<text x="1858" y="209" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="end">pingserver</text>
+<text x="1864" y="209" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="1872" y="209" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="start">ping</text>
 <line x1="36" y1="168" x2="1752" y2="168" stroke="#DDDDDD" stroke-width="1"/>
-<text x="42" y="226" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="bold" fill="#000" text-anchor="start">pelikan_work</text>
+<text x="42" y="226" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#000" text-anchor="start">pelikan_work</text>
 <line x1="36" y1="284" x2="1752" y2="284" stroke="#DDDDDD" stroke-width="1"/>
 <rect x="109" y="82" width="90" height="56" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
-<text x="154" y="110" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
+<text x="154" y="110" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="229" y="190" width="184" height="72" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
 <circle cx="247" cy="207" r="11" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
 <text x="247" y="207" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#000" text-anchor="middle">1</text>
@@ -59,22 +59,22 @@
 <text x="1203" y="98" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">response (wire)</text>
 <rect x="24" y="340" width="1740" height="412" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
 <text x="1864" y="512" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="bold" fill="#000" text-anchor="middle">multiple workers</text>
-<text x="1858" y="543" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
-<text x="1864" y="543" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="1872" y="543" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
-<text x="1858" y="563" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="end">rds</text>
-<text x="1864" y="563" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="1872" y="563" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="start">resp</text>
-<text x="1858" y="583" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="end">pingserver</text>
-<text x="1864" y="583" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="1872" y="583" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="start">ping</text>
+<text x="1858" y="543" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
+<text x="1864" y="543" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="1872" y="543" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
+<text x="1858" y="563" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="end">rds</text>
+<text x="1864" y="563" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="1872" y="563" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="start">resp</text>
+<text x="1858" y="583" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="end">pingserver</text>
+<text x="1864" y="583" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="1872" y="583" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="start">ping</text>
 <line x1="36" y1="484" x2="1752" y2="484" stroke="#DDDDDD" stroke-width="1"/>
-<text x="42" y="542" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="bold" fill="#000" text-anchor="start">pelikan_work_i</text>
+<text x="42" y="542" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#000" text-anchor="start">pelikan_work_i</text>
 <line x1="36" y1="600" x2="1752" y2="600" stroke="#DDDDDD" stroke-width="1"/>
-<text x="42" y="658" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="bold" fill="#000" text-anchor="start">pelikan_storage</text>
+<text x="42" y="658" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#000" text-anchor="start">pelikan_storage</text>
 <line x1="36" y1="716" x2="1752" y2="716" stroke="#DDDDDD" stroke-width="1"/>
 <rect x="109" y="398" width="90" height="56" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
-<text x="154" y="426" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
+<text x="154" y="426" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="229" y="506" width="184" height="72" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
 <circle cx="247" cy="523" r="11" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
 <text x="247" y="523" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#000" text-anchor="middle">1</text>
@@ -126,17 +126,17 @@
 <text x="1203" y="414" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">response (wire)</text>
 <rect x="24" y="772" width="1740" height="528" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
 <text x="1864" y="1022" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="bold" fill="#000" text-anchor="middle">proxy</text>
-<text x="1858" y="1053" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="end">pingproxy</text>
-<text x="1864" y="1053" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="1872" y="1053" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="normal" fill="#555" text-anchor="start">ping</text>
+<text x="1858" y="1053" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="end">pingproxy</text>
+<text x="1864" y="1053" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="1872" y="1053" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="start">ping</text>
 <line x1="36" y1="916" x2="1752" y2="916" stroke="#DDDDDD" stroke-width="1"/>
-<text x="42" y="974" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="bold" fill="#000" text-anchor="start">pelikan_fe_i</text>
+<text x="42" y="974" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#000" text-anchor="start">pelikan_fe_i</text>
 <line x1="36" y1="1032" x2="1752" y2="1032" stroke="#DDDDDD" stroke-width="1"/>
-<text x="42" y="1090" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="16" font-weight="bold" fill="#000" text-anchor="start">pelikan_be_i</text>
+<text x="42" y="1090" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="17" font-weight="bold" fill="#000" text-anchor="start">pelikan_be_i</text>
 <line x1="36" y1="1148" x2="1752" y2="1148" stroke="#DDDDDD" stroke-width="1"/>
 <line x1="36" y1="1264" x2="1752" y2="1264" stroke="#DDDDDD" stroke-width="1"/>
 <rect x="109" y="830" width="90" height="56" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
-<text x="154" y="858" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
+<text x="154" y="858" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="229" y="938" width="184" height="72" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
 <circle cx="247" cy="955" r="11" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
 <text x="247" y="955" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#000" text-anchor="middle">1</text>
@@ -192,7 +192,7 @@
 <text x="469" y="1032" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="start">request (object)</text>
 <path d="M 677 1090 L 757 1090" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <rect x="936" y="1178" width="90" height="56" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
-<text x="981" y="1206" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">servers</text>
+<text x="981" y="1206" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="17" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">servers</text>
 <path d="M 849 1126 L 849 1206 L 936 1206" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
 <text x="837" y="1172" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="normal" fill="#555" text-anchor="end">request (wire)</text>
 <path d="M 1026 1206 L 1113 1206 L 1113 1126" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>

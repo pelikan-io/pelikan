@@ -162,7 +162,7 @@ fn thread_box(
     );
     if let Some(sub) = sub {
         ty += 26.0;
-        let mut t = text(x + TB_W / 2.0, ty, sub).size(16).fill("#333");
+        let mut t = text(x + TB_W / 2.0, ty, sub).fill("#333");
         if external {
             t = t.italic();
         }
@@ -207,7 +207,7 @@ fn ext_box(parts: &mut Vec<String>, x: f64, y_row: f64, name: &str) {
     parts.push(rect(x, y, EXT_W, EXT_H, FILL_EXTERNAL).dashed().build());
     parts.push(
         text(x + EXT_W / 2.0, y + EXT_H / 2.0, name)
-            .size(15)
+            .size(17)
             .italic()
             .build(),
     );
@@ -245,21 +245,9 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
     parts.push(text(cx, ty, title).size(20).bold().build());
     let mut ry = ty + title_h / 2.0 + gap + row_h / 2.0;
     for (binary, proto) in rows {
-        parts.push(
-            text(cx - 6.0, ry, binary)
-                .size(13)
-                .fill("#555")
-                .end()
-                .build(),
-        );
-        parts.push(text(cx, ry, ":").size(13).fill("#555").build());
-        parts.push(
-            text(cx + 8.0, ry, proto)
-                .size(13)
-                .fill("#555")
-                .start()
-                .build(),
-        );
+        parts.push(text(cx - 6.0, ry, binary).fill("#555").end().build());
+        parts.push(text(cx, ry, ":").fill("#555").build());
+        parts.push(text(cx + 8.0, ry, proto).fill("#555").start().build());
         ry += row_h;
     }
 }

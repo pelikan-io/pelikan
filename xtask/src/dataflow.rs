@@ -144,7 +144,7 @@ fn lane_header(parts: &mut Vec<String>, y: f64, name: &str, external: bool) {
     if !external {
         parts.push(
             text(X0 + 18.0, y + LANE_H / 2.0, name)
-                .size(16)
+                .size(17)
                 .bold()
                 .mono()
                 .start()
@@ -174,21 +174,9 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
     parts.push(text(cx, ty, title).size(20).bold().build());
     let mut ry = ty + title_h / 2.0 + gap + row_h / 2.0;
     for (binary, proto) in rows {
-        parts.push(
-            text(cx - 6.0, ry, binary)
-                .size(13)
-                .fill("#555")
-                .end()
-                .build(),
-        );
-        parts.push(text(cx, ry, ":").size(13).fill("#555").build());
-        parts.push(
-            text(cx + 8.0, ry, proto)
-                .size(13)
-                .fill("#555")
-                .start()
-                .build(),
-        );
+        parts.push(text(cx - 6.0, ry, binary).fill("#555").end().build());
+        parts.push(text(cx, ry, ":").fill("#555").build());
+        parts.push(text(cx + 8.0, ry, proto).fill("#555").start().build());
         ry += row_h;
     }
 }
@@ -232,7 +220,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
     parts.push(rect(cl_x, cl_y, 90.0, 56.0, FILL_EXTERNAL).dashed().build());
     parts.push(
         text(cl_x + 45.0, cl_y + 28.0, "clients")
-            .size(15)
+            .size(17)
             .italic()
             .build(),
     );
@@ -418,7 +406,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
                     .dashed()
                     .build(),
             );
-            parts.push(text(sx, sv_mid, "servers").size(15).italic().build());
+            parts.push(text(sx, sv_mid, "servers").size(17).italic().build());
             parts.push(
                 ortho(&[
                     (xs[2] + ST_W / 2.0, st_y(bl) + ST_H),
