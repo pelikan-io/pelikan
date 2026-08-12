@@ -218,11 +218,6 @@ impl Ortho<'_> {
     }
 }
 
-/// Estimated rendered width of a label at the shared 14px label size.
-pub fn label_w(s: &str) -> f64 {
-    label_w_at(s, 14.0)
-}
-
 /// Estimated rendered width of a label at an explicit font size.
 pub fn label_w_at(s: &str, size: f64) -> f64 {
     s.len() as f64 * size * 0.55 + 16.0
