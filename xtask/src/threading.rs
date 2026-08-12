@@ -122,7 +122,7 @@ const CHIP_SEGCACHE: Chip = ("segcache", FILL_STORAGE);
 // uniform geometry: every thread container is the same size; externals
 // share their own smaller dashed size
 const TB_W: f64 = 230.0;
-const TB_H: f64 = 156.0;
+const TB_H: f64 = 176.0;
 const EXT_W: f64 = 110.0;
 const EXT_H: f64 = 64.0;
 const GAP: f64 = 40.0; // minimum arrow length between columns
@@ -180,7 +180,7 @@ fn thread_box(
         // the architecture chart's composition bars — width stays constant
         // no matter how many modules a thread runs
         let bw = TB_W - 20.0;
-        let bh = 30.0;
+        let bh = 36.0;
         let mut cy = y + TB_H - 10.0 - (chips.len() as f64 * (bh + 6.0) - 6.0);
         for (label, cfill) in chips {
             parts.push(rect(x + 10.0, cy, bw, bh, cfill).sw(1.0).build());
@@ -264,7 +264,7 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
 
 fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = if multi { 658.0 } else { 462.0 };
+    let h = if multi { 718.0 } else { 502.0 };
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -308,7 +308,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
 
     let wk_x = q_x + q_w + qg;
     let top_y = y0 + 30.0;
-    let row_b = y0 + h - 166.0;
+    let row_b = y0 + h - 186.0;
 
     let (wk_bottom, st): (f64, Option<(f64, f64)>) = if !multi {
         thread_box(
@@ -483,7 +483,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
 
 fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = 658.0;
+    let h = 718.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -652,7 +652,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     );
 
     // control plane: signal left of admin, admin aligned under listener
-    let row_b = y0 + h - 166.0;
+    let row_b = y0 + h - 186.0;
     let sg_x = X0 + 26.0;
     thread_box(
         &mut parts,

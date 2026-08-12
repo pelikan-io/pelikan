@@ -81,11 +81,11 @@ const CHIP_SEGCACHE: Chip = ("segcache", FILL_STORAGE);
 const LANE_LINE: &str = "#DDDDDD";
 
 // geometry: uniform chips size the stage; one uniform inter-column gap
-const CHIP_H: f64 = 30.0;
+const CHIP_H: f64 = 36.0;
 const ST_W: f64 = 170.0;
-const ST_H: f64 = 120.0;
+const ST_H: f64 = 132.0;
 const GAP: f64 = 96.0;
-const LANE_H: f64 = 160.0;
+const LANE_H: f64 = 172.0;
 const LANE_LABEL_W: f64 = 210.0;
 const PANEL_W: f64 = 1790.0;
 
