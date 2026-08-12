@@ -5,11 +5,14 @@ on:
     branches: [ main ]
   pull_request:
 
+# FUZZ_JOBS matches the vCPU count of ubuntu-latest runners; FUZZ_TIME is
+# halved relative to the old 2-job config so total CPU-seconds of fuzzing per
+# target stay the same (4 x 150 = 2 x 300) in half the wall-clock.
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: full
-  FUZZ_TIME: 300
-  FUZZ_JOBS: 2
+  FUZZ_TIME: 150
+  FUZZ_JOBS: 4
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
@@ -40,16 +43,35 @@ jobs:
             cd - > /dev/null
           done
 
+      # The fuzz job matrix below enumerates targets by hand so that each one
+      # gets its own runner. Fail here if a fuzz target exists that the matrix
+      # would silently skip.
+      - name: verify fuzz matrix covers all targets
+        shell: bash
+        run: |
+          expected="admin
+          memcache_binary
+          memcache_text
+          ping
+          resp"
+          actual=$(for target in protocol/admin protocol/memcache protocol/ping protocol/resp; do
+            cd src/$target; cargo fuzz list; cd - > /dev/null
+          done | sort)
+          if [ "$(echo "$expected" | sed 's/^ *//')" != "$actual" ]; then
+            echo "fuzz targets drifted from the matrix in fuzz.yml:"
+            diff <(echo "$expected" | sed 's/^ *//') <(echo "$actual") || true
+            exit 1
+          fi
+
   fuzz:
     strategy:
       matrix:
-        os: [ ubuntu-latest ]
-        target: [
-          protocol/admin,
-          protocol/memcache,
-          protocol/ping,
-          protocol/resp,
-        ]
+        include:
+          - { os: ubuntu-latest, dir: protocol/admin, target: admin }
+          - { os: ubuntu-latest, dir: protocol/memcache, target: memcache_binary }
+          - { os: ubuntu-latest, dir: protocol/memcache, target: memcache_text }
+          - { os: ubuntu-latest, dir: protocol/ping, target: ping }
+          - { os: ubuntu-latest, dir: protocol/resp, target: resp }
     name: fuzz-${{ matrix.os }}-${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     needs: [ build ]
@@ -63,15 +85,25 @@ jobs:
           save-if: false
       - uses: dtolnay/install@cargo-fuzz
 
+      # Persist the libFuzzer corpus across runs so each run starts from
+      # accumulated coverage instead of rediscovering it from scratch. The
+      # run_id in the key makes every run save its grown corpus; restore-keys
+      # picks up the most recent one from any branch.
+      - name: restore fuzz corpus
+        uses: actions/cache@v4
+        with:
+          path: src/${{ matrix.dir }}/fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+
       - name: fuzz ${{ matrix.target }}
         run: |
           export CARGO_TARGET_DIR=$(pwd)/target
 
-          cd src/${{ matrix.target }}
-          for FUZZ_TARGET in `cargo fuzz list`; do
-            cargo fuzz run ${FUZZ_TARGET} --jobs ${{ env.FUZZ_JOBS }} -- \
-              -max_total_time=${{ env.FUZZ_TIME }};
-          done
+          cd src/${{ matrix.dir }}
+          cargo fuzz run ${{ matrix.target }} --jobs ${{ env.FUZZ_JOBS }} -- \
+            -max_total_time=${{ env.FUZZ_TIME }}
 
   check-success:
     name: verify all fuzz tests pass
