@@ -236,12 +236,13 @@ pub const TYPE_ARCH: TypeScale = TypeScale {
     body: 14,
 };
 
-/// The runtime charts' scale: the same roles bumped +4 for canvases half
-/// again as wide, so the set reads evenly at full size.
+/// The runtime charts' scale: the same roles, larger — their canvases are
+/// wider than the architecture chart's, and tightened vertical margins pay
+/// for the bigger body text.
 pub const TYPE_RUNTIME: TypeScale = TypeScale {
-    h1: 24,
-    h2: 21,
-    body: 18,
+    h1: 30,
+    h2: 26,
+    body: 22,
 };
 
 /// Estimated rendered width of a label at an explicit font size.

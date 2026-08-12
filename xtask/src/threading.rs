@@ -121,13 +121,13 @@ const CHIP_SEGCACHE: Chip = ("segcache", FILL_STORAGE);
 
 // uniform geometry: every thread container is the same size; externals
 // share their own smaller dashed size
-const TB_W: f64 = 230.0;
-const TB_H: f64 = 176.0;
-const EXT_W: f64 = 110.0;
-const EXT_H: f64 = 64.0;
+const TB_W: f64 = 270.0;
+const TB_H: f64 = 168.0;
+const EXT_W: f64 = 124.0;
+const EXT_H: f64 = 68.0;
 const GAP: f64 = 40.0; // minimum arrow length between columns
 const ELBOW: f64 = 56.0; // elbow verticals sit this far from a queue
-const PANEL_W: f64 = 1700.0;
+const PANEL_W: f64 = 1910.0;
 
 const TS: TypeScale = TYPE_RUNTIME;
 
@@ -159,7 +159,7 @@ fn thread_box(
     external: bool,
 ) {
     parts.push(rect(x, y, TB_W, TB_H, "#FFFFFF").rx(10.0).build());
-    let mut ty = y + 24.0;
+    let mut ty = y + 20.0;
     parts.push(
         text(x + TB_W / 2.0, ty, name)
             .size(TS.h2)
@@ -168,7 +168,7 @@ fn thread_box(
             .build(),
     );
     if let Some(sub) = sub {
-        ty += 30.0;
+        ty += 28.0;
         let mut t = text(x + TB_W / 2.0, ty, sub).fill("#333");
         if external {
             t = t.italic();
@@ -181,7 +181,7 @@ fn thread_box(
         // no matter how many modules a thread runs
         let bw = TB_W - 20.0;
         let bh = 36.0;
-        let mut cy = y + TB_H - 10.0 - (chips.len() as f64 * (bh + 6.0) - 6.0);
+        let mut cy = y + TB_H - 8.0 - (chips.len() as f64 * (bh + 6.0) - 6.0);
         for (label, cfill) in chips {
             parts.push(rect(x + 10.0, cy, bw, bh, cfill).sw(1.0).build());
             parts.push(text(x + TB_W / 2.0, cy + bh / 2.0, label).build());
@@ -201,14 +201,14 @@ fn queue_glyph(parts: &mut Vec<String>, x: f64, y: f64, w: f64, h: f64, label: &
         );
     }
     if let Some((first, rest)) = label.split_once(" (") {
-        parts.push(text(x + w / 2.0, y - 35.0, first).fill("#555").build());
+        parts.push(text(x + w / 2.0, y - 42.0, first).fill("#555").build());
         parts.push(
-            text(x + w / 2.0, y - 14.0, &format!("({rest}"))
+            text(x + w / 2.0, y - 16.0, &format!("({rest}"))
                 .fill("#555")
                 .build(),
         );
     } else {
-        parts.push(text(x + w / 2.0, y - 13.0, label).fill("#555").build());
+        parts.push(text(x + w / 2.0, y - 16.0, label).fill("#555").build());
     }
 }
 
@@ -249,7 +249,7 @@ fn worker_column(
 /// Right-margin block: panel title over a binary->protocol mini-table, the
 /// whole block vertically centered.
 fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[(&str, &str)]) {
-    let (row_h, title_h, gap) = (26.0, 32.0, 10.0);
+    let (row_h, title_h, gap) = (30.0, 38.0, 12.0);
     let block_h = title_h + gap + rows.len() as f64 * row_h;
     let ty = cy - block_h / 2.0 + title_h / 2.0;
     parts.push(text(cx, ty, title).size(TS.h1).bold().build());
@@ -264,7 +264,7 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
 
 fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = if multi { 718.0 } else { 502.0 };
+    let h = if multi { 698.0 } else { 490.0 };
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -273,7 +273,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
     );
     margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
 
-    let row_a = y0 + 64.0;
+    let row_a = y0 + 68.0;
     let mid_a = row_a + TB_H / 2.0;
 
     let cl_x = X0 + 26.0;
@@ -295,7 +295,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
             .build(),
     );
     parts.push(
-        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 13.0, "accept")
+        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 15.0, "accept")
             .fill("#555")
             .build(),
     );
@@ -307,8 +307,8 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
     parts.push(ortho(&[(li_x + TB_W, mid_a), (q_x, mid_a)]).build());
 
     let wk_x = q_x + q_w + qg;
-    let top_y = y0 + 30.0;
-    let row_b = y0 + h - 186.0;
+    let top_y = y0 + 34.0;
+    let row_b = y0 + h - 178.0;
 
     let (wk_bottom, st): (f64, Option<(f64, f64)>) = if !multi {
         thread_box(
@@ -415,7 +415,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
     parts.push(
         text(
             (cl_x + wk_x + TB_W) / 2.0,
-            top_y - 13.0,
+            top_y - 15.0,
             "requests / responses (wire)",
         )
         .fill("#555")
@@ -483,7 +483,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
 
 fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = 718.0;
+    let h = 698.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -492,7 +492,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     );
     margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
 
-    let row_a = y0 + 64.0;
+    let row_a = y0 + 68.0;
     let mid_a = row_a + TB_H / 2.0;
 
     let cl_x = X0 + 26.0;
@@ -514,7 +514,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 13.0, "accept")
+        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 15.0, "accept")
             .fill("#555")
             .build(),
     );
@@ -553,7 +553,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
         .build(),
     );
 
-    let top_y = y0 + 30.0;
+    let top_y = y0 + 34.0;
     parts.push(
         ortho(&[
             (cl_x + EXT_W / 2.0, row_a + (TB_H - EXT_H) / 2.0),
@@ -568,7 +568,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     parts.push(
         text(
             (cl_x + fe_x + TB_W) / 2.0,
-            top_y - 13.0,
+            top_y - 15.0,
             "requests / responses (wire)",
         )
         .fill("#555")
@@ -646,13 +646,13 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text((be_x + TB_W + sv_x) / 2.0, mid_a - 13.0, "connect")
+        text((be_x + TB_W + sv_x) / 2.0, mid_a - 15.0, "connect")
             .fill("#555")
             .build(),
     );
 
     // control plane: signal left of admin, admin aligned under listener
-    let row_b = y0 + h - 186.0;
+    let row_b = y0 + h - 178.0;
     let sg_x = X0 + 26.0;
     thread_box(
         &mut parts,

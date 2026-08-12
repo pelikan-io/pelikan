@@ -82,12 +82,12 @@ const LANE_LINE: &str = "#DDDDDD";
 
 // geometry: uniform chips size the stage; one uniform inter-column gap
 const CHIP_H: f64 = 36.0;
-const ST_W: f64 = 170.0;
-const ST_H: f64 = 132.0;
+const ST_W: f64 = 180.0;
+const ST_H: f64 = 130.0;
 const GAP: f64 = 96.0;
-const LANE_H: f64 = 172.0;
+const LANE_H: f64 = 170.0;
 const LANE_LABEL_W: f64 = 210.0;
-const PANEL_W: f64 = 1790.0;
+const PANEL_W: f64 = 1900.0;
 
 const TS: TypeScale = TYPE_RUNTIME;
 
@@ -99,15 +99,14 @@ const X0: f64 = 24.0;
 
 fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &[Chip]) {
     parts.push(rect(x, y, ST_W, ST_H, "#FFFFFF").rx(10.0).build());
+    let (bx, by) = (x + 24.0, y + 24.0);
     parts.push(format!(
-        "<circle cx=\"{:.0}\" cy=\"{:.0}\" r=\"14\" fill=\"none\" \
-         stroke=\"#4D4D4D\" stroke-width=\"1.2\"/>",
-        x + 18.0,
-        y + 17.0
+        "<circle cx=\"{bx:.0}\" cy=\"{by:.0}\" r=\"16\" fill=\"none\" \
+         stroke=\"#4D4D4D\" stroke-width=\"1.2\"/>"
     ));
-    parts.push(text(x + 22.0, y + 22.0, &num.to_string()).bold().build());
+    parts.push(text(bx, by, &num.to_string()).bold().build());
     parts.push(
-        text(x + ST_W / 2.0 + 8.0, y + 22.0, name)
+        text(x + ST_W / 2.0 + 12.0, y + 24.0, name)
             .size(TS.h2)
             .bold()
             .build(),
@@ -115,7 +114,7 @@ fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &
     // one column: full-width bars stacked bottom-up (see the threading
     // chart's thread boxes and the architecture chart's composition bars)
     let bw = ST_W - 20.0;
-    let mut cy = y + ST_H - 10.0 - (chips.len() as f64 * (CHIP_H + 6.0) - 6.0);
+    let mut cy = y + ST_H - 8.0 - (chips.len() as f64 * (CHIP_H + 6.0) - 6.0);
     for (label, cfill) in chips {
         parts.push(rect(x + 10.0, cy, bw, CHIP_H, cfill).sw(1.0).build());
         parts.push(text(x + ST_W / 2.0, cy + CHIP_H / 2.0, label).build());
@@ -175,7 +174,7 @@ fn columns(n: usize) -> Vec<f64> {
 }
 
 fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[(&str, &str)]) {
-    let (row_h, title_h, gap) = (26.0, 32.0, 10.0);
+    let (row_h, title_h, gap) = (30.0, 38.0, 12.0);
     let block_h = title_h + gap + rows.len() as f64 * row_h;
     let ty = cy - block_h / 2.0 + title_h / 2.0;
     parts.push(text(cx, ty, title).size(TS.h1).bold().build());
@@ -222,15 +221,15 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
     let st_y = |ln: &str| ly(ln) + (LANE_H - ST_H) / 2.0;
     let st_mid = |ln: &str| ly(ln) + LANE_H / 2.0;
 
-    let cl_x = X0 + LANE_LABEL_W + 36.0 - 36.0 - 110.0;
-    let cl_y = st_mid("clients") - 32.0;
+    let cl_x = X0 + LANE_LABEL_W + 36.0 - 36.0 - 124.0;
+    let cl_y = st_mid("clients") - 34.0;
     parts.push(
         rect(cl_x, cl_y, 110.0, 64.0, FILL_EXTERNAL)
             .dashed()
             .build(),
     );
     parts.push(
-        text(cl_x + 55.0, cl_y + 32.0, "clients")
+        text(cl_x + 62.0, cl_y + 34.0, "clients")
             .size(TS.h2)
             .italic()
             .build(),
@@ -240,7 +239,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
     let wire_in = |parts: &mut Vec<String>, xs: &[f64], ln: &str| {
         parts.push(
             ortho(&[
-                (cl_x + 110.0, st_mid("clients")),
+                (cl_x + 124.0, st_mid("clients")),
                 (xs[0] + ST_W / 2.0, st_mid("clients")),
                 (xs[0] + ST_W / 2.0, st_y(ln)),
             ])
@@ -249,8 +248,8 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
         );
         parts.push(
             text(
-                (cl_x + 110.0 + xs[0] + ST_W / 2.0) / 2.0,
-                st_mid("clients") - 15.0,
+                (cl_x + 124.0 + xs[0] + ST_W / 2.0) / 2.0,
+                st_mid("clients") - 17.0,
                 "request (wire)",
             )
             .fill("#555")
@@ -263,22 +262,22 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
             ortho(&[
                 (x, st_y(ln)),
                 (x, st_mid("clients")),
-                (cl_x + 110.0, st_mid("clients")),
+                (cl_x + 124.0, st_mid("clients")),
             ])
             .network()
             .build(),
         );
         let half = label_w_at("response (wire)", TS.body as f64) / 2.0;
-        let lx = (x + 110.0).min(X0 + PANEL_W - half);
+        let lx = (x + 124.0).min(X0 + PANEL_W - half);
         parts.push(
-            text(lx, st_mid("clients") - 15.0, "response (wire)")
+            text(lx, st_mid("clients") - 17.0, "response (wire)")
                 .fill("#555")
                 .build(),
         );
     };
     let gap_label = |parts: &mut Vec<String>, xs: &[f64], i: usize, label: &str, ln: &str| {
         let cx = xs[i] + ST_W + (xs[i + 1] - xs[i] - ST_W) / 2.0;
-        parts.push(text(cx, st_y(ln) - 15.0, label).fill("#555").build());
+        parts.push(text(cx, st_y(ln) - 17.0, label).fill("#555").build());
     };
     let crossing =
         |parts: &mut Vec<String>, xs: &[f64], i: usize, from: &str, to: &str, label: &str| {
@@ -413,7 +412,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
             let sv_mid = st_mid("servers");
             let sx = xs[2] + ST_W + GAP / 2.0;
             parts.push(
-                rect(sx - 55.0, sv_mid - 32.0, 110.0, 64.0, FILL_EXTERNAL)
+                rect(sx - 62.0, sv_mid - 34.0, 124.0, 68.0, FILL_EXTERNAL)
                     .dashed()
                     .build(),
             );
@@ -422,20 +421,20 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
                 ortho(&[
                     (xs[2] + ST_W / 2.0, st_y(bl) + ST_H),
                     (xs[2] + ST_W / 2.0, sv_mid),
-                    (sx - 55.0, sv_mid),
+                    (sx - 62.0, sv_mid),
                 ])
                 .network()
                 .build(),
             );
             parts.push(
-                text(xs[2] + ST_W / 2.0 - 15.0, sv_mid - 44.0, "request (wire)")
+                text(xs[2] + ST_W / 2.0 - 17.0, sv_mid - 48.0, "request (wire)")
                     .fill("#555")
                     .end()
                     .build(),
             );
             parts.push(
                 ortho(&[
-                    (sx + 55.0, sv_mid),
+                    (sx + 62.0, sv_mid),
                     (xs[3] + ST_W / 2.0, sv_mid),
                     (xs[3] + ST_W / 2.0, st_y(bl) + ST_H),
                 ])
@@ -443,7 +442,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
                 .build(),
             );
             parts.push(
-                text(xs[3] + ST_W / 2.0 + 15.0, sv_mid - 44.0, "response (wire)")
+                text(xs[3] + ST_W / 2.0 + 17.0, sv_mid - 48.0, "response (wire)")
                     .fill("#555")
                     .start()
                     .build(),
