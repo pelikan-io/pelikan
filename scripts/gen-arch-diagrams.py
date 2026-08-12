@@ -27,7 +27,7 @@ LAYER = {
     "pelikan-segcache": "product",
     "pelikan-rds": "product",
     "pelikan-pingserver": "product",
-    "pingproxy": "product",
+    "pelikan-pingproxy": "product",
     "server": "core",
     "proxy": "core",
     "admin": "core",
@@ -270,7 +270,7 @@ EXTERNAL_LINK = {
 }
 
 # curated display order (flagship first); validated against LAYER at run time
-PRODUCT_ORDER = ["pelikan-segcache", "pelikan-rds", "pelikan-pingserver", "pingproxy"]
+PRODUCT_ORDER = ["pelikan-segcache", "pelikan-rds", "pelikan-pingserver", "pelikan-pingproxy"]
 PROTOCOL_ORDER = ["memcache", "resp", "ping", "http", "admin", "common"]
 
 # band 3 utility row: foundation crates plus external utilities, judged by
@@ -307,7 +307,7 @@ def full_chart(graph, bins, meta):
         bx = S["margin"] + i * (box_w + S["gap"])
         parts.append(_rect(bx, y, box_w, box_h, "#F5F5F5", "#9E9E9E", 2))
         parts.append(_text(bx + box_w / 2, y + S["pad"] + S["cell_h"] / 2 - 6,
-                           prod, size=16, weight="bold"))
+                           prod, size=17, weight="bold"))
         by = y + S["pad"] + S["cell_h"]
         bars = ([(p, FILL["protocol"], False) for p in comp[prod]["protocols"]]
                 + ([(ENGINE_LABEL.get(comp[prod]["engine"], comp[prod]["engine"]),
@@ -336,7 +336,7 @@ def full_chart(graph, bins, meta):
         gh = S["pad"] * 2 + S["cell_h"] + len(rows) * (S["cell_h"] + S["gap"]) - S["gap"]
         parts.append(_rect(x, y, w, gh, "#F5F5F5", "#9E9E9E", 2))
         parts.append(_text(x + w / 2, y + S["pad"] + S["cell_h"] / 2 - 6,
-                           title, size=16, weight="bold"))
+                           title, size=17, weight="bold"))
         cy = y + S["pad"] + S["cell_h"]
         R = len(rows)
         for i, row in enumerate(rows):

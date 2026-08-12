@@ -140,3 +140,67 @@ architecture-diagram skill.
   integration is ever wanted (programmatic layout rather than emitting
   text), Go's `oss.terrastruct.com/d2` library is the alternative;
   Python stays only while the diagram language is still in flux.
+
+## Threading diagram (2026-08-11 addendum)
+
+Runtime companion to the build chart (`docs/diagrams/threading.svg`,
+`scripts/gen-threading-diagram.py`), covering all four binaries in three
+panels (single worker / multiple workers / proxy), stacked vertically for
+mobile-friendly reading. Conventions that emerged, for the future skill's
+runtime half:
+
+- **Literal thread names, monospace** — boxes carry the exact
+  `std::thread::Builder` names (`pelikan_work_0`, `pelikan_fe_n-1`), so an
+  operator can match a hot thread in `top -H` to the chart directly; the
+  names are grep-asserted against the spawn sites.
+- **Chips bridge build and runtime** — each thread box contains the build
+  modules that execute on it, in the build chart's layer colors. The
+  single-vs-multi difference reads purely as chip migration (storage chips
+  move from the worker into `pelikan_storage`).
+- **Thread fill is reserved** for unusual scheduling (non-default
+  scheduler, pinning); plain threads stay white so chips carry the color.
+- **External elements are italic + dashed** (*clients*, *servers*, the
+  *SIGINT/TERM/QUIT* stimulus); literal thread names stay upright mono.
+- **Network vs internal**: boundary-crossing edges draw heavier; internal
+  queues are labeled by payload truth ("parsed requests / responses").
+  A process-boundary frame was rejected: clients and `pelikan_signal`
+  share a column, so a rectangle would falsely enclose the external.
+- **Queues are small connective glyphs** (5-6 narrow cells), not visual
+  foci; queue labels size their columns' gaps, and elbow verticals run in
+  lanes computed to clear the label spans.
+- **Orthogonal arrows only; labels above arrows; columns on a computed
+  grid** sized from max(min arrow length, label width).
+- **Per-panel binary annotations** in the right margin (same convention as
+  the build chart's band labels).
+- **Negative claims matter**: the proxy core spawns no signal-handler
+  thread — asserted as an absence check, and visible as the missing box.
+  Possible real gap: pingproxy ignores SIGTERM (no graceful shutdown path
+  from OS signals).
+- **Source anchoring for runtime charts**: 17 grep assertions (thread
+  spawns, queue wiring, signal set, ports, upstream connect) abort
+  generation on drift — the runtime analog of deriving from cargo
+  metadata, for facts that live in code rather than manifests.
+
+## Dataflow diagram (2026-08-11 addendum)
+
+"Life of a request" chart (`docs/diagrams/dataflow.svg`,
+`scripts/gen-dataflow-diagram.py`) — the third of the trio, and the one
+squarely in the dataflow-diagram skill's home domain. Conventions:
+
+- **Swimlanes are threads; stages sit in the lane that runs them.** The
+  multi-worker panel's "dip" into `pelikan_storage` for execute, and the
+  proxy's zig-zag (fe -> be -> upstream -> be -> fe), make the thread-hop
+  cost of each design visible as geometry.
+- **Numbered stage badges** — execution order is real here, so the
+  dataflow skill's ordering convention finally applies (drawn as explicit
+  circle+digit; unicode circled digits die in font fallback).
+- **Stage verbs are the code's verbs** (`receive`, `execute`, `send`,
+  `flush` — session.receive() bundles read+parse, session.send() bundles
+  compose), each stage carrying chips for the modules it runs, completing
+  the build -> threading -> dataflow chip thread.
+- **Payload-truth edge labels**: "request/response bytes" on heavy
+  network edges, `Request`/`Response` struct names on thin queue-crossing
+  edges with small vertical queue glyphs at the crossings.
+- **Per-panel stage pitch** computed so any stage count fits the shared
+  panel width.
+- Control plane omitted by scope decision; the threading chart carries it.
