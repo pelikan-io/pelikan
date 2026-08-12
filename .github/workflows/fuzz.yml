@@ -65,6 +65,9 @@ jobs:
 
   fuzz:
     strategy:
+      # one target's failure (a real crash or a transient runner error) must
+      # not cancel the other targets' coverage
+      fail-fast: false
       matrix:
         include:
           - { os: ubuntu-latest, dir: protocol/admin, target: admin }
