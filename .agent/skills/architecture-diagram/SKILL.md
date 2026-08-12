@@ -23,6 +23,20 @@ answers neither "what depends on what" nor "where does a request go", and a
 reader cannot tell which kind of claim any given edge is making. Split the
 claims, then bind the halves together visually (see "Chips bridge the halves").
 
+## Relationship to the dataflow-diagram skill
+
+This skill is the `dataflow-diagram` skill's principles carried into a
+domain that skill was not written for, with every override recorded. The
+shared principles below restate its core (derive-never-draw, fail-loudly,
+channels as claims) compactly so an installed instance is self-contained;
+where the two disagree, the disagreement is deliberate (arrows dropped
+entirely from the build chart, provenance demoted from a visual channel to
+nothing, geometry emitted directly rather than delegated to a layout
+engine — each with its reason in the sections below). For a pure pipeline
+or DAG chart of data moving through one program, use `dataflow-diagram`
+directly; this skill covers the system-architecture duo — what the code
+is, and what the process does at runtime.
+
 ## Project Contract
 
 Read and fill the [diagram charter](references/diagram-charter.md) before

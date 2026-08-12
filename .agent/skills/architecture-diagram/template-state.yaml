@@ -1,0 +1,25 @@
+schema_version: 1
+instance_id: 6d8f2c17-e794-4e69-9cd8-6a342fd1eee5
+template:
+  id: architecture-diagram-skill
+  version: 0.1.0
+source:
+  repository: https://github.com/iopsystems/skills-mcp
+  commit: 513911ddc5b0b4ce657d07e5438822b59e47ea50
+base:
+  aggregate_sha256: 462e92d6c839a8fb65f94b569d66134c9f9d2b5710f3a0ff083d831e71cd3823
+  files:
+    - path: SKILL.md
+      sha256: 1ce27410fd14538227aa8069488a92ea0f0ee0467ead004c18a38e56ee3f342c
+      merge_strategy: three-way
+    - path: references/diagram-charter.md
+      sha256: 26da75c2265b013a4aaea125486bc229b853096b9b5c03bde298da9f3540ad27
+      merge_strategy: three-way
+    - path: evals/trigger-evals.json
+      sha256: 4a82741c243a67615906031e220f05a247b428644aef61813176cb52fd00d43d
+      merge_strategy: preserve-local
+installed_at: 2026-08-12
+last_upgraded_at: null
+customizations:
+  - path: references/diagram-charter.md
+    rationale: filled placeholder charter with pelikan bindings (three-chart inventory, cargo xtask diagrams generator, cargo_metadata + source-claim ground truth, palette/type scale, diagram-freshness CI job, maintainer review gate)
