@@ -9,7 +9,7 @@ material diagram effort. This copy is filled for Pelikan.
 | Chart | Half | Output | Generator module | Claims |
 | --- | --- | --- | --- | --- |
 | Layered architecture | build | `docs/diagrams/architecture.svg` | `xtask/src/arch.rs` | classification tables + `verify_topo_rows` + engine grep |
-| Thread model | runtime | `docs/diagrams/threading.svg` | `xtask/src/threading.rs` | 17 positive + 1 negative source claims |
+| Thread model | runtime | `docs/diagrams/threading.svg` | `xtask/src/threading.rs` | positive + negative source claims |
 | Life of a request | runtime | `docs/diagrams/dataflow.svg` | `xtask/src/dataflow.rs` | 11 source claims + panel bounds check |
 
 All three are embedded in `docs/ARCHITECTURE.md` with textual equivalents
@@ -36,7 +36,10 @@ All three are embedded in `docs/ARCHITECTURE.md` with textual equivalents
   `src/core/proxy` — thread spawn sites and literal thread names
   (`pelikan_*`), queue wiring, signal set (SIGINT/SIGTERM/SIGQUIT), ports,
   upstream connects, and event-loop verbs (`receive`/`execute`/`send`/
-  `flush`). Negative claim: the proxy core spawns no signal-handler thread.
+  `flush`). A negative claim asserting the proxy core spawned no
+  signal-handler thread caught a real gap (no graceful shutdown on
+  SIGTERM) and tripped as designed when the gap was fixed (#181), at
+  which point it flipped to a positive claim.
 - Curated tables that need maintenance when the workspace changes (each
   validated at generation time, so drift aborts the run): `LAYER`,
   `TOOLING` (excluded crates, e.g. `xtask` itself), `EXTERNALS` and
