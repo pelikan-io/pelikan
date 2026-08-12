@@ -11,6 +11,13 @@
 //! unclassified aborts generation rather than being silently omitted.
 
 use crate::svg::*;
+
+const TS: TypeScale = TYPE_ARCH;
+
+/// Chart-local default: body text at this chart's scale.
+fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {
+    crate::svg::text(x, y, s).size(TS.body)
+}
 use cargo_metadata::MetadataCommand;
 use regex::Regex;
 use std::collections::{BTreeMap, BTreeSet};
@@ -398,7 +405,7 @@ pub fn generate() {
     let band_label = |parts: &mut Vec<String>, name: &str, y0: f64, y1: f64| {
         parts.push(
             text(MARGIN + inner_w + LABEL_W / 2.0, (y0 + y1) / 2.0, name)
-                .size(20)
+                .size(TS.h1)
                 .bold()
                 .build(),
         );
@@ -426,7 +433,7 @@ pub fn generate() {
         );
         parts.push(
             text(bx + box_w / 2.0, y + PAD + CELL_H / 2.0 - 6.0, prod)
-                .size(17)
+                .size(TS.h2)
                 .bold()
                 .build(),
         );
@@ -495,7 +502,7 @@ pub fn generate() {
         );
         parts.push(
             text(x + w / 2.0, y + PAD + CELL_H / 2.0 - 6.0, title)
-                .size(17)
+                .size(TS.h2)
                 .bold()
                 .build(),
         );

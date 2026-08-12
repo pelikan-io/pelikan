@@ -129,22 +129,23 @@ const GAP: f64 = 40.0; // minimum arrow length between columns
 const ELBOW: f64 = 56.0; // elbow verticals sit this far from a queue
 const PANEL_W: f64 = 2210.0;
 
-/// Chart-local default label size: the architecture chart's 14, bumped +4
-/// with the rest of this chart's type scale (18/21/24).
+const TS: TypeScale = TYPE_RUNTIME;
+
+/// Chart-local default: body text at this chart's scale.
 fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {
-    crate::svg::text(x, y, s).size(18)
+    crate::svg::text(x, y, s).size(TS.body)
 }
 const X0: f64 = 24.0;
 
 fn gap_for(label: &str) -> f64 {
-    (label_w_at(label, 18.0) + 10.0).max(GAP)
+    (label_w_at(label, TS.body as f64) + 10.0).max(GAP)
 }
 
 fn queue_gap(label: &str) -> f64 {
     // labels wrap at " (" so only the longest line drives the overhang
     let longest = label.split(" (").max_by_key(|s| s.len()).unwrap();
     (GAP + 8.0)
-        .max((label_w_at(longest, 18.0) - 50.0) / 2.0 + 8.0)
+        .max((label_w_at(longest, TS.body as f64) - 50.0) / 2.0 + 8.0)
         .max(ELBOW + 16.0)
 }
 
@@ -161,7 +162,7 @@ fn thread_box(
     let mut ty = y + 24.0;
     parts.push(
         text(x + TB_W / 2.0, ty, name)
-            .size(21)
+            .size(TS.h2)
             .bold()
             .mono()
             .build(),
@@ -213,7 +214,7 @@ fn ext_box(parts: &mut Vec<String>, x: f64, y_row: f64, name: &str) {
     parts.push(rect(x, y, EXT_W, EXT_H, FILL_EXTERNAL).dashed().build());
     parts.push(
         text(x + EXT_W / 2.0, y + EXT_H / 2.0, name)
-            .size(21)
+            .size(TS.h2)
             .italic()
             .build(),
     );
@@ -248,7 +249,7 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
     let (row_h, title_h, gap) = (26.0, 32.0, 10.0);
     let block_h = title_h + gap + rows.len() as f64 * row_h;
     let ty = cy - block_h / 2.0 + title_h / 2.0;
-    parts.push(text(cx, ty, title).size(24).bold().build());
+    parts.push(text(cx, ty, title).size(TS.h1).bold().build());
     let mut ry = ty + title_h / 2.0 + gap + row_h / 2.0;
     for (binary, proto) in rows {
         parts.push(text(cx - 6.0, ry, binary).fill("#555").end().build());

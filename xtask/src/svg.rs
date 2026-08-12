@@ -218,6 +218,32 @@ impl Ortho<'_> {
     }
 }
 
+/// Semantic type scale for a chart. Every text element plays one of three
+/// roles — no ad-hoc font sizes:
+pub struct TypeScale {
+    /// panel and band titles
+    pub h1: u32,
+    /// element names: crates, threads, stages, lane headers, externals
+    pub h2: u32,
+    /// everything else: chips, edge/queue/sub labels, mini-tables
+    pub body: u32,
+}
+
+/// The architecture chart's scale, sized for its ~1280px canvas.
+pub const TYPE_ARCH: TypeScale = TypeScale {
+    h1: 20,
+    h2: 17,
+    body: 14,
+};
+
+/// The runtime charts' scale: the same roles bumped +4 for canvases half
+/// again as wide, so the set reads evenly at full size.
+pub const TYPE_RUNTIME: TypeScale = TypeScale {
+    h1: 24,
+    h2: 21,
+    body: 18,
+};
+
 /// Estimated rendered width of a label at an explicit font size.
 pub fn label_w_at(s: &str, size: f64) -> f64 {
     s.len() as f64 * size * 0.55 + 16.0

@@ -90,10 +90,11 @@ const LANE_H: f64 = 150.0;
 const LANE_LABEL_W: f64 = 210.0;
 const PANEL_W: f64 = 2240.0;
 
-/// Chart-local default label size: the architecture chart's 14, bumped +4
-/// with the rest of this chart's type scale (18/21/24).
+const TS: TypeScale = TYPE_RUNTIME;
+
+/// Chart-local default: body text at this chart's scale.
 fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {
-    crate::svg::text(x, y, s).size(18)
+    crate::svg::text(x, y, s).size(TS.body)
 }
 const X0: f64 = 24.0;
 
@@ -108,7 +109,7 @@ fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &
     parts.push(text(x + 22.0, y + 22.0, &num.to_string()).bold().build());
     parts.push(
         text(x + ST_W / 2.0 + 8.0, y + 22.0, name)
-            .size(21)
+            .size(TS.h2)
             .bold()
             .build(),
     );
@@ -150,7 +151,7 @@ fn lane_header(parts: &mut Vec<String>, y: f64, name: &str, external: bool) {
     if !external {
         parts.push(
             text(X0 + 18.0, y + LANE_H / 2.0, name)
-                .size(21)
+                .size(TS.h2)
                 .bold()
                 .mono()
                 .start()
@@ -177,7 +178,7 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
     let (row_h, title_h, gap) = (26.0, 32.0, 10.0);
     let block_h = title_h + gap + rows.len() as f64 * row_h;
     let ty = cy - block_h / 2.0 + title_h / 2.0;
-    parts.push(text(cx, ty, title).size(24).bold().build());
+    parts.push(text(cx, ty, title).size(TS.h1).bold().build());
     let mut ry = ty + title_h / 2.0 + gap + row_h / 2.0;
     for (binary, proto) in rows {
         parts.push(text(cx - 6.0, ry, binary).fill("#555").end().build());
@@ -230,7 +231,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
     );
     parts.push(
         text(cl_x + 55.0, cl_y + 32.0, "clients")
-            .size(21)
+            .size(TS.h2)
             .italic()
             .build(),
     );
@@ -267,7 +268,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
             .network()
             .build(),
         );
-        let half = label_w_at("response (wire)", 18.0) / 2.0;
+        let half = label_w_at("response (wire)", TS.body as f64) / 2.0;
         let lx = (x + 110.0).min(X0 + PANEL_W - half);
         parts.push(
             text(lx, st_mid("clients") - 15.0, "response (wire)")
@@ -416,7 +417,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
                     .dashed()
                     .build(),
             );
-            parts.push(text(sx, sv_mid, "servers").size(21).italic().build());
+            parts.push(text(sx, sv_mid, "servers").size(TS.h2).italic().build());
             parts.push(
                 ortho(&[
                     (xs[2] + ST_W / 2.0, st_y(bl) + ST_H),
