@@ -168,7 +168,7 @@ fn thread_box(
     let bars_h = if chips.is_empty() {
         0.0
     } else {
-        chips.len() as f64 * (bh + 6.0) - 6.0 + 10.0
+        chips.len() as f64 * (bh + 6.0) - 6.0 + 18.0
     };
     let top = y + (TB_H - name_h - sub_h - bars_h) / 2.0;
     parts.push(
@@ -187,7 +187,7 @@ fn thread_box(
     }
     if !chips.is_empty() {
         let bw = TB_W - 40.0;
-        let mut cy = top + name_h + sub_h + 10.0;
+        let mut cy = top + name_h + sub_h + 18.0;
         for (label, cfill) in chips {
             parts.push(rect(x + 20.0, cy, bw, bh, cfill).sw(1.0).build());
             parts.push(text(x + TB_W / 2.0, cy + bh / 2.0, label).build());

@@ -105,7 +105,7 @@ fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &
     let bars_h = if chips.is_empty() {
         0.0
     } else {
-        chips.len() as f64 * (CHIP_H + 6.0) - 6.0 + 10.0
+        chips.len() as f64 * (CHIP_H + 6.0) - 6.0 + 18.0
     };
     let top = y + (ST_H - row_h - bars_h) / 2.0;
     let (bx, by) = (x + 28.0, top + row_h / 2.0);
@@ -121,7 +121,7 @@ fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &
             .build(),
     );
     let bw = ST_W - 40.0;
-    let mut cy = top + row_h + 10.0;
+    let mut cy = top + row_h + 18.0;
     for (label, cfill) in chips {
         parts.push(rect(x + 20.0, cy, bw, CHIP_H, cfill).sw(1.0).build());
         parts.push(text(x + ST_W / 2.0, cy + CHIP_H / 2.0, label).build());
