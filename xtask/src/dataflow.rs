@@ -99,22 +99,29 @@ const X0: f64 = 24.0;
 
 fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &[Chip]) {
     parts.push(rect(x, y, ST_W, ST_H, "#FFFFFF").rx(10.0).build());
-    let (bx, by) = (x + 24.0, y + 24.0);
+    // name row plus the one-column bar stack (the architecture chart's
+    // composition-bar idiom), vertically centered as one block
+    let row_h = 32.0; // badge diameter
+    let bars_h = if chips.is_empty() {
+        0.0
+    } else {
+        chips.len() as f64 * (CHIP_H + 6.0) - 6.0 + 10.0
+    };
+    let top = y + (ST_H - row_h - bars_h) / 2.0;
+    let (bx, by) = (x + 24.0, top + row_h / 2.0);
     parts.push(format!(
         "<circle cx=\"{bx:.0}\" cy=\"{by:.0}\" r=\"16\" fill=\"none\" \
          stroke=\"#4D4D4D\" stroke-width=\"1.2\"/>"
     ));
     parts.push(text(bx, by, &num.to_string()).bold().build());
     parts.push(
-        text(x + ST_W / 2.0 + 12.0, y + 24.0, name)
+        text(x + ST_W / 2.0 + 12.0, by, name)
             .size(TS.h2)
             .bold()
             .build(),
     );
-    // one column: full-width bars stacked bottom-up (see the threading
-    // chart's thread boxes and the architecture chart's composition bars)
     let bw = ST_W - 20.0;
-    let mut cy = y + ST_H - 8.0 - (chips.len() as f64 * (CHIP_H + 6.0) - 6.0);
+    let mut cy = top + row_h + 10.0;
     for (label, cfill) in chips {
         parts.push(rect(x + 10.0, cy, bw, CHIP_H, cfill).sw(1.0).build());
         parts.push(text(x + ST_W / 2.0, cy + CHIP_H / 2.0, label).build());
@@ -224,7 +231,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
     let cl_x = X0 + LANE_LABEL_W + 36.0 - 36.0 - 124.0;
     let cl_y = st_mid("clients") - 34.0;
     parts.push(
-        rect(cl_x, cl_y, 110.0, 64.0, FILL_EXTERNAL)
+        rect(cl_x, cl_y, 124.0, 68.0, FILL_EXTERNAL)
             .dashed()
             .build(),
     );

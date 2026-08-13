@@ -16,38 +16,38 @@
 <line x1="36" y1="226" x2="1912" y2="226" stroke="#DDDDDD" stroke-width="1"/>
 <text x="42" y="311" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="start">pelikan_work</text>
 <line x1="36" y1="396" x2="1912" y2="396" stroke="#DDDDDD" stroke-width="1"/>
-<rect x="110" y="107" width="110" height="64" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
+<rect x="110" y="107" width="124" height="68" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
 <text x="172" y="141" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="270" y="246" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="294" cy="270" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="294" y="270" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">1</text>
-<text x="372" y="270" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">receive</text>
-<rect x="280" y="290" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="360" y="308" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
-<rect x="280" y="332" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="360" y="350" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
+<circle cx="294" cy="267" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="294" y="267" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">1</text>
+<text x="372" y="267" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">receive</text>
+<rect x="280" y="293" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="360" y="311" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<rect x="280" y="335" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="360" y="353" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="546" y="246" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="570" cy="270" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="570" y="270" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">2</text>
-<text x="648" y="270" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">execute</text>
-<rect x="556" y="290" width="160" height="36" fill="#B3CDE3" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="636" y="308" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">entrystore</text>
-<rect x="556" y="332" width="160" height="36" fill="#B3CDE3" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="636" y="350" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">segcache</text>
+<circle cx="570" cy="267" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="570" y="267" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">2</text>
+<text x="648" y="267" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">execute</text>
+<rect x="556" y="293" width="160" height="36" fill="#B3CDE3" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="636" y="311" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">entrystore</text>
+<rect x="556" y="335" width="160" height="36" fill="#B3CDE3" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="636" y="353" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">segcache</text>
 <rect x="822" y="246" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="846" cy="270" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="846" y="270" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">3</text>
-<text x="924" y="270" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">send</text>
-<rect x="832" y="290" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="912" y="308" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
-<rect x="832" y="332" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="912" y="350" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
+<circle cx="846" cy="267" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="846" y="267" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">3</text>
+<text x="924" y="267" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">send</text>
+<rect x="832" y="293" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="912" y="311" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<rect x="832" y="335" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="912" y="353" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="1098" y="246" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="1122" cy="270" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="1122" y="270" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">4</text>
-<text x="1200" y="270" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">flush</text>
-<rect x="1108" y="332" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="1188" y="350" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<circle cx="1122" cy="288" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="1122" y="288" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">4</text>
+<text x="1200" y="288" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">flush</text>
+<rect x="1108" y="314" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="1188" y="332" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
 <path d="M 234 141 L 360 141 L 360 246" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
 <text x="297" y="124" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">request (wire)</text>
 <path d="M 450 311 L 546 311" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
@@ -73,38 +73,38 @@
 <line x1="36" y1="828" x2="1912" y2="828" stroke="#DDDDDD" stroke-width="1"/>
 <text x="42" y="913" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="start">pelikan_storage</text>
 <line x1="36" y1="998" x2="1912" y2="998" stroke="#DDDDDD" stroke-width="1"/>
-<rect x="110" y="539" width="110" height="64" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
+<rect x="110" y="539" width="124" height="68" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
 <text x="172" y="573" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="270" y="678" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="294" cy="702" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="294" y="702" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">1</text>
-<text x="372" y="702" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">receive</text>
-<rect x="280" y="722" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="360" y="740" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
-<rect x="280" y="764" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="360" y="782" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
+<circle cx="294" cy="699" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="294" y="699" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">1</text>
+<text x="372" y="699" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">receive</text>
+<rect x="280" y="725" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="360" y="743" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<rect x="280" y="767" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="360" y="785" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="546" y="848" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="570" cy="872" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="570" y="872" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">2</text>
-<text x="648" y="872" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">execute</text>
-<rect x="556" y="892" width="160" height="36" fill="#B3CDE3" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="636" y="910" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">entrystore</text>
-<rect x="556" y="934" width="160" height="36" fill="#B3CDE3" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="636" y="952" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">segcache</text>
+<circle cx="570" cy="869" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="570" y="869" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">2</text>
+<text x="648" y="869" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">execute</text>
+<rect x="556" y="895" width="160" height="36" fill="#B3CDE3" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="636" y="913" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">entrystore</text>
+<rect x="556" y="937" width="160" height="36" fill="#B3CDE3" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="636" y="955" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">segcache</text>
 <rect x="822" y="678" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="846" cy="702" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="846" y="702" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">3</text>
-<text x="924" y="702" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">send</text>
-<rect x="832" y="722" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="912" y="740" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
-<rect x="832" y="764" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="912" y="782" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
+<circle cx="846" cy="699" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="846" y="699" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">3</text>
+<text x="924" y="699" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">send</text>
+<rect x="832" y="725" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="912" y="743" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<rect x="832" y="767" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="912" y="785" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="1098" y="678" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="1122" cy="702" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="1122" y="702" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">4</text>
-<text x="1200" y="702" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">flush</text>
-<rect x="1108" y="764" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="1188" y="782" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<circle cx="1122" cy="720" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="1122" y="720" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">4</text>
+<text x="1200" y="720" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">flush</text>
+<rect x="1108" y="746" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="1188" y="764" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
 <path d="M 234 573 L 360 573 L 360 678" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
 <text x="297" y="556" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">request (wire)</text>
 <path d="M 450 743 L 498 743 L 498 913 L 546 913" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
@@ -135,52 +135,52 @@
 <text x="42" y="1515" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="start">pelikan_be_i</text>
 <line x1="36" y1="1600" x2="1912" y2="1600" stroke="#DDDDDD" stroke-width="1"/>
 <line x1="36" y1="1770" x2="1912" y2="1770" stroke="#DDDDDD" stroke-width="1"/>
-<rect x="110" y="1141" width="110" height="64" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
+<rect x="110" y="1141" width="124" height="68" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
 <text x="172" y="1175" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="270" y="1280" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="294" cy="1304" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="294" y="1304" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">1</text>
-<text x="372" y="1304" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">receive</text>
-<rect x="280" y="1324" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="360" y="1342" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
-<rect x="280" y="1366" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="360" y="1384" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
+<circle cx="294" cy="1301" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="294" y="1301" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">1</text>
+<text x="372" y="1301" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">receive</text>
+<rect x="280" y="1327" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="360" y="1345" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<rect x="280" y="1369" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="360" y="1387" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="546" y="1450" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="570" cy="1474" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="570" y="1474" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">2</text>
-<text x="648" y="1474" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">send</text>
-<rect x="556" y="1494" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="636" y="1512" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
-<rect x="556" y="1536" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="636" y="1554" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
+<circle cx="570" cy="1471" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="570" y="1471" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">2</text>
+<text x="648" y="1471" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">send</text>
+<rect x="556" y="1497" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="636" y="1515" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<rect x="556" y="1539" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="636" y="1557" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="822" y="1450" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="846" cy="1474" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="846" y="1474" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">3</text>
-<text x="924" y="1474" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">flush</text>
-<rect x="832" y="1536" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="912" y="1554" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<circle cx="846" cy="1492" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="846" y="1492" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">3</text>
+<text x="924" y="1492" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">flush</text>
+<rect x="832" y="1518" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="912" y="1536" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
 <rect x="1098" y="1450" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="1122" cy="1474" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="1122" y="1474" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">4</text>
-<text x="1200" y="1474" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">receive</text>
-<rect x="1108" y="1494" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="1188" y="1512" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
-<rect x="1108" y="1536" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="1188" y="1554" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
+<circle cx="1122" cy="1471" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="1122" y="1471" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">4</text>
+<text x="1200" y="1471" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">receive</text>
+<rect x="1108" y="1497" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="1188" y="1515" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<rect x="1108" y="1539" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="1188" y="1557" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="1374" y="1280" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="1398" cy="1304" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="1398" y="1304" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">5</text>
-<text x="1476" y="1304" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">send</text>
-<rect x="1384" y="1324" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="1464" y="1342" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
-<rect x="1384" y="1366" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="1464" y="1384" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
+<circle cx="1398" cy="1301" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="1398" y="1301" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">5</text>
+<text x="1476" y="1301" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">send</text>
+<rect x="1384" y="1327" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="1464" y="1345" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<rect x="1384" y="1369" width="160" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="1464" y="1387" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="1650" y="1280" width="180" height="130" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<circle cx="1674" cy="1304" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
-<text x="1674" y="1304" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">6</text>
-<text x="1752" y="1304" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">flush</text>
-<rect x="1660" y="1366" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="1740" y="1384" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
+<circle cx="1674" cy="1322" r="16" fill="none" stroke="#4D4D4D" stroke-width="1.2"/>
+<text x="1674" y="1322" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="bold" fill="#000" text-anchor="middle">6</text>
+<text x="1752" y="1322" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">flush</text>
+<rect x="1660" y="1348" width="160" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
+<text x="1740" y="1366" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
 <path d="M 234 1175 L 360 1175 L 360 1280" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
 <text x="297" y="1158" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">request (wire)</text>
 <path d="M 450 1345 L 498 1345 L 498 1515 L 546 1515" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>

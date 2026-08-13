@@ -103,8 +103,13 @@ const FOUNDATION_ROW: &[&str] = &[
 ];
 
 // layout constants (the SVG_STYLE table of the Python original)
-const CELL_H: f64 = 40.0;
-const PAD: f64 = 16.0;
+// module cells and bars share the runtime charts' aspect: height ~1.7x the
+// body text (see TYPE_RUNTIME's 36px bars on 22px text), with the same
+// tight vertical margins
+const CELL_H: f64 = 24.0;
+const TITLE_H: f64 = 26.0; // header rows (h2 text)
+const ROW_GAP: f64 = 6.0; // vertical stacking gap, as in the runtime bars
+const PAD: f64 = 10.0;
 const GAP: f64 = 12.0;
 const BAND_GAP: f64 = 26.0;
 const RULE_H: f64 = 7.0;
@@ -415,14 +420,14 @@ pub fn generate() {
     let y0 = y;
     let n = PRODUCT_ORDER.len() as f64;
     let box_w = (inner_w - (n - 1.0) * GAP) / n;
-    let bar_h = CELL_H - 6.0;
-    let bar_gap = 8.0;
+    let bar_h = CELL_H;
+    let bar_gap = ROW_GAP;
     let max_bars = comp
         .values()
         .map(|c| c.protocols.len() + usize::from(c.engine.is_some()) + c.core.len())
         .max()
         .unwrap() as f64;
-    let box_h = PAD * 2.0 + CELL_H + max_bars * (bar_h + bar_gap);
+    let box_h = PAD * 2.0 + TITLE_H + 8.0 + max_bars * (bar_h + bar_gap) - bar_gap;
     for (i, prod) in PRODUCT_ORDER.iter().enumerate() {
         let bx = MARGIN + i as f64 * (box_w + GAP);
         parts.push(
@@ -432,7 +437,7 @@ pub fn generate() {
                 .build(),
         );
         parts.push(
-            text(bx + box_w / 2.0, y + PAD + CELL_H / 2.0 - 6.0, prod)
+            text(bx + box_w / 2.0, y + PAD + TITLE_H / 2.0, prod)
                 .size(TS.h2)
                 .bold()
                 .build(),
@@ -452,7 +457,7 @@ pub fn generate() {
         for co in &c.core {
             bars.push((co.clone(), FILL_CORE, false));
         }
-        let mut by = y + PAD + CELL_H;
+        let mut by = y + PAD + TITLE_H + 8.0;
         for (label, fill, stub) in bars {
             let mut r = rect(bx + PAD, by, box_w - 2.0 * PAD, bar_h, fill);
             if stub {
@@ -493,7 +498,7 @@ pub fn generate() {
                  rows: &[Vec<String>],
                  fill: &str|
      -> f64 {
-        let gh = PAD * 2.0 + CELL_H + rows.len() as f64 * (CELL_H + GAP) - GAP;
+        let gh = PAD * 2.0 + TITLE_H + 8.0 + rows.len() as f64 * (CELL_H + ROW_GAP) - ROW_GAP;
         parts.push(
             rect(x, y, w, gh, "#F5F5F5")
                 .stroke("#9E9E9E")
@@ -501,12 +506,12 @@ pub fn generate() {
                 .build(),
         );
         parts.push(
-            text(x + w / 2.0, y + PAD + CELL_H / 2.0 - 6.0, title)
+            text(x + w / 2.0, y + PAD + TITLE_H / 2.0, title)
                 .size(TS.h2)
                 .bold()
                 .build(),
         );
-        let mut cy = y + PAD + CELL_H;
+        let mut cy = y + PAD + TITLE_H + 8.0;
         let nrows = rows.len();
         for (i, row) in rows.iter().enumerate() {
             // rows stack because of dependencies: dependents on top, most
@@ -523,7 +528,7 @@ pub fn generate() {
                 parts.push(cell_text(cx + cw / 2.0, cy + CELL_H / 2.0, cell, 14, false));
                 cx += cw + GAP;
             }
-            cy += CELL_H + GAP;
+            cy += CELL_H + ROW_GAP;
         }
         gh
     };
