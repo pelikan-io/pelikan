@@ -126,8 +126,8 @@ const TB_H: f64 = 192.0;
 const EXT_W: f64 = 124.0;
 const EXT_H: f64 = 68.0;
 const GAP: f64 = 40.0; // minimum arrow length between columns
-const ELBOW: f64 = 56.0; // elbow verticals sit this far from a queue
-const PANEL_W: f64 = 1972.0;
+const ELBOW: f64 = 130.0; // elbow verticals route outside the queue labels
+const PANEL_W: f64 = 2190.0;
 
 const TS: TypeScale = TYPE_SCALE;
 
@@ -164,7 +164,7 @@ fn thread_box(
     // one block
     let bh = 36.0;
     let name_h = 30.0;
-    let sub_h = if sub.is_some() { 28.0 } else { 0.0 };
+    let sub_h = if sub.is_some() { 38.0 } else { 0.0 };
     let bars_h = if chips.is_empty() {
         0.0
     } else {
@@ -270,7 +270,7 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
 
 fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = if multi { 770.0 } else { 538.0 };
+    let h = if multi { 792.0 } else { 560.0 };
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -279,7 +279,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
     );
     margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
 
-    let row_a = y0 + 68.0;
+    let row_a = y0 + 80.0;
     let mid_a = row_a + TB_H / 2.0;
 
     let cl_x = X0 + 26.0;
@@ -313,8 +313,8 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
     parts.push(ortho(&[(li_x + TB_W, mid_a), (q_x, mid_a)]).build());
 
     let wk_x = q_x + q_w + qg;
-    let top_y = y0 + 34.0;
-    let row_b = y0 + h - 202.0;
+    let top_y = y0 + 40.0;
+    let row_b = y0 + h - 212.0;
 
     let (wk_bottom, st): (f64, Option<(f64, f64)>) = if !multi {
         thread_box(
@@ -489,7 +489,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
 
 fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = 770.0;
+    let h = 792.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -498,7 +498,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     );
     margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
 
-    let row_a = y0 + 68.0;
+    let row_a = y0 + 80.0;
     let mid_a = row_a + TB_H / 2.0;
 
     let cl_x = X0 + 26.0;
@@ -559,7 +559,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
         .build(),
     );
 
-    let top_y = y0 + 34.0;
+    let top_y = y0 + 40.0;
     parts.push(
         ortho(&[
             (cl_x + EXT_W / 2.0, row_a + (TB_H - EXT_H) / 2.0),
@@ -658,7 +658,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     );
 
     // control plane: signal left of admin, admin aligned under listener
-    let row_b = y0 + h - 202.0;
+    let row_b = y0 + h - 212.0;
     let sg_x = X0 + 26.0;
     thread_box(
         &mut parts,
