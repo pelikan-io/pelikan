@@ -253,13 +253,15 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
             .network()
             .build(),
         );
+        // label rides the downward run into stage 1
         parts.push(
             text(
-                (cl_x + 124.0 + xs[0] + ST_W / 2.0) / 2.0,
-                st_mid("clients") - 17.0,
+                xs[0] + ST_W / 2.0 + 12.0,
+                (st_mid("clients") + st_y(ln)) / 2.0,
                 "request (wire)",
             )
             .fill("#555")
+            .start()
             .build(),
         );
     };
@@ -274,12 +276,15 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
             .network()
             .build(),
         );
-        let half = label_w_at("response (wire)", TS.body as f64) / 2.0;
-        let lx = (x + 124.0).min(X0 + PANEL_W - half);
+        // label centered along the horizontal run back to the clients
         parts.push(
-            text(lx, st_mid("clients") - 17.0, "response (wire)")
-                .fill("#555")
-                .build(),
+            text(
+                (cl_x + 124.0 + x) / 2.0,
+                st_mid("clients") - 17.0,
+                "response (wire)",
+            )
+            .fill("#555")
+            .build(),
         );
     };
     let gap_label = |parts: &mut Vec<String>, xs: &[f64], i: usize, label: &str, ln: &str| {

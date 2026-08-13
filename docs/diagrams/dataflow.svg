@@ -49,14 +49,14 @@
 <rect x="1148" y="344" width="150" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <text x="1223" y="362" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
 <path d="M 234 151 L 365 151 L 365 265" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
-<text x="300" y="134" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">request (wire)</text>
+<text x="377" y="208" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">request (wire)</text>
 <path d="M 460 341 L 556 341" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 746 341 L 842 341" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 1032 341 L 1128 341" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <text x="508" y="248" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">request (object)</text>
 <text x="794" y="248" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">response (object)</text>
 <path d="M 1223 265 L 1223 151 L 234 151" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
-<text x="1347" y="134" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">response (wire)</text>
+<text x="728" y="134" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">response (wire)</text>
 <rect x="24" y="496" width="1972" height="642" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
 <text x="2126" y="766" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">multiple workers</text>
 <text x="2120" y="812" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
@@ -106,7 +106,7 @@
 <rect x="1148" y="816" width="150" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <text x="1223" y="834" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
 <path d="M 234 623 L 365 623 L 365 737" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
-<text x="300" y="606" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">request (wire)</text>
+<text x="377" y="680" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">request (wire)</text>
 <path d="M 460 813 L 508 813 L 508 1003 L 556 1003" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <rect x="498" y="870" width="20" height="15" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="498" y="885" width="20" height="15" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
@@ -123,7 +123,7 @@
 <text x="814" y="908" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">response (object)</text>
 <path d="M 1032 813 L 1128 813" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 1223 737 L 1223 623 L 234 623" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
-<text x="1347" y="606" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">response (wire)</text>
+<text x="728" y="606" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">response (wire)</text>
 <rect x="24" y="1158" width="1972" height="832" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
 <text x="2126" y="1553" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">proxy</text>
 <text x="2120" y="1599" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">pingproxy</text>
@@ -182,7 +182,7 @@
 <rect x="1720" y="1478" width="150" height="36" fill="#CCEBC5" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <text x="1795" y="1496" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">session</text>
 <path d="M 234 1285 L 365 1285 L 365 1399" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
-<text x="300" y="1268" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">request (wire)</text>
+<text x="377" y="1342" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">request (wire)</text>
 <path d="M 460 1475 L 508 1475 L 508 1665 L 556 1665" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <rect x="498" y="1532" width="20" height="15" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="498" y="1547" width="20" height="15" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
@@ -206,5 +206,5 @@
 <text x="1386" y="1570" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">response (object)</text>
 <path d="M 1604 1475 L 1700 1475" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 1795 1399 L 1795 1285 L 234 1285" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
-<text x="1897" y="1268" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">response (wire)</text>
+<text x="1014" y="1268" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">response (wire)</text>
 </svg>
