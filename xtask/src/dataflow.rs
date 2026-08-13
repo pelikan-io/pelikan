@@ -84,10 +84,10 @@ const LANE_LINE: &str = "#DDDDDD";
 const CHIP_H: f64 = 36.0;
 const ST_W: f64 = 190.0;
 const ST_H: f64 = 152.0;
-const GAP: f64 = 96.0;
+const GAP: f64 = 240.0;
 const LANE_H: f64 = 190.0;
 const LANE_LABEL_W: f64 = 210.0;
-const PANEL_W: f64 = 1972.0;
+const PANEL_W: f64 = 2670.0;
 
 const TS: TypeScale = TYPE_SCALE;
 
@@ -289,7 +289,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
     };
     let gap_label = |parts: &mut Vec<String>, xs: &[f64], i: usize, label: &str, ln: &str| {
         let cx = xs[i] + ST_W + (xs[i + 1] - xs[i] - ST_W) / 2.0;
-        parts.push(text(cx, st_y(ln) - 17.0, label).fill("#555").build());
+        parts.push(text(cx, st_mid(ln) - 17.0, label).fill("#555").build());
     };
     let crossing =
         |parts: &mut Vec<String>, xs: &[f64], i: usize, from: &str, to: &str, label: &str| {
