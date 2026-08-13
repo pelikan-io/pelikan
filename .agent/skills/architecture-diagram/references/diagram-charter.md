@@ -60,14 +60,12 @@ All three are embedded in `docs/ARCHITECTURE.md` with textual equivalents
 
 ## Overrides (defaults apply unless listed here)
 
-- Two type ramps instead of one (#183): effective text size is the
-  font-to-canvas-width ratio, so each chart's ramp is sized to its own
-  canvas — the roles stay (h1/h2/body, named in `xtask/src/svg.rs`), but
-  the build chart (1280 wide) uses 24/21/18 and the runtime charts
-  (~2200) use 30/26/22. The skill's single-ramp default assumes charts
-  of similar width.
-- The skill's default 16px sub-label size is dropped; sub-labels are body
-  text. Exactly three sizes per ramp.
+- The skill's default type scale is replaced wholesale (#183): effective
+  text size is the font-to-canvas-width ratio, so the canvases were
+  reconciled to one width (2218) and the set uses a single named ramp
+  (`TYPE_SCALE` in `xtask/src/svg.rs`): 30 titles / 26 element names /
+  22 body. The default's 16px sub-label size is dropped — sub-labels are
+  body text, exactly three roles.
 - Otherwise defaults adopted wholesale — the palette, style channels, edge
   weights, and panel conventions were derived from this project's diagrams.
 
