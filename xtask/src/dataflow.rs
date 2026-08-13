@@ -86,8 +86,8 @@ const ST_W: f64 = 190.0;
 const ST_H: f64 = 152.0;
 const GAP: f64 = 240.0;
 const LANE_H: f64 = 190.0;
-const LANE_LABEL_W: f64 = 210.0;
-const PANEL_W: f64 = 2670.0;
+const LANE_LABEL_W: f64 = 225.0;
+const PANEL_W: f64 = 2690.0;
 
 const TS: TypeScale = TYPE_SCALE;
 
