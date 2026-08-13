@@ -1,3 +1,7 @@
+---
+beta_skills: [architecture-diagram]
+---
+
 # Architecture diagrams
 
 ## What
@@ -261,3 +265,46 @@ size. The runtime charts (~1950px) render ~35% smaller than the build chart
   SVG, which browsers render at natural size with scroll/zoom (#183).
   Also collapsed the runtime charts' off-scale 13/15/16px sizes into the
   set's 14/17/20 scale; one type scale is now literal, not aspirational.
+
+## Skill Feedback
+
+### architecture-diagram (beta)
+
+- **Friction** — asked to make the runtime charts as legible as the build
+  chart, the skill's one-visual-language default (a single type scale)
+  assumed charts of similar canvas width; under markdown width
+  normalization, nominal font parity across canvases of different widths
+  is meaningless. Done instead: reconciled every canvas to one width and
+  one named ramp (`TYPE_SCALE`), recorded as a charter override (#183).
+- **Friction** — the charter template invites concrete values, so the
+  filled charter hand-kept claim counts and the reconciled canvas width;
+  both drifted within hours of being written. Done instead: replaced them
+  with pointers to the claims arrays and the SVG viewBox. The skill's
+  derive-never-draw principle should be stated to apply to the charter's
+  own contents.
+- **Friction** — "verify the rendering" prescribes bounds checks, but the
+  implementation the skill grew from checks x-coordinates only; vertical
+  overflows during the margin passes were caught by human render review,
+  not by the check. Done instead: render-inspected every pass; a y-bounds
+  check remains unbuilt.
+- **Confirmation** — negative claims: the proxy no-signal-thread absence
+  assertion surfaced a real bug (#181), then tripped generation when the
+  bug was fixed, forcing chart and claims to flip together.
+- **Confirmation** — fail-loudly classification: adding the xtask crate
+  aborted the build chart until explicitly classified as tooling.
+- **Confirmation** — byte-comparison on generator refactors: the named
+  type-scale refactor was proven pure by identical output.
+- **Confirmation** — the composition-bar idiom extended cleanly from the
+  build chart into thread boxes and stages (single-column module bars),
+  exactly the cross-chart bridging the skill prescribes.
+
+## Appendix: Skills Invoked
+
+- `dataflow-diagram` (skills-mcp) — seeded the conventions the original
+  charts were built from, and re-read while distilling this skill.
+- `architecture-diagram` (beta) — applied throughout the #183 legibility
+  and consistency passes; this effort is also its reference
+  implementation.
+
+Earlier sessions of this effort predate the skill-use convention; their
+invocations are not reconstructed here.
