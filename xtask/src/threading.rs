@@ -255,14 +255,14 @@ fn worker_column(
 /// Right-margin block: panel title over a binary->protocol mini-table, the
 /// whole block vertically centered.
 fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[(&str, &str)]) {
-    let (row_h, title_h, gap) = (30.0, 38.0, 12.0);
+    let (row_h, title_h, gap) = (34.0, 38.0, 12.0);
     let block_h = title_h + gap + rows.len() as f64 * row_h;
     let ty = cy - block_h / 2.0 + title_h / 2.0;
     parts.push(text(cx, ty, title).size(TS.h1).bold().build());
     let mut ry = ty + title_h / 2.0 + gap + row_h / 2.0;
     for (binary, proto) in rows {
         parts.push(text(cx - 6.0, ry, binary).fill("#555").end().build());
-        parts.push(text(cx, ry, ":").fill("#555").build());
+        parts.push(text(cx, ry, ":").size(TS.h2).fill("#555").build());
         parts.push(text(cx + 8.0, ry, proto).fill("#555").start().build());
         ry += row_h;
     }

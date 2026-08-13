@@ -3,16 +3,16 @@
 <rect width="100%" height="100%" fill="white"/>
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4D4D4D"/></marker></defs>
 <rect x="24" y="24" width="2190" height="560" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
-<text x="2344" y="253" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">single worker</text>
-<text x="2338" y="299" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
-<text x="2344" y="299" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="2352" y="299" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
+<text x="2344" y="247" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">single worker</text>
+<text x="2338" y="295" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
+<text x="2344" y="295" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="2352" y="295" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
 <text x="2338" y="329" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">rds</text>
-<text x="2344" y="329" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="2344" y="329" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#555" text-anchor="middle">:</text>
 <text x="2352" y="329" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">resp</text>
-<text x="2338" y="359" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">pingserver</text>
-<text x="2344" y="359" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="2352" y="359" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">ping</text>
+<text x="2338" y="363" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">pingserver</text>
+<text x="2344" y="363" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="2352" y="363" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">ping</text>
 <rect x="50" y="166" width="124" height="68" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
 <text x="112" y="200" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="380" y="104" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
@@ -51,16 +51,16 @@
 <text x="396" y="334" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">signals</text>
 <path d="M 670 468 L 1157 468 L 1157 296" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <rect x="24" y="604" width="2190" height="792" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
-<text x="2344" y="949" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">multiple workers</text>
-<text x="2338" y="995" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
-<text x="2344" y="995" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="2352" y="995" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
+<text x="2344" y="943" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">multiple workers</text>
+<text x="2338" y="991" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
+<text x="2344" y="991" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="2352" y="991" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
 <text x="2338" y="1025" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">rds</text>
-<text x="2344" y="1025" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="2344" y="1025" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#555" text-anchor="middle">:</text>
 <text x="2352" y="1025" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">resp</text>
-<text x="2338" y="1055" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">pingserver</text>
-<text x="2344" y="1055" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">:</text>
-<text x="2352" y="1055" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">ping</text>
+<text x="2338" y="1059" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">pingserver</text>
+<text x="2344" y="1059" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="2352" y="1059" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">ping</text>
 <rect x="50" y="746" width="124" height="68" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
 <text x="112" y="780" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="380" y="684" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
@@ -120,9 +120,9 @@
 <path d="M 670 1280 L 1157 1280 L 1157 1108" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <path d="M 670 1280 L 1789 1280 L 1789 992" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <rect x="24" y="1416" width="2190" height="792" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
-<text x="2344" y="1791" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">proxy</text>
+<text x="2344" y="1789" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">proxy</text>
 <text x="2338" y="1837" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">pingproxy</text>
-<text x="2344" y="1837" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">:</text>
+<text x="2344" y="1837" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#555" text-anchor="middle">:</text>
 <text x="2352" y="1837" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">ping</text>
 <rect x="50" y="1558" width="124" height="68" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
 <text x="112" y="1592" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
