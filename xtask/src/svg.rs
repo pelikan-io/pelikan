@@ -229,11 +229,12 @@ pub struct TypeScale {
     pub body: u32,
 }
 
-/// The architecture chart's scale, sized for its ~1280px canvas.
+/// The architecture chart's scale. Its cells have horizontal slack, so the
+/// text grew without widening the ~1280px canvas — taller modules pay for it.
 pub const TYPE_ARCH: TypeScale = TypeScale {
-    h1: 20,
-    h2: 17,
-    body: 14,
+    h1: 24,
+    h2: 21,
+    body: 18,
 };
 
 /// The runtime charts' scale: the same roles, larger — their canvases are

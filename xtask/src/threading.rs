@@ -159,29 +159,35 @@ fn thread_box(
     external: bool,
 ) {
     parts.push(rect(x, y, TB_W, TB_H, "#FFFFFF").rx(10.0).build());
-    let mut ty = y + 20.0;
+    // name row, optional sub row, and the one-column bar stack (the
+    // architecture chart's composition-bar idiom) vertically centered as
+    // one block
+    let bh = 36.0;
+    let name_h = 30.0;
+    let sub_h = if sub.is_some() { 28.0 } else { 0.0 };
+    let bars_h = if chips.is_empty() {
+        0.0
+    } else {
+        chips.len() as f64 * (bh + 6.0) - 6.0 + 10.0
+    };
+    let top = y + (TB_H - name_h - sub_h - bars_h) / 2.0;
     parts.push(
-        text(x + TB_W / 2.0, ty, name)
+        text(x + TB_W / 2.0, top + name_h / 2.0, name)
             .size(TS.h2)
             .bold()
             .mono()
             .build(),
     );
     if let Some(sub) = sub {
-        ty += 28.0;
-        let mut t = text(x + TB_W / 2.0, ty, sub).fill("#333");
+        let mut t = text(x + TB_W / 2.0, top + name_h + sub_h / 2.0, sub).fill("#333");
         if external {
             t = t.italic();
         }
         parts.push(t.build());
     }
     if !chips.is_empty() {
-        // one column: full-width bars stacked bottom-up, the same idiom as
-        // the architecture chart's composition bars — width stays constant
-        // no matter how many modules a thread runs
         let bw = TB_W - 20.0;
-        let bh = 36.0;
-        let mut cy = y + TB_H - 8.0 - (chips.len() as f64 * (bh + 6.0) - 6.0);
+        let mut cy = top + name_h + sub_h + 10.0;
         for (label, cfill) in chips {
             parts.push(rect(x + 10.0, cy, bw, bh, cfill).sw(1.0).build());
             parts.push(text(x + TB_W / 2.0, cy + bh / 2.0, label).build());
