@@ -82,12 +82,12 @@ const LANE_LINE: &str = "#DDDDDD";
 
 // geometry: uniform chips size the stage; one uniform inter-column gap
 const CHIP_H: f64 = 36.0;
-const ST_W: f64 = 180.0;
-const ST_H: f64 = 130.0;
+const ST_W: f64 = 190.0;
+const ST_H: f64 = 152.0;
 const GAP: f64 = 96.0;
-const LANE_H: f64 = 170.0;
+const LANE_H: f64 = 190.0;
 const LANE_LABEL_W: f64 = 210.0;
-const PANEL_W: f64 = 1910.0;
+const PANEL_W: f64 = 1972.0;
 
 const TS: TypeScale = TYPE_SCALE;
 
@@ -108,7 +108,7 @@ fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &
         chips.len() as f64 * (CHIP_H + 6.0) - 6.0 + 10.0
     };
     let top = y + (ST_H - row_h - bars_h) / 2.0;
-    let (bx, by) = (x + 24.0, top + row_h / 2.0);
+    let (bx, by) = (x + 28.0, top + row_h / 2.0);
     parts.push(format!(
         "<circle cx=\"{bx:.0}\" cy=\"{by:.0}\" r=\"16\" fill=\"none\" \
          stroke=\"#4D4D4D\" stroke-width=\"1.2\"/>"
@@ -120,10 +120,10 @@ fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &
             .bold()
             .build(),
     );
-    let bw = ST_W - 20.0;
+    let bw = ST_W - 40.0;
     let mut cy = top + row_h + 10.0;
     for (label, cfill) in chips {
-        parts.push(rect(x + 10.0, cy, bw, CHIP_H, cfill).sw(1.0).build());
+        parts.push(rect(x + 20.0, cy, bw, CHIP_H, cfill).sw(1.0).build());
         parts.push(text(x + ST_W / 2.0, cy + CHIP_H / 2.0, label).build());
         cy += CHIP_H + 6.0;
     }

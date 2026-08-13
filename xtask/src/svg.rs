@@ -230,7 +230,7 @@ pub struct TypeScale {
 }
 
 /// One ramp for every chart: the canvases are reconciled to equal width
-/// (2218), so a single scale renders text at the same effective size across
+/// (2280), so a single scale renders text at the same effective size across
 /// the whole set, inline and at full size.
 pub const TYPE_SCALE: TypeScale = TypeScale {
     h1: 30,

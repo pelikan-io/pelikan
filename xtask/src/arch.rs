@@ -104,11 +104,11 @@ const FOUNDATION_ROW: &[&str] = &[
 
 // layout constants (the SVG_STYLE table of the Python original)
 const CELL_H: f64 = 52.0;
-const PAD: f64 = 16.0;
+const PAD: f64 = 24.0;
 const GAP: f64 = 12.0;
 const BAND_GAP: f64 = 26.0;
 const RULE_H: f64 = 7.0;
-const CANVAS_W: f64 = 2218.0;
+const CANVAS_W: f64 = 2280.0;
 const MARGIN: f64 = 24.0;
 const LABEL_W: f64 = 300.0;
 
