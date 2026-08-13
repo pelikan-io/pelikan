@@ -12,7 +12,7 @@
 
 use crate::svg::*;
 
-const TS: TypeScale = TYPE_ARCH;
+const TS: TypeScale = TYPE_SCALE;
 
 /// Chart-local default: body text at this chart's scale.
 fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {
@@ -103,14 +103,14 @@ const FOUNDATION_ROW: &[&str] = &[
 ];
 
 // layout constants (the SVG_STYLE table of the Python original)
-const CELL_H: f64 = 44.0;
+const CELL_H: f64 = 52.0;
 const PAD: f64 = 16.0;
 const GAP: f64 = 12.0;
 const BAND_GAP: f64 = 26.0;
 const RULE_H: f64 = 7.0;
-const CANVAS_W: f64 = 1280.0;
+const CANVAS_W: f64 = 2218.0;
 const MARGIN: f64 = 24.0;
-const LABEL_W: f64 = 230.0;
+const LABEL_W: f64 = 300.0;
 
 fn layer_of(name: &str) -> Option<Layer> {
     LAYER.iter().find(|(n, _)| *n == name).map(|(_, l)| *l)

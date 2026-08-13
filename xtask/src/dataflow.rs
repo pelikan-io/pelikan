@@ -87,9 +87,9 @@ const ST_H: f64 = 130.0;
 const GAP: f64 = 96.0;
 const LANE_H: f64 = 170.0;
 const LANE_LABEL_W: f64 = 210.0;
-const PANEL_W: f64 = 1900.0;
+const PANEL_W: f64 = 1910.0;
 
-const TS: TypeScale = TYPE_RUNTIME;
+const TS: TypeScale = TYPE_SCALE;
 
 /// Chart-local default: body text at this chart's scale.
 fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {

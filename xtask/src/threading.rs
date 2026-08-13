@@ -129,7 +129,7 @@ const GAP: f64 = 40.0; // minimum arrow length between columns
 const ELBOW: f64 = 56.0; // elbow verticals sit this far from a queue
 const PANEL_W: f64 = 1910.0;
 
-const TS: TypeScale = TYPE_RUNTIME;
+const TS: TypeScale = TYPE_SCALE;
 
 /// Chart-local default: body text at this chart's scale.
 fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {
