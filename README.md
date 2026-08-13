@@ -2,14 +2,23 @@
 
 Pelikan is a framework for developing cache services. It is:
 
-- **Fast**: Pelikan provides high-throughput and low-latency caching solutions.
+- **Fast**: predictably low latency, not just high throughput — threads
+  communicate over lockless queues, workers never block on each other, and
+  the storage engine scales almost linearly with cores where others plateau
+  ([Segcache blog]).
 
-- **Reliable**: Pelikan is designed for large-scale deployment and the
-  implementation is informed by our operational experiences.
+- **Efficient**: Segcache, the flagship storage engine, spends 5 bytes of
+  metadata per object (Memcached: 56) and cuts cache memory requirements by
+  22–60% against state-of-the-art designs ([NSDI'21 paper]).
 
-- **Modular**: Pelikan is a framework for rapidly developing new caching
-  solutions by focusing on the inherent architectural similarity between caching
-  services and providing reusable low-level components.
+- **Reliable**: the design is distilled from years of operating cache fleets
+  at planet scale — control and data planes are separated at runtime, and
+  every module ships its own metrics, so the server stays observable and
+  manageable under load.
+
+- **Modular**: every service is a thin composition of a protocol, a storage
+  engine, and a runtime core drawn from shared libraries; new caching
+  solutions reuse the low-level machinery instead of reimplementing it.
 
 [![License: Apache-2.0][license-badge]][license-url]
 [![Build Status][cargo-build-badge]][cargo-build-url]
@@ -48,6 +57,34 @@ The framework approach allows us to develop new features and protocols quickly.
 Each service composes a protocol, a storage engine, and a runtime core from
 the shared libraries below it; see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 for the full breakdown.
+
+## Why Pelikan
+
+**Memory efficiency.** Cache capacity is usually bought in DRAM, so metadata
+overhead and dead objects are real money. Segcache groups objects by TTL into
+segments, amortizing metadata to about 5 bytes per object (Memcached: 56) and
+removing expired objects within a second of expiry ([Segcache blog]). In the
+[NSDI'21 paper]'s
+evaluation on production workloads, this reduced memory requirements by
+40–90% versus Pelikan's own production slab storage and by 22–60% versus
+state-of-the-art research systems.
+
+**Predictable tail latency.** The data plane is built so that a worker
+thread never waits on a peer: threads communicate over lockless queues, and
+what locking storage needs is amortized ~10,000× by managing segments rather
+than individual objects ([Segcache blog]). Latency SLOs at the tail are a
+design target, not an aspiration — in a
+[joint evaluation with Intel ADQ](https://pelikan.io/blog/benchmark-adq/),
+stacked Pelikan instances upheld a p999 < 5 ms SLO at 1M QPS per host, and
+the same architecture scaled to ~8× Memcached's throughput at 24 threads
+([Segcache blog]).
+
+**Velocity through composition.** Cache servers share most of their anatomy;
+Pelikan makes that anatomy reusable. A new service picks a wire protocol, a
+storage engine, and a threading model from existing crates and wires them
+together — `pelikan-pingserver` is the minimal worked example, and the same
+composition carries `pelikan-segcache` and `pelikan-rds`. Adding a protocol
+or storage backend extends every service that wants it, not one binary.
 
 ## Products
 
@@ -217,4 +254,5 @@ This software is licensed under the Apache 2.0 license, see [LICENSE](LICENSE) f
 [license-badge]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
 [license-url]: https://github.com/pelikan-io/pelikan/blob/main/LICENSE
 [nsdi'21 paper]: https://www.usenix.org/conference/nsdi21/presentation/yang-juncheng
+[segcache blog]: https://pelikan.io/blog/segcache/
 [discord-url]: https://discord.gg/yUBWHqxGUR
