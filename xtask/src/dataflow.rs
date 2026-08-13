@@ -86,8 +86,8 @@ const ST_W: f64 = 190.0;
 const ST_H: f64 = 152.0;
 const GAP: f64 = 240.0;
 const LANE_H: f64 = 190.0;
-const LANE_LABEL_W: f64 = 225.0;
-const PANEL_W: f64 = 2690.0;
+const LANE_LABEL_W: f64 = 240.0;
+const PANEL_W: f64 = 2705.0;
 
 const TS: TypeScale = TYPE_SCALE;
 
@@ -156,7 +156,7 @@ fn vqueue(parts: &mut Vec<String>, x: f64, y_mid: f64, label: &str) {
 fn lane_header(parts: &mut Vec<String>, y: f64, name: &str, external: bool) {
     if !external {
         parts.push(
-            text(X0 + 18.0, y + LANE_H / 2.0, name)
+            text(X0 + 32.0, y + LANE_H / 2.0, name)
                 .size(TS.h2)
                 .bold()
                 .mono()
