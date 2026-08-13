@@ -62,7 +62,8 @@ All three are embedded in `docs/ARCHITECTURE.md` with textual equivalents
 
 - The skill's default type scale is replaced wholesale (#183): effective
   text size is the font-to-canvas-width ratio, so the canvases were
-  reconciled to one width (2218) and the set uses a single named ramp
+  reconciled to a single width (a hand-kept number would drift — read it
+  from any chart's viewBox) and the set uses a single named ramp
   (`TYPE_SCALE` in `xtask/src/svg.rs`): 30 titles / 26 element names /
   22 body. The default's 16px sub-label size is dropped — sub-labels are
   body text, exactly three roles.
