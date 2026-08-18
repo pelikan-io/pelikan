@@ -155,6 +155,20 @@ New `workers/maintenance.rs` (thread name `pelikan_maint`):
 - **CAS vs eviction race:** a `cas` racing an eviction-relocation of the
   checked item can fail with `EXISTS` where the old engine would have
   succeeded. Fail-safe direction; documented in the engine.
+- **add/replace are not atomic under concurrent workers** (decision
+  2026-08-18): entrystore implements them as check-then-act
+  (`get_no_freq_incr` → `insert`). With workers sharing the engine, two
+  concurrent `add`s on one key can both return `STORED`, and `replace` can
+  race a concurrent `delete`. Accepted for now; the correct fix is
+  engine-level conditional-insert primitives (insert-if-absent /
+  insert-if-present) in cache-rs — related groundwork exists there as the
+  fresh-key insert de-duplication spec — after which entrystore switches to
+  them. Note: add-based distributed-locking patterns can double-win until
+  then.
+- **cas with past-timestamp TTL has a non-atomic delete-after tail:** the
+  engine `cas` is atomic, but the follow-up delete used to emulate
+  immediate expiry can remove a value a concurrent `set` stored in between.
+  Same category and same eventual fix as add/replace; obscure path.
 - **Expiration driver:** expiration moves from the storage thread (multi) or
   the worker loop (single) to the maintenance thread. Cadence is equivalent;
   single-worker deployments gain a thread but lose per-loop expire work on the

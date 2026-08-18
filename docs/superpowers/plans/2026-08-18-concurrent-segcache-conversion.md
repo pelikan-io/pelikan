@@ -1021,6 +1021,11 @@ cargo xtask diagrams
 
 Expected: runtime threading/dataflow charts no longer show a storage thread or worker↔storage queues.
 
+- [ ] **Step 3b: Reviewer drive-bys (from Phase C quality review)**
+
+- `src/entrystore/src/lib.rs:8` — doc comment references `protocol::memcache::MemcacheStorage`, which doesn't exist; fix the reference.
+- `src/protocol/http/src/lib.rs:34-38` — the http `Storage` trait still takes `&mut self` and has no implementors; add a `// NOTE:` that it predates the &self conversion and should be converted when http is next touched (or convert it if trivial).
+
 - [ ] **Step 4: Commit**
 
 ```bash
@@ -1030,7 +1035,7 @@ git commit -m "docs: thread model reflects Arc-shared workers"
 
 ### Task E2: Journal entry
 
-- [ ] **Step 1: Invoke the `journal` skill** to scaffold `docs/journal/` entry covering: why the storage thread existed, what the concurrent engine changed, the staged conversion (deps → traits → threading), and the accepted CAS-vs-eviction semantic change.
+- [ ] **Step 1: Invoke the `journal` skill** to scaffold `docs/journal/` entry covering: why the storage thread existed, what the concurrent engine changed, the staged conversion (deps → traits → threading), and the accepted semantic changes (CAS-vs-eviction; add/replace check-then-act non-atomicity and the cas delete-after tail, accepted 2026-08-18 pending engine conditional-insert primitives).
 
 - [ ] **Step 2: Commit**
 
