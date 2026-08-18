@@ -45,7 +45,7 @@ clap = "4.6.0"
 clocksource = "0.8.3"
 criterion = "0.8.2"
 crossbeam-channel = "0.5.15"
-segcache = "0.3.0"
+segcache = "0.4.0"
 httparse = "1.10.1"
 libc = "0.2.183"
 log = "0.4.29"
@@ -97,3 +97,9 @@ codegen-units = 1
 [profile.dev]
 debug = true
 opt-level = 0
+
+# TEMPORARY: segcache 0.4.0 is not yet on crates.io (keyvalue ownership is
+# being resolved). Remove this patch before merging (see Task E3 of
+# docs/superpowers/plans/2026-08-18-concurrent-segcache-conversion.md).
+[patch.crates-io]
+segcache = { git = "https://github.com/pelikan-io/cache-rs", rev = "c1b3599f8a0d552501c99db96dcda2a195ab62bf" }
