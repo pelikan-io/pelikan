@@ -15,11 +15,11 @@ metriken = { workspace = true, optional = true }
 mio = { workspace = true, features = ["os-poll", "net"] }
 rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
-slab = { workspace = true }
 webpki-roots = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 ringline = { workspace = true }
+slab = { workspace = true }
 
 [features]
 metrics = ["metriken"]
