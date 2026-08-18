@@ -7,8 +7,11 @@ license = "Apache-2.0"
 
 [workspace]
 resolver = "2"
+exclude = [
+    "vendor/ringline-0.5.3",
+    "vendor/segcache-0.3.0",
+]
 members = [
-    "src/compat/metriken",
     "src/common",
     "src/config",
     "src/core/admin",
@@ -52,7 +55,7 @@ libc = "0.2.183"
 log = "0.4.29"
 logroller = "0.1"
 memmap2 = "0.9.10"
-metriken = "0.7.0"
+metriken = "0.9.0"
 metrohash = "1.0.7"
 mio = "1.1.1"
 nom = "8.0.0"
@@ -81,7 +84,8 @@ urlencoding = "2.1.3"
 webpki-roots = "0.26"
 
 [patch.crates-io]
-metriken = { path = "src/compat/metriken" }
+ringline = { path = "vendor/ringline-0.5.3" }
+segcache = { path = "vendor/segcache-0.3.0" }
 
 [profile.release]
 opt-level = 3

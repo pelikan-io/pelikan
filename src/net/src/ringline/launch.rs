@@ -102,7 +102,7 @@ fn join_workers(workers: Vec<WorkerJoin>) -> io::Result<()> {
         let error = match worker.join() {
             Ok(Ok(())) => None,
             Ok(Err(error)) => Some(io::Error::other(error)),
-            Err(_) => Some(io::Error::other("Ringline worker panicked")),
+            Err(payload) => Some(worker_panic_error(payload)),
         };
         if first_error.is_none() {
             first_error = error;
@@ -112,6 +112,20 @@ fn join_workers(workers: Vec<WorkerJoin>) -> io::Result<()> {
     match first_error {
         Some(error) => Err(error),
         None => Ok(()),
+    }
+}
+
+fn worker_panic_error(payload: Box<dyn Any + Send + 'static>) -> io::Error {
+    let payload = match payload.downcast::<String>() {
+        Ok(message) => {
+            return io::Error::other(format!("Ringline worker panicked: {message}"));
+        }
+        Err(payload) => payload,
+    };
+
+    match payload.downcast::<&'static str>() {
+        Ok(message) => io::Error::other(format!("Ringline worker panicked: {message}")),
+        Err(_) => io::Error::other("Ringline worker panicked with a non-string payload"),
     }
 }
 
@@ -267,5 +281,6 @@ mod tests {
         let error = join_workers(vec![worker]).unwrap_err();
 
         assert_eq!(error.kind(), io::ErrorKind::Other);
+        assert_eq!(error.to_string(), "Ringline worker panicked: worker panic");
     }
 }

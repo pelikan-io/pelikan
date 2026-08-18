@@ -27,7 +27,7 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "parking_lot",
  "pelikan-net",
  "protocol-admin",
@@ -424,7 +424,7 @@ name = "common"
 version = "0.3.2"
 dependencies = [
  "clocksource",
- "metriken 0.7.0",
+ "metriken",
  "pelikan-net",
  "serde",
 ]
@@ -972,13 +972,6 @@ dependencies = [
 
 [[package]]
 name = "metriken"
-version = "0.7.0"
-dependencies = [
- "metriken 0.9.2",
-]
-
-[[package]]
-name = "metriken"
 version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d34d88b3f3ec8c532945831eeea8170f9410a37f444feb1322b8e124f3a4a3b9"
@@ -1140,7 +1133,7 @@ name = "pelikan-net"
 version = "0.5.0"
 dependencies = [
  "libc",
- "metriken 0.7.0",
+ "metriken",
  "mio",
  "ringline",
  "rustls",
@@ -1157,7 +1150,7 @@ dependencies = [
  "common",
  "config",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "protocol-ping",
  "proxy",
 ]
@@ -1172,7 +1165,7 @@ dependencies = [
  "config",
  "entrystore",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "protocol-ping",
  "server",
 ]
@@ -1188,7 +1181,7 @@ dependencies = [
  "criterion",
  "entrystore",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "protocol-resp",
  "server",
 ]
@@ -1204,7 +1197,7 @@ dependencies = [
  "criterion",
  "entrystore",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "protocol-memcache",
  "server",
 ]
@@ -1328,7 +1321,7 @@ dependencies = [
  "config",
  "criterion",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "parking_lot",
  "protocol-common",
  "storage-types",
@@ -1371,7 +1364,7 @@ dependencies = [
  "common",
  "criterion",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "nom",
  "protocol-common",
 ]
@@ -1384,7 +1377,7 @@ dependencies = [
  "config",
  "criterion",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "protocol-common",
  "storage-types",
 ]
@@ -1397,7 +1390,7 @@ dependencies = [
  "common",
  "logger",
  "memchr",
- "metriken 0.7.0",
+ "metriken",
  "nom",
  "protocol-common",
  "thiserror 2.0.18",
@@ -1415,7 +1408,7 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "pelikan-net",
  "protocol-admin",
  "protocol-common",
@@ -1565,15 +1558,13 @@ dependencies = [
 [[package]]
 name = "ringline"
 version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93b934743f292f7ec5edc97def629f0609fbd857e5aa4cd6b472c9e4e3583d9a"
 dependencies = [
  "bytes",
  "crossbeam-channel",
  "futures-io",
  "io-uring",
  "libc",
- "metriken 0.9.2",
+ "metriken",
  "mio",
  "pin-project-lite",
  "rustls",
@@ -1647,15 +1638,13 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 [[package]]
 name = "segcache"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "511afdec590e313aa76a32e095840c623a9f10a5a33c67bd846901c2a8853ea5"
 dependencies = [
  "ahash",
  "clocksource",
  "keyvalue",
  "log",
  "memmap2",
- "metriken 0.7.0",
+ "metriken",
  "rand",
  "rand_xoshiro",
  "thiserror 2.0.18",
@@ -1734,7 +1723,7 @@ dependencies = [
  "entrystore",
  "libc",
  "logger",
- "metriken 0.7.0",
+ "metriken",
  "pelikan-net",
  "protocol-admin",
  "protocol-common",
@@ -1752,7 +1741,7 @@ dependencies = [
  "clocksource",
  "common",
  "log",
- "metriken 0.7.0",
+ "metriken",
  "pelikan-net",
  "protocol-common",
 ]
