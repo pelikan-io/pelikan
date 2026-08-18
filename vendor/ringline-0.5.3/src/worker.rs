@@ -19,6 +19,28 @@ type LaunchResult = Result<
     ),
     crate::error::Error,
 >;
+type WorkerHandle = thread::JoinHandle<Result<(), crate::error::Error>>;
+
+fn rollback_workers(
+    shutdown_flag: &Arc<AtomicBool>,
+    worker_wake_fds: &[crate::wakeup::WakeFd],
+    handles: Vec<WorkerHandle>,
+) -> Option<crate::error::Error> {
+    shutdown_flag.store(true, Ordering::SeqCst);
+    for wake in worker_wake_fds {
+        wake.wake();
+    }
+
+    let mut first_error = None;
+    for handle in handles {
+        if let Ok(Err(error)) = handle.join()
+            && first_error.is_none()
+        {
+            first_error = Some(error);
+        }
+    }
+    first_error
+}
 
 /// Owns a worker wake read descriptor until the backend driver takes it.
 struct WorkerReadFd {
@@ -680,52 +702,22 @@ impl RinglineBuilder {
             (None, None)
         };
 
-        // Prepare the listener, but do not start accepting until every worker
-        // has completed its fallible backend setup.
-        let mut bound_addr: Option<SocketAddr> = None;
-        let (listen_fd, listen_fd_closed, pending_acceptor) =
-            if let Some(bind_addr) = self.bind_addr {
-                let (fd, is_unix) = match bind_addr {
-                    BindAddr::Tcp(addr) => {
-                        let fd = create_listener(addr, self.config.backlog)?;
-                        bound_addr = getsockname_v4_v6(fd);
-                        (fd, false)
-                    }
-                    BindAddr::Unix(ref path) => {
-                        (create_unix_listener(path, self.config.backlog)?, true)
-                    }
-                };
-                let closed = Arc::new(AtomicBool::new(false));
-
-                let acceptor_config = AcceptorConfig {
-                    listen_fd: fd,
-                    worker_channels: worker_txs,
-                    worker_wake_handles: worker_wake_fds.clone(),
-                    shutdown_flag: shutdown_flag.clone(),
-                    tcp_nodelay: if is_unix {
-                        false
-                    } else {
-                        self.config.tcp_nodelay
-                    },
-                    #[cfg(feature = "timestamps")]
-                    timestamps: self.config.timestamps,
-                    conn_chunk_size: self.config.conn_chunk_size,
-                };
-
-                (Some(fd), Some(closed), Some(acceptor_config))
-            } else {
-                // Client-only mode — drop txs so workers don't expect accept data.
-                drop(worker_txs);
-                (None, None, None)
-            };
+        // Retain only bind intent and worker senders until every worker has
+        // completed fallible setup. No socket is bound or listening yet.
+        let pending_bind_addr = self.bind_addr;
+        let has_acceptor = pending_bind_addr.is_some();
+        let pending_worker_txs = if has_acceptor {
+            Some(worker_txs)
+        } else {
+            drop(worker_txs);
+            None
+        };
 
         // Spawn worker threads. Each worker reports its setup outcome
         // (Ok / Err) over `startup_rx` so we can surface bind / config
         // errors to the caller of `launch()` instead of silently
         // swallowing them inside a thread that never gets joined.
-        let mut handles: Vec<thread::JoinHandle<Result<(), crate::error::Error>>> =
-            Vec::with_capacity(num_threads);
-        let has_acceptor = listen_fd.is_some();
+        let mut handles: Vec<WorkerHandle> = Vec::with_capacity(num_threads);
         let (startup_tx, startup_rx) = crossbeam_channel::bounded::<Result<(), ()>>(num_threads);
 
         // SMT-aware pinning: when the requested worker range fits within
@@ -836,20 +828,7 @@ impl RinglineBuilder {
             let handle = match spawn_result {
                 Ok(handle) => handle,
                 Err(error) => {
-                    shutdown_flag.store(true, Ordering::SeqCst);
-                    for wake in &worker_wake_fds {
-                        wake.wake();
-                    }
-                    if let (Some(fd), Some(closed)) = (listen_fd, listen_fd_closed.as_ref())
-                        && !closed.swap(true, Ordering::AcqRel)
-                    {
-                        unsafe {
-                            libc::close(fd);
-                        }
-                    }
-                    for handle in handles {
-                        let _ = handle.join();
-                    }
+                    rollback_workers(&shutdown_flag, &worker_wake_fds, handles);
                     return Err(crate::error::Error::Io(error));
                 }
             };
@@ -876,44 +855,46 @@ impl RinglineBuilder {
         }
 
         if setup_failed {
-            shutdown_flag.store(true, Ordering::SeqCst);
-            // Wake workers that did successfully start so they observe
-            // the shutdown flag and exit promptly.
-            for w in &worker_wake_fds {
-                w.wake();
-            }
-            // Tear down the listener if we created one; the acceptor
-            // thread will exit when the fd closes.
-            if let (Some(fd), Some(closed)) = (listen_fd, listen_fd_closed.as_ref())
-                && !closed.swap(true, Ordering::AcqRel)
-            {
-                unsafe {
-                    libc::close(fd);
-                }
-            }
-            // Join all workers, capturing the first error to return.
-            let mut first_err: Option<crate::error::Error> = None;
-            for handle in handles {
-                match handle.join() {
-                    Ok(Err(e)) if first_err.is_none() => first_err = Some(e),
-                    Ok(_) => {}
-                    Err(_panic) => {}
-                }
-            }
+            let first_err = rollback_workers(&shutdown_flag, &worker_wake_fds, handles);
             return Err(first_err.unwrap_or_else(|| {
                 crate::error::Error::Io(io::Error::other("worker setup failed"))
             }));
         }
 
-        // Commit the listener only after every worker has completed its
-        // fallible initialization. Before this point no application socket
-        // can be accepted or queued to a worker.
-        if let Some(acceptor_config) = pending_acceptor {
-            let fd = acceptor_config.listen_fd;
-            let acceptor_closed = listen_fd_closed
-                .as_ref()
-                .expect("listener closure state must exist")
-                .clone();
+        // Commit the listener only after every worker has completed fallible
+        // initialization. Before this point clients cannot connect or enter a
+        // kernel listen backlog.
+        let (listen_fd, listen_fd_closed, bound_addr) = if has_acceptor {
+            let listener = match pending_bind_addr.expect("bind intent must exist") {
+                BindAddr::Tcp(addr) => create_listener(addr, self.config.backlog)
+                    .map(|fd| (fd, false, getsockname_v4_v6(fd))),
+                BindAddr::Unix(ref path) => {
+                    create_unix_listener(path, self.config.backlog).map(|fd| (fd, true, None))
+                }
+            };
+            let (fd, is_unix, bound_addr) = match listener {
+                Ok(listener) => listener,
+                Err(error) => {
+                    rollback_workers(&shutdown_flag, &worker_wake_fds, handles);
+                    return Err(error);
+                }
+            };
+            let closed = Arc::new(AtomicBool::new(false));
+            let acceptor_config = AcceptorConfig {
+                listen_fd: fd,
+                worker_channels: pending_worker_txs.expect("worker senders must exist"),
+                worker_wake_handles: worker_wake_fds.clone(),
+                shutdown_flag: shutdown_flag.clone(),
+                tcp_nodelay: if is_unix {
+                    false
+                } else {
+                    self.config.tcp_nodelay
+                },
+                #[cfg(feature = "timestamps")]
+                timestamps: self.config.timestamps,
+                conn_chunk_size: self.config.conn_chunk_size,
+            };
+            let acceptor_closed = closed.clone();
             let spawn_result = thread::Builder::new()
                 .name("ringline-acceptor".to_string())
                 .spawn(move || {
@@ -926,23 +907,18 @@ impl RinglineBuilder {
                 });
 
             if let Err(error) = spawn_result {
-                shutdown_flag.store(true, Ordering::SeqCst);
-                for wake in &worker_wake_fds {
-                    wake.wake();
-                }
-                if let Some(closed) = listen_fd_closed.as_ref()
-                    && !closed.swap(true, Ordering::AcqRel)
-                {
+                if !closed.swap(true, Ordering::AcqRel) {
                     unsafe {
                         libc::close(fd);
                     }
                 }
-                for handle in handles {
-                    let _ = handle.join();
-                }
+                rollback_workers(&shutdown_flag, &worker_wake_fds, handles);
                 return Err(crate::error::Error::Io(error));
             }
-        }
+            (Some(fd), Some(closed), bound_addr)
+        } else {
+            (None, None, None)
+        };
 
         let region_registrar = Arc::new(crate::region_registry::RegionRegistrar::new(
             self.config.max_registered_regions,
@@ -1164,7 +1140,7 @@ mod startup_gate_tests {
     }
 
     #[test]
-    fn worker_startup_failure_happens_before_any_accept_is_queued() {
+    fn listener_is_not_created_before_worker_startup_succeeds() {
         let _test_guard = TEST_LOCK.lock().unwrap();
         let addr = unused_loopback_addr();
         let (ready_tx, ready_rx) = crossbeam_channel::bounded(1);
@@ -1196,13 +1172,15 @@ mod startup_gate_tests {
         });
 
         ready_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-        let client = TcpStream::connect_timeout(&addr, Duration::from_secs(2)).unwrap();
+        let pre_ready_connect = TcpStream::connect_timeout(&addr, Duration::from_millis(250));
         inspect_tx.send(()).unwrap();
 
         assert!(!observed_rx.recv_timeout(Duration::from_secs(2)).unwrap());
         assert!(launcher.join().unwrap().is_err());
-        drop(client);
+        let connect_failed = pre_ready_connect.is_err();
+        drop(pre_ready_connect);
         assert!(TcpListener::bind(addr).is_ok());
+        assert!(connect_failed);
     }
 
     #[cfg(target_os = "linux")]

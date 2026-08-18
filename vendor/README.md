@@ -8,6 +8,7 @@ can be rebased onto a future upstream release or submitted independently.
 
 - Upstream repository: <https://github.com/pelikan-io/cache-rs>
 - Published version: `0.3.0`
+- crates.io archive checksum: `511afdec590e313aa76a32e095840c623a9f10a5a33c67bd846901c2a8853ea5`
 - Archive VCS revision: `4ce3405708e6831afa3c0abe3056090889e05aa5`
 - Archive path: `crates/segcache`
 - Local change: require `metriken` 0.9 instead of 0.7. No metric definitions,
@@ -16,16 +17,26 @@ can be rebased onto a future upstream release or submitted independently.
 This keeps Segcache's default `metrics` feature enabled while the Pelikan
 workspace uses a single `metriken-core` 0.2 registration domain.
 
+Compared with the published archive, this vendor tree omits the package-local
+`Cargo.lock` and publication-source `Cargo.toml.orig`; it adds no files. Cargo's
+`.cargo-ok` unpack-cache marker is not part of the archive and is not vendored.
+
 ## `ringline` 0.5.3
 
 - Upstream repository: <https://github.com/brayniac/ringline>
 - Published version: `0.5.3`
+- crates.io archive checksum: `93b934743f292f7ec5edc97def629f0609fbd857e5aa4cd6b472c9e4e3583d9a`
 - Archive VCS revision: `da05b68890f22e6a511165eaa93e331588c218f1`
 - Archive path: `ringline`
-- Local change: make server launch transactional, reporting success and
-  startup rollback closes launch-owned descriptors and joins started workers.
+- Local change: make server launch transactional, reporting success only after
+  worker initialization and deferring bind/listen until the startup commit;
+  rollback closes launch-owned descriptors and joins started workers.
 
 The Ringline change is generic and contains no Pelikan-specific fallback or
 configuration behavior. See `ringline-0.5.3/UPSTREAM-PR.md` for the standalone
 patch artifact, draft PR text, and upstream verification commands.
-  starting the acceptor only after every worker completes initialization;
+
+Compared with the published archive, this vendor tree omits `Cargo.lock`,
+`Cargo.toml.orig`, and `ROADMAP.md`; it adds `UPSTREAM-PR.md` and the standalone
+`ringline-v0.5.3-startup-transaction.patch`. Cargo's `.cargo-ok` unpack-cache
+marker is not part of the archive and is not vendored.
