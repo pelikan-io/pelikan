@@ -22,7 +22,7 @@ pub trait Compose {
 }
 
 pub trait Execute<Request, Response: Compose> {
-    fn execute(&mut self, request: &Request) -> Response;
+    fn execute(&self, request: &Request) -> Response;
 }
 
 #[derive(Debug, PartialEq, Eq)]

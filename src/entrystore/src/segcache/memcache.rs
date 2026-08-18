@@ -14,7 +14,7 @@ use protocol_memcache::*;
 use std::time::Duration;
 
 impl Execute<Request, Response> for Seg {
-    fn execute(&mut self, request: &Request) -> Response {
+    fn execute(&self, request: &Request) -> Response {
         match request {
             Request::Get(get) => {
                 if get.cas() {
@@ -40,7 +40,7 @@ impl Execute<Request, Response> for Seg {
 }
 
 impl Storage for Seg {
-    fn get(&mut self, get: &Get) -> Response {
+    fn get(&self, get: &Get) -> Response {
         let mut values = Vec::with_capacity(get.keys().len());
         for key in get.keys().iter() {
             if let Some(item) = self.data.get(key) {
@@ -66,7 +66,7 @@ impl Storage for Seg {
         Values::new(values.into_boxed_slice()).into()
     }
 
-    fn gets(&mut self, get: &Get) -> Response {
+    fn gets(&self, get: &Get) -> Response {
         let mut values = Vec::with_capacity(get.keys().len());
         for key in get.keys().iter() {
             if let Some(item) = self.data.get(key) {
@@ -92,7 +92,7 @@ impl Storage for Seg {
         Values::new(values.into_boxed_slice()).into()
     }
 
-    fn set(&mut self, set: &Set) -> Response {
+    fn set(&self, set: &Set) -> Response {
         let ttl = set.ttl().get().unwrap_or(0);
 
         if ttl < 0 {
@@ -145,7 +145,7 @@ impl Storage for Seg {
         }
     }
 
-    fn add(&mut self, add: &Add) -> Response {
+    fn add(&self, add: &Add) -> Response {
         if self.data.get_no_freq_incr(add.key()).is_some() {
             return Response::not_stored(add.noreply());
         }
@@ -202,7 +202,7 @@ impl Storage for Seg {
         }
     }
 
-    fn replace(&mut self, replace: &Replace) -> Response {
+    fn replace(&self, replace: &Replace) -> Response {
         if self.data.get_no_freq_incr(replace.key()).is_none() {
             return Response::not_stored(replace.noreply());
         }
@@ -259,15 +259,15 @@ impl Storage for Seg {
         }
     }
 
-    fn append(&mut self, _: &Append) -> Response {
+    fn append(&self, _: &Append) -> Response {
         Response::error()
     }
 
-    fn prepend(&mut self, _: &Prepend) -> Response {
+    fn prepend(&self, _: &Prepend) -> Response {
         Response::error()
     }
 
-    fn incr(&mut self, incr: &Incr) -> Response {
+    fn incr(&self, incr: &Incr) -> Response {
         match self.data.wrapping_add(incr.key(), incr.value()) {
             Ok(v) => Response::numeric(v, incr.noreply()),
             Err(SegcacheError::NotFound) => Response::not_found(incr.noreply()),
@@ -276,7 +276,7 @@ impl Storage for Seg {
         }
     }
 
-    fn decr(&mut self, decr: &Decr) -> Response {
+    fn decr(&self, decr: &Decr) -> Response {
         match self.data.saturating_sub(decr.key(), decr.value()) {
             Ok(v) => Response::numeric(v, decr.noreply()),
             Err(SegcacheError::NotFound) => Response::not_found(decr.noreply()),
@@ -285,7 +285,7 @@ impl Storage for Seg {
         }
     }
 
-    fn cas(&mut self, cas: &Cas) -> Response {
+    fn cas(&self, cas: &Cas) -> Response {
         // TTL of None means that it doesn't expire. In `Seg` storage
         // a TTL of zero maps to the longest TTL representable which
         // is ~97 days.
@@ -367,7 +367,7 @@ impl Storage for Seg {
         response
     }
 
-    fn delete(&mut self, delete: &Delete) -> Response {
+    fn delete(&self, delete: &Delete) -> Response {
         if self.data.delete(delete.key()) {
             Response::deleted(delete.noreply())
         } else {
@@ -375,11 +375,11 @@ impl Storage for Seg {
         }
     }
 
-    fn flush_all(&mut self, _flush_all: &FlushAll) -> Response {
+    fn flush_all(&self, _flush_all: &FlushAll) -> Response {
         Response::error()
     }
 
-    fn quit(&mut self, _quit: &Quit) -> Response {
+    fn quit(&self, _quit: &Quit) -> Response {
         Response::hangup()
     }
 }

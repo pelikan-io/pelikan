@@ -20,8 +20,8 @@ pub trait EntryStore {
     /// will be able to efficiently implement this function. The default
     /// implementation is a no-op. Types which can efficiently implement eager
     /// expiration should implement their own handling logic for this function.
-    fn expire(&mut self) {}
+    fn expire(&self) {}
 
     /// Remove all existing values from the entry store.
-    fn clear(&mut self);
+    fn clear(&self);
 }
