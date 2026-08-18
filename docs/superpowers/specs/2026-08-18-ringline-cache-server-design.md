@@ -59,6 +59,11 @@ The abstraction is above raw readiness events. Ringline must not emulate
 state machine on a completion runtime and complicate buffer ownership without
 preserving Ringline's benefits.
 
+Backend selection is bound once during process startup. There is no per-request
+backend dispatch or in-process adaptation. This keeps each deployed instance
+monomorphic and characterizable while allowing the operator to select a tested
+configuration, following P17 and P18 of `docs/PRINCIPLES.md`.
+
 `pelikan-core-server::ProcessBuilder` resolves the configured backend and owns
 one of two internal cache-server process implementations:
 
@@ -138,10 +143,13 @@ queues. A connection awaiting its response yields rather than blocking the
 worker.
 
 The `pelikan-net` Ringline facade provides the async side of this bridge. A
-pending response registers a task waker; storage completion makes the response
-available and wakes the corresponding task. Queue capacity remains bounded and
-queue saturation applies explicit backpressure or a connection-scoped error.
-No blocking receive is performed on a Ringline worker.
+pending response registers a task waker in worker-local state. The storage
+thread enqueues the response and signals Ringline's worker notification file
+descriptor; the worker's `on_notify` callback then makes the response available
+and wakes the corresponding task on the owning worker thread. Queue capacity
+remains bounded and queue saturation applies explicit backpressure or a
+connection-scoped error. No blocking receive is performed on a Ringline worker,
+and no lock is acquired on the per-request data path.
 
 Connection identities include generation or equivalent stale-detection data so
 a delayed response cannot be delivered to a reused connection slot.
@@ -188,6 +196,11 @@ meaning across both backends. Backend-specific runtime metrics may be added
 with distinct names, but should not replace backend-independent operational
 counters.
 
+Every terminal error branch must propagate, increment a counter, or emit a log;
+errors with a useful reason both increment the class counter and retain the
+reason in a waitless log. This applies the P27-P29 observability contract
+without putting blocking observability on the data plane.
+
 Startup logs and admin output expose both the configured backend and the active
 backend, including fallback reason when applicable.
 
@@ -211,6 +224,7 @@ backends:
 - `FlushAll` and graceful shutdown.
 - Single-worker and multi-worker configurations.
 - Equivalent core metrics.
+- Connection-establishment bursts and repeated startup/shutdown cycles.
 
 Existing mio tests remain unchanged and passing. Ringline runtime tests execute
 only on Linux hosts with required kernel capabilities; absence of those
@@ -220,6 +234,10 @@ cover Ringline code where runtime support is unavailable.
 Mio and Ringline benchmarks are recorded separately. Performance is evaluated
 as evidence for later rollout decisions, not as an acceptance gate for the
 initial integration.
+
+Because this changes the runtime thread model, the generated threading and
+request-dataflow diagrams and their source assertions must be updated with
+`cargo xtask diagrams`; generated SVGs are never edited by hand.
 
 ## Follow-up: TLS
 
