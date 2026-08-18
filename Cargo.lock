@@ -1138,6 +1138,7 @@ dependencies = [
  "ringline",
  "rustls",
  "rustls-pki-types",
+ "slab",
  "webpki-roots 0.26.11",
 ]
 
