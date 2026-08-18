@@ -86,7 +86,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         })
     }
 
-    /// Complete fallible backend setup before the runtime is advertised as ready.
+    /// Complete the fallible backend setup known before the runtime is ready.
+    ///
+    /// The eventfd-read SQE points into this event loop, so the caller must not
+    /// move it between this method and `run()`. `run()` can still return an
+    /// error after the listener becomes live.
     pub(crate) fn prepare_run(&mut self) -> Result<(), crate::error::Error> {
         // Always arm eventfd read — needed for shutdown wakeup even in client-only mode.
         self.driver

@@ -1,6 +1,8 @@
 use std::io;
 use std::net::SocketAddr;
 use std::os::fd::RawFd;
+#[cfg(not(has_io_uring))]
+use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -42,41 +44,54 @@ fn rollback_workers(
     first_error
 }
 
-/// Owns a worker wake read descriptor until the backend driver takes it.
+/// Carries the worker wake read descriptor into its worker thread.
+///
+/// Mio has a distinct pipe read end, which this type owns until the driver is
+/// constructed. On io_uring, [`crate::wakeup::WakeHandle`] owns the shared
+/// eventfd and this type only carries its descriptor number.
 struct WorkerReadFd {
+    #[cfg(has_io_uring)]
     fd: RawFd,
     #[cfg(not(has_io_uring))]
-    owned: bool,
+    fd: Option<OwnedFd>,
 }
 
 impl WorkerReadFd {
     fn new(fd: RawFd) -> Self {
+        #[cfg(has_io_uring)]
+        {
+            Self { fd }
+        }
+        #[cfg(not(has_io_uring))]
         Self {
-            fd,
-            #[cfg(not(has_io_uring))]
-            owned: true,
+            // SAFETY: create_wake_fd returns a fresh pipe read descriptor and
+            // transfers its ownership to this constructor on the mio backend.
+            fd: Some(unsafe { OwnedFd::from_raw_fd(fd) }),
         }
     }
 
     fn as_raw_fd(&self) -> RawFd {
-        self.fd
+        #[cfg(has_io_uring)]
+        {
+            self.fd
+        }
+        #[cfg(not(has_io_uring))]
+        {
+            self.fd
+                .as_ref()
+                .expect("worker read fd must not be transferred twice")
+                .as_raw_fd()
+        }
     }
 
     fn transfer_to_driver(&mut self) {
         #[cfg(not(has_io_uring))]
         {
-            self.owned = false;
-        }
-    }
-}
-
-impl Drop for WorkerReadFd {
-    fn drop(&mut self) {
-        #[cfg(not(has_io_uring))]
-        if self.owned {
-            unsafe {
-                libc::close(self.fd);
-            }
+            let owned = self
+                .fd
+                .take()
+                .expect("worker read fd must not be transferred twice");
+            let _ = owned.into_raw_fd();
         }
     }
 }
@@ -476,7 +491,10 @@ impl RinglineBuilder {
     /// Launch worker threads with the async `AsyncEventHandler`.
     ///
     /// Each accepted connection gets a long-lived async task. The executor
-    /// polls futures on the same thread-per-core model.
+    /// polls futures on the same thread-per-core model. `launch()` waits for
+    /// each worker to construct and prepare its backend before creating the
+    /// listener. Errors from the subsequent event-loop run can still surface
+    /// through the returned worker handles after the listener is live.
     pub fn launch<A: AsyncEventHandler>(self) -> LaunchResult {
         self.launch_inner(
             |worker_id,
@@ -545,30 +563,28 @@ impl RinglineBuilder {
                 let event_loop_result: Result<_, crate::error::Error> =
                     new_result.map_err(crate::error::Error::Io);
 
-                // Signal setup outcome only after fallible backend preparation.
-                // This is what makes
-                // `launch()` actually surface bind / config errors at
-                // call time instead of swallowing them inside a
-                // never-joined worker thread.
                 let mut event_loop = match event_loop_result {
-                    Ok(mut el) => {
-                        eventfd.0.transfer_to_driver();
-                        match el.prepare_run() {
-                            Ok(()) => {
-                                let _ = startup_tx.send(Ok(()));
-                                el
-                            }
-                            Err(e) => {
-                                let _ = startup_tx.send(Err(()));
-                                return Err(e);
-                            }
-                        }
-                    }
+                    Ok(event_loop) => event_loop,
                     Err(e) => {
                         let _ = startup_tx.send(Err(()));
                         return Err(e);
                     }
                 };
+
+                // Keep `event_loop` in this final local binding from
+                // preparation through `run()`: the io_uring eventfd-read SQE
+                // points into its inline driver storage, so moving the value
+                // after `prepare_run()` would invalidate that pointer.
+                eventfd.0.transfer_to_driver();
+                if let Err(e) = event_loop.prepare_run() {
+                    let _ = startup_tx.send(Err(()));
+                    return Err(e);
+                }
+
+                // Signal only after the backend preparation Ringline knows can
+                // fail before `run()`. This lets `launch()` surface those
+                // errors rather than burying them in an unjoined worker.
+                let _ = startup_tx.send(Ok(()));
                 drop(startup_tx);
                 event_loop.run()?;
                 Ok(())
@@ -1117,14 +1133,17 @@ fn create_unix_listener(path: &Path, backlog: i32) -> Result<RawFd, crate::error
 #[cfg(test)]
 mod startup_gate_tests {
     use super::*;
-    use std::net::{TcpListener, TcpStream};
+    use std::path::PathBuf;
+    #[cfg(target_os = "linux")]
+    use std::process::Command;
     use std::time::Duration;
 
-    static TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    #[cfg(target_os = "linux")]
+    const FD_LEAK_CHILD: &str =
+        "worker::startup_gate_tests::worker_startup_failure_closes_all_runtime_fds_child";
 
-    fn unused_loopback_addr() -> SocketAddr {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        listener.local_addr().unwrap()
+    fn unix_socket_path() -> PathBuf {
+        std::env::temp_dir().join(format!("ringline-startup-gate-{}.sock", std::process::id()))
     }
 
     fn one_worker_config() -> Config {
@@ -1141,18 +1160,33 @@ mod startup_gate_tests {
 
     #[test]
     fn listener_is_not_created_before_worker_startup_succeeds() {
-        let _test_guard = TEST_LOCK.lock().unwrap();
-        let addr = unused_loopback_addr();
+        let path = unix_socket_path();
+        let _ = std::fs::remove_file(&path);
         let (ready_tx, ready_rx) = crossbeam_channel::bounded(1);
         let (inspect_tx, inspect_rx) = crossbeam_channel::bounded(1);
         let (observed_tx, observed_rx) = crossbeam_channel::bounded(1);
+        let launch_path = path.clone();
 
         let launcher = thread::spawn(move || {
             RinglineBuilder::new(one_worker_config())
-                .bind(addr)
+                .bind_unix(launch_path)
                 .launch_inner(
-                    move |_, _, accept_rx, eventfd, _, _, _, _, _, _, _, _, _, _, _, startup_tx| {
-                        drop(eventfd.0);
+                    move |_,
+                          _,
+                          accept_rx,
+                          _eventfd,
+                          _,
+                          _,
+                          _,
+                          _,
+                          _,
+                          _,
+                          _,
+                          _,
+                          _,
+                          _,
+                          _,
+                          startup_tx| {
                         ready_tx.send(()).unwrap();
                         inspect_rx.recv().unwrap();
                         let accepted = accept_rx
@@ -1172,21 +1206,34 @@ mod startup_gate_tests {
         });
 
         ready_rx.recv_timeout(Duration::from_secs(2)).unwrap();
-        let pre_ready_connect = TcpStream::connect_timeout(&addr, Duration::from_millis(250));
+        let absent_before_worker_ready = !path.exists();
         inspect_tx.send(()).unwrap();
 
         assert!(!observed_rx.recv_timeout(Duration::from_secs(2)).unwrap());
         assert!(launcher.join().unwrap().is_err());
-        let connect_failed = pre_ready_connect.is_err();
-        drop(pre_ready_connect);
-        assert!(TcpListener::bind(addr).is_ok());
-        assert!(connect_failed);
+        let absent_after_rollback = !path.exists();
+        let _ = std::fs::remove_file(path);
+        assert!(absent_before_worker_ready);
+        assert!(absent_after_rollback);
     }
 
     #[cfg(target_os = "linux")]
     #[test]
     fn worker_startup_failure_closes_all_runtime_fds() {
-        let _test_guard = TEST_LOCK.lock().unwrap();
+        let status = Command::new(std::env::current_exe().unwrap())
+            .args(["--ignored", "--exact", FD_LEAK_CHILD])
+            .env("RINGLINE_FD_LEAK_CHILD", "1")
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    #[ignore = "spawned by worker_startup_failure_closes_all_runtime_fds"]
+    fn worker_startup_failure_closes_all_runtime_fds_child() {
+        assert_eq!(std::env::var("RINGLINE_FD_LEAK_CHILD").as_deref(), Ok("1"));
+
         fn fd_count() -> usize {
             std::fs::read_dir("/proc/self/fd").unwrap().count()
         }
@@ -1194,8 +1241,7 @@ mod startup_gate_tests {
         let before = fd_count();
         for _ in 0..4 {
             let result = RinglineBuilder::new(one_worker_config()).launch_inner(
-                |_, _, _, eventfd, _, _, _, _, _, _, _, _, _, _, _, startup_tx| {
-                    drop(eventfd.0);
+                |_, _, _, _eventfd, _, _, _, _, _, _, _, _, _, _, _, startup_tx| {
                     let _ = startup_tx.send(Err(()));
                     Err(crate::error::Error::Io(io::Error::other(
                         "injected worker startup failure",

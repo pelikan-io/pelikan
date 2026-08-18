@@ -30,11 +30,14 @@ Compared with the published archive, this vendor tree omits the package-local
 - Archive path: `ringline`
 - Local change: make server launch transactional, reporting success only after
   worker initialization and deferring bind/listen until the startup commit;
-  rollback closes launch-owned descriptors and joins started workers.
+  rollback closes launch-owned descriptors and joins started workers. The
+  reviewed correction binds the io_uring event loop before submitting an SQE
+  that references inline storage and uses `OwnedFd` for Mio read-end ownership.
 
 The Ringline change is generic and contains no Pelikan-specific fallback or
-configuration behavior. See `ringline-0.5.3/UPSTREAM-PR.md` for the standalone
-patch artifact, draft PR text, and upstream verification commands.
+configuration behavior. It is open upstream as ringline-rs/ringline#309. See
+`ringline-0.5.3/UPSTREAM-PR.md` for the standalone patch artifact and
+verification commands.
 
 Compared with the published archive, this vendor tree omits `Cargo.lock`,
 `Cargo.toml.orig`, and `ROADMAP.md`; it adds `UPSTREAM-PR.md` and the standalone

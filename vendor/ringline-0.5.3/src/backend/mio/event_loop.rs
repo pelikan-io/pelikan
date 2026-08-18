@@ -99,7 +99,9 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         })
     }
 
-    /// Complete fallible backend setup before the runtime is advertised as ready.
+    /// Complete the fallible backend setup known before the runtime is ready.
+    ///
+    /// `run()` can still return an error after the listener becomes live.
     pub(crate) fn prepare_run(&mut self) -> Result<(), crate::error::Error> {
         // Register the wake pipe read-end with mio Poll.
         self.driver.poll.registry().register(
