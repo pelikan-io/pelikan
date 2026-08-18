@@ -33,7 +33,7 @@ Listener errors now surface after worker initialization and rollback. This inten
 
 Standalone patch: `ringline-v0.5.3-startup-transaction.patch`
 
-SHA-256: `b22be4ea54533f8fc902f132dc029d4a5822e1b971ea58088460111e674885ca`
+SHA-256: `2a0eb83566c9599821d292ac5febcc77c1bcbed350601c7fc54da2911be36166`
 
 Commands:
 

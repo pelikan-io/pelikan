@@ -59,7 +59,7 @@ index f7d2f3f..fded0b1 100644
          for udp_idx in 0..self.driver.udp_sockets.len() {
              let udp_ctx = UdpCtx {
 diff --git a/src/worker.rs b/src/worker.rs
-index 90d02b1..8297d21 100644
+index 90d02b1..43754ec 100644
 --- a/src/worker.rs
 +++ b/src/worker.rs
 @@ -1,6 +1,8 @@
@@ -459,7 +459,7 @@ index 90d02b1..8297d21 100644
          let region_registrar = Arc::new(crate::region_registry::RegionRegistrar::new(
              self.config.max_registered_regions,
              self.config.registered_regions.len() as u16,
-@@ -1040,3 +1129,127 @@ fn create_unix_listener(path: &Path, backlog: i32) -> Result<RawFd, crate::error
+@@ -1040,3 +1129,129 @@ fn create_unix_listener(path: &Path, backlog: i32) -> Result<RawFd, crate::error
 
      Ok(fd)
  }
@@ -566,7 +566,9 @@ index 90d02b1..8297d21 100644
 +    #[test]
 +    #[ignore = "spawned by worker_startup_failure_closes_all_runtime_fds"]
 +    fn worker_startup_failure_closes_all_runtime_fds_child() {
-+        assert_eq!(std::env::var("RINGLINE_FD_LEAK_CHILD").as_deref(), Ok("1"));
++        if std::env::var("RINGLINE_FD_LEAK_CHILD").as_deref() != Ok("1") {
++            return;
++        }
 +
 +        fn fd_count() -> usize {
 +            std::fs::read_dir("/proc/self/fd").unwrap().count()

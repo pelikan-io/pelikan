@@ -1232,7 +1232,9 @@ mod startup_gate_tests {
     #[test]
     #[ignore = "spawned by worker_startup_failure_closes_all_runtime_fds"]
     fn worker_startup_failure_closes_all_runtime_fds_child() {
-        assert_eq!(std::env::var("RINGLINE_FD_LEAK_CHILD").as_deref(), Ok("1"));
+        if std::env::var("RINGLINE_FD_LEAK_CHILD").as_deref() != Ok("1") {
+            return;
+        }
 
         fn fd_count() -> usize {
             std::fs::read_dir("/proc/self/fd").unwrap().count()
