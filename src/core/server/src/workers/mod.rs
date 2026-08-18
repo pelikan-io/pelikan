@@ -6,10 +6,8 @@ use crate::*;
 use protocol_common::Protocol;
 use std::thread::JoinHandle;
 
-mod maintenance;
 mod worker;
 
-use maintenance::{Maintenance, MaintenanceBuilder};
 use worker::{Worker, WorkerBuilder};
 
 #[metric(
@@ -64,7 +62,6 @@ fn map_result(result: Result<usize>) -> Result<()> {
 
 pub struct Workers<Proto, Request, Response, Storage> {
     workers: Vec<Worker<Proto, Request, Response, Storage>>,
-    maintenance: Maintenance<Storage>,
 }
 
 impl<Proto, Request, Response, Storage> Workers<Proto, Request, Response, Storage>
@@ -75,11 +72,7 @@ where
     Storage: 'static + EntryStore + Execute<Request, Response> + Send + Sync,
 {
     pub fn spawn(self) -> Vec<JoinHandle<()>> {
-        let mut maintenance = self.maintenance;
-        let mut join_handles = vec![std::thread::Builder::new()
-            .name(format!("{THREAD_PREFIX}_maint"))
-            .spawn(move || maintenance.run())
-            .unwrap()];
+        let mut join_handles = Vec::new();
 
         for (id, mut worker) in self.workers.into_iter().enumerate() {
             join_handles.push(
@@ -96,7 +89,6 @@ where
 
 pub struct WorkersBuilder<Proto, Request, Response, Storage> {
     workers: Vec<WorkerBuilder<Proto, Request, Response, Storage>>,
-    maintenance: MaintenanceBuilder<Storage>,
 }
 
 impl<Proto, Request, Response, Storage> WorkersBuilder<Proto, Request, Response, Storage>
@@ -118,10 +110,7 @@ where
             )?)
         }
 
-        Ok(Self {
-            workers,
-            maintenance: MaintenanceBuilder::new(config, storage)?,
-        })
+        Ok(Self { workers })
     }
 
     pub fn worker_wakers(&self) -> Vec<Arc<Waker>> {
@@ -129,11 +118,7 @@ where
     }
 
     pub fn wakers(&self) -> Vec<Arc<Waker>> {
-        let mut wakers = vec![self.maintenance.waker()];
-        for worker in &self.workers {
-            wakers.push(worker.waker());
-        }
-        wakers
+        self.worker_wakers()
     }
 
     pub fn build(
@@ -141,21 +126,13 @@ where
         mut session_queues: Vec<Queues<Session, Session>>,
         mut signal_queues: Vec<Queues<(), Signal>>,
     ) -> Workers<Proto, Request, Response, Storage> {
-        // The maintenance thread precedes the worker threads in the set of
-        // wakers, so its signal queue is the first element of
-        // `signal_queues`. We remove it and build the maintenance thread so
-        // we can loop through the remaining queues when building the
-        // workers.
-        let maintenance = self.maintenance.build(signal_queues.remove(0));
-
+        // The queues arrive in the same order as `wakers()`: one session
+        // queue and one signal queue per worker.
         let mut workers = Vec::new();
         for builder in self.workers {
             workers.push(builder.build(session_queues.remove(0), signal_queues.remove(0)));
         }
 
-        Workers {
-            workers,
-            maintenance,
-        }
+        Workers { workers }
     }
 }

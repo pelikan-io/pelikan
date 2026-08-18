@@ -60,10 +60,6 @@ impl Seg {
 }
 
 impl EntryStore for Seg {
-    fn expire(&self) {
-        self.data.expire();
-    }
-
     fn clear(&self) {
         self.data.clear();
     }

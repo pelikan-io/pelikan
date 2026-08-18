@@ -21,7 +21,5 @@ impl Noop {
 }
 
 impl EntryStore for Noop {
-    fn expire(&self) {}
-
     fn clear(&self) {}
 }

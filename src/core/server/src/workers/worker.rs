@@ -246,7 +246,12 @@ where
                         while let Some(signal) = self.signal_queue.try_recv() {
                             match signal.into_inner() {
                                 Signal::FlushAll => {
-                                    // the maintenance thread handles flush
+                                    // the admin thread broadcasts flush_all to
+                                    // every worker; each calls `clear()`, and
+                                    // the second..Nth calls find already
+                                    // drained buckets and are cheap no-ops
+                                    warn!("received flush_all");
+                                    self.storage.clear();
                                 }
                                 Signal::Shutdown => {
                                     // if we received a shutdown, we can return

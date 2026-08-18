@@ -16,12 +16,6 @@ pub use self::segcache::*;
 /// A trait defining the basic requirements of a type which may be used for
 /// storage.
 pub trait EntryStore {
-    /// Eager expiration of items/values from storage. Not all storage types
-    /// will be able to efficiently implement this function. The default
-    /// implementation is a no-op. Types which can efficiently implement eager
-    /// expiration should implement their own handling logic for this function.
-    fn expire(&self) {}
-
     /// Remove all existing values from the entry store.
     fn clear(&self);
 }
