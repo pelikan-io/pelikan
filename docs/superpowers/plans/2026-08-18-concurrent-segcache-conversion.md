@@ -18,6 +18,8 @@
 
 ## Phase A: cache-rs release (keyvalue 0.3.0, segcache 0.4.0)
 
+> **Status 2026-08-18:** A1/A2 complete (PR #42 merged as `c1b3599`, clean clone validated). A3/A4 **blocked on crates.io ownership**: `keyvalue` is owned solely by thinkingfish (Yao Yue); brayniac cannot publish it. The user is resolving ownership out-of-band. Interim: Phase B uses a temporary `[patch.crates-io]` git pin to `c1b3599` so development proceeds; Task E3 removes the patch once both crates are published (hard prerequisite for merging the PR).
+
 Published state on crates.io: `keyvalue 0.2.0`, `segcache 0.3.0` (deps on keyvalue ^0.2.0). Local/origin main has `keyvalue 0.3.0` (unpublished, has the seqlock numeric slot) and `segcache 0.3.0` (needs bump to 0.4.0 — the `&self` API is breaking). The full test suite passes on local main (verified 2026-08-18, exit 0).
 
 ### Task A1: Version-bump PR for segcache 0.4.0
@@ -185,6 +187,17 @@ segcache = "0.4.0"
 ```
 
 (replaces `segcache = "0.3.0"`)
+
+- [ ] **Step 2b (temporary, while crates.io publish is blocked): add a git pin**
+
+At the end of the root `Cargo.toml`:
+
+```toml
+# TEMPORARY: segcache 0.4.0 is not yet on crates.io (keyvalue ownership is
+# being resolved). Remove this patch before merging (see Task E3).
+[patch.crates-io]
+segcache = { git = "https://github.com/pelikan-io/cache-rs", rev = "c1b3599f8a0d552501c99db96dcda2a195ab62bf" }
+```
 
 - [ ] **Step 3: Update the lockfile and attempt a build**
 
@@ -1026,6 +1039,17 @@ git add docs/journal && git commit -m "docs: journal the concurrent segcache con
 ```
 
 ### Task E3: Final verification and PR
+
+- [ ] **Step 0: Remove the temporary git pin (blocks merge until publishes land)**
+
+Once keyvalue 0.3.0 and segcache 0.4.0 are on crates.io (Tasks A3/A4), delete the `[patch.crates-io]` block from the root `Cargo.toml`, then:
+
+```bash
+cargo update -p segcache && cargo test --workspace 2>&1 | tail -10
+git add Cargo.toml Cargo.lock && git commit -m "deps: use published segcache 0.4.0, drop git pin"
+```
+
+Expected: lockfile now sources segcache from `registry+https://github.com/rust-lang/crates.io-index`; all tests pass.
 
 - [ ] **Step 1: Full verification (superpowers:verification-before-completion)**
 
