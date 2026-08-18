@@ -95,7 +95,6 @@ use admin::AdminBuilder;
 use common::signal::Signal;
 use common::ssl::tls_acceptor;
 use config::*;
-use core::marker::PhantomData;
 use core::time::Duration;
 use crossbeam_channel::{bounded, Sender};
 use entrystore::EntryStore;

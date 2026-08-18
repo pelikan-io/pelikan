@@ -6,13 +6,11 @@ use crate::*;
 use protocol_common::Protocol;
 use std::thread::JoinHandle;
 
-mod multi;
-mod single;
-mod storage;
+mod maintenance;
+mod worker;
 
-use multi::*;
-use single::*;
-use storage::*;
+use maintenance::{Maintenance, MaintenanceBuilder};
+use worker::{Worker, WorkerBuilder};
 
 #[metric(
     name = "worker_event_depth",
@@ -64,17 +62,9 @@ fn map_result(result: Result<usize>) -> Result<()> {
     }
 }
 
-// NOTE: as it is expected to have very few instances of this enum
-// we suppress the warning about the large variant
-#[allow(clippy::large_enum_variant)]
-pub enum Workers<Parser, Request, Response, Storage> {
-    Single {
-        worker: SingleWorker<Parser, Request, Response, Storage>,
-    },
-    Multi {
-        workers: Vec<MultiWorker<Parser, Request, Response>>,
-        storage: StorageWorker<Request, Response, Storage, Token>,
-    },
+pub struct Workers<Proto, Request, Response, Storage> {
+    workers: Vec<Worker<Proto, Request, Response, Storage>>,
+    maintenance: Maintenance<Storage>,
 }
 
 impl<Proto, Request, Response, Storage> Workers<Proto, Request, Response, Storage>
@@ -82,48 +72,31 @@ where
     Proto: 'static + Protocol<Request, Response> + Clone + Send,
     Request: 'static + Klog + Klog<Response = Response> + Send,
     Response: 'static + Compose + Send,
-    Storage: 'static + EntryStore + Execute<Request, Response> + Send,
+    Storage: 'static + EntryStore + Execute<Request, Response> + Send + Sync,
 {
     pub fn spawn(self) -> Vec<JoinHandle<()>> {
-        match self {
-            Self::Single { mut worker } => {
-                vec![std::thread::Builder::new()
-                    .name(format!("{THREAD_PREFIX}_work"))
+        let mut maintenance = self.maintenance;
+        let mut join_handles = vec![std::thread::Builder::new()
+            .name(format!("{THREAD_PREFIX}_maint"))
+            .spawn(move || maintenance.run())
+            .unwrap()];
+
+        for (id, mut worker) in self.workers.into_iter().enumerate() {
+            join_handles.push(
+                std::thread::Builder::new()
+                    .name(format!("{THREAD_PREFIX}_work_{id}"))
                     .spawn(move || worker.run())
-                    .unwrap()]
-            }
-            Self::Multi {
-                mut workers,
-                mut storage,
-            } => {
-                let mut join_handles = vec![std::thread::Builder::new()
-                    .name(format!("{THREAD_PREFIX}_storage"))
-                    .spawn(move || storage.run())
-                    .unwrap()];
-
-                for (id, mut worker) in workers.drain(..).enumerate() {
-                    join_handles.push(
-                        std::thread::Builder::new()
-                            .name(format!("{THREAD_PREFIX}_work_{id}"))
-                            .spawn(move || worker.run())
-                            .unwrap(),
-                    )
-                }
-
-                join_handles
-            }
+                    .unwrap(),
+            )
         }
+
+        join_handles
     }
 }
 
-pub enum WorkersBuilder<Proto, Request, Response, Storage> {
-    Single {
-        worker: SingleWorkerBuilder<Proto, Request, Response, Storage>,
-    },
-    Multi {
-        workers: Vec<MultiWorkerBuilder<Proto, Request, Response>>,
-        storage: StorageWorkerBuilder<Request, Response, Storage>,
-    },
+pub struct WorkersBuilder<Proto, Request, Response, Storage> {
+    workers: Vec<WorkerBuilder<Proto, Request, Response, Storage>>,
+    maintenance: MaintenanceBuilder<Storage>,
 }
 
 impl<Proto, Request, Response, Storage> WorkersBuilder<Proto, Request, Response, Storage>
@@ -134,93 +107,55 @@ where
 {
     pub fn new<T: WorkerConfig>(config: &T, protocol: Proto, storage: Storage) -> Result<Self> {
         let threads = config.worker().threads();
+        let storage = Arc::new(storage);
 
-        if threads > 1 {
-            let mut workers = vec![];
-            for _ in 0..threads {
-                workers.push(MultiWorkerBuilder::new(config, protocol.clone())?)
-            }
-
-            Ok(Self::Multi {
-                workers,
-                storage: StorageWorkerBuilder::new(config, storage)?,
-            })
-        } else {
-            Ok(Self::Single {
-                worker: SingleWorkerBuilder::new(config, protocol, storage)?,
-            })
+        let mut workers = vec![];
+        for _ in 0..threads {
+            workers.push(WorkerBuilder::new(
+                config,
+                protocol.clone(),
+                storage.clone(),
+            )?)
         }
+
+        Ok(Self {
+            workers,
+            maintenance: MaintenanceBuilder::new(config, storage)?,
+        })
     }
 
     pub fn worker_wakers(&self) -> Vec<Arc<Waker>> {
-        match self {
-            Self::Single { worker } => {
-                vec![worker.waker()]
-            }
-            Self::Multi {
-                workers,
-                storage: _,
-            } => workers.iter().map(|w| w.waker()).collect(),
-        }
+        self.workers.iter().map(|w| w.waker()).collect()
     }
 
     pub fn wakers(&self) -> Vec<Arc<Waker>> {
-        match self {
-            Self::Single { worker } => {
-                vec![worker.waker()]
-            }
-            Self::Multi { workers, storage } => {
-                let mut wakers = vec![storage.waker()];
-                for worker in workers {
-                    wakers.push(worker.waker());
-                }
-                wakers
-            }
+        let mut wakers = vec![self.maintenance.waker()];
+        for worker in &self.workers {
+            wakers.push(worker.waker());
         }
+        wakers
     }
 
     pub fn build(
         self,
-        session_queues: Vec<Queues<Session, Session>>,
-        signal_queues: Vec<Queues<(), Signal>>,
+        mut session_queues: Vec<Queues<Session, Session>>,
+        mut signal_queues: Vec<Queues<(), Signal>>,
     ) -> Workers<Proto, Request, Response, Storage> {
-        let mut signal_queues = signal_queues;
-        let mut session_queues = session_queues;
-        match self {
-            Self::Multi {
-                storage,
-                mut workers,
-            } => {
-                let storage_wakers = vec![storage.waker()];
-                let worker_wakers: Vec<Arc<Waker>> = workers.iter().map(|v| v.waker()).collect();
-                let (mut worker_data_queues, mut storage_data_queues) =
-                    Queues::new(worker_wakers, storage_wakers, QUEUE_CAPACITY).unwrap();
+        // The maintenance thread precedes the worker threads in the set of
+        // wakers, so its signal queue is the first element of
+        // `signal_queues`. We remove it and build the maintenance thread so
+        // we can loop through the remaining queues when building the
+        // workers.
+        let maintenance = self.maintenance.build(signal_queues.remove(0));
 
-                // The storage thread precedes the worker threads in the set of
-                // wakers, so its signal queue is the first element of
-                // `signal_queues`. Its request queue is also the first (and
-                // only) element of `request_queues`. We remove these and build
-                // the storage so we can loop through the remaining signal
-                // queues when launching the worker threads.
-                let s = storage.build(storage_data_queues.remove(0), signal_queues.remove(0));
+        let mut workers = Vec::new();
+        for builder in self.workers {
+            workers.push(builder.build(session_queues.remove(0), signal_queues.remove(0)));
+        }
 
-                let mut w = Vec::new();
-                for worker_builder in workers.drain(..) {
-                    w.push(worker_builder.build(
-                        worker_data_queues.remove(0),
-                        session_queues.remove(0),
-                        signal_queues.remove(0),
-                    ));
-                }
-
-                Workers::Multi {
-                    storage: s,
-                    workers: w,
-                }
-            }
-            Self::Single { worker } => Workers::Single {
-                worker: worker.build(session_queues.remove(0), signal_queues.remove(0)),
-            },
+        Workers {
+            workers,
+            maintenance,
         }
     }
 }

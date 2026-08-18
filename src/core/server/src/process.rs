@@ -21,7 +21,7 @@ where
     P: 'static + Protocol<Request, Response> + Clone + Send,
     Request: 'static + Klog + Klog<Response = Response> + Send,
     Response: 'static + Compose + Send,
-    Storage: 'static + Execute<Request, Response> + EntryStore + Send,
+    Storage: 'static + Execute<Request, Response> + EntryStore + Send + Sync,
 {
     pub fn new<T: AdminConfig + ServerConfig + TlsConfig + WorkerConfig>(
         config: &T,

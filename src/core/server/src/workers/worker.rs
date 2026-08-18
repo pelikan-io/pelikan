@@ -5,19 +5,23 @@
 use super::*;
 use std::collections::VecDeque;
 
-pub struct SingleWorkerBuilder<Proto, Request, Response, Storage> {
+pub struct WorkerBuilder<Proto, Request, Response, Storage> {
     nevent: usize,
     protocol: Proto,
     pending: VecDeque<Token>,
     poll: Poll,
     sessions: Slab<ServerSession<Proto, Response, Request>>,
-    storage: Storage,
+    storage: Arc<Storage>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Proto, Request, Response, Storage> SingleWorkerBuilder<Proto, Request, Response, Storage> {
-    pub fn new<T: WorkerConfig>(config: &T, protocol: Proto, storage: Storage) -> Result<Self> {
+impl<Proto, Request, Response, Storage> WorkerBuilder<Proto, Request, Response, Storage> {
+    pub fn new<T: WorkerConfig>(
+        config: &T,
+        protocol: Proto,
+        storage: Arc<Storage>,
+    ) -> Result<Self> {
         let config = config.worker();
 
         let poll = Poll::new()?;
@@ -49,8 +53,8 @@ impl<Proto, Request, Response, Storage> SingleWorkerBuilder<Proto, Request, Resp
         self,
         session_queue: Queues<Session, Session>,
         signal_queue: Queues<(), Signal>,
-    ) -> SingleWorker<Proto, Request, Response, Storage> {
-        SingleWorker {
+    ) -> Worker<Proto, Request, Response, Storage> {
+        Worker {
             nevent: self.nevent,
             protocol: self.protocol,
             pending: self.pending,
@@ -65,7 +69,7 @@ impl<Proto, Request, Response, Storage> SingleWorkerBuilder<Proto, Request, Resp
     }
 }
 
-pub struct SingleWorker<Proto, Request, Response, Storage> {
+pub struct Worker<Proto, Request, Response, Storage> {
     nevent: usize,
     protocol: Proto,
     pending: VecDeque<Token>,
@@ -73,12 +77,12 @@ pub struct SingleWorker<Proto, Request, Response, Storage> {
     session_queue: Queues<Session, Session>,
     sessions: Slab<ServerSession<Proto, Response, Request>>,
     signal_queue: Queues<(), Signal>,
-    storage: Storage,
+    storage: Arc<Storage>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Proto, Request, Response, Storage> SingleWorker<Proto, Request, Response, Storage>
+impl<Proto, Request, Response, Storage> Worker<Proto, Request, Response, Storage>
 where
     Proto: Protocol<Request, Response> + Clone,
     Request: Klog + Klog<Response = Response>,
@@ -185,8 +189,6 @@ where
         loop {
             WORKER_EVENT_LOOP.increment();
 
-            self.storage.expire();
-
             // we need another wakeup if there are still pending reads
             if !self.pending.is_empty() {
                 let _ = self.waker.wake();
@@ -244,7 +246,7 @@ where
                         while let Some(signal) = self.signal_queue.try_recv() {
                             match signal.into_inner() {
                                 Signal::FlushAll => {
-                                    self.storage.clear();
+                                    // the maintenance thread handles flush
                                 }
                                 Signal::Shutdown => {
                                     // if we received a shutdown, we can return
