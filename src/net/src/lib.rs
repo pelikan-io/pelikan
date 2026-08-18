@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+mod backend;
 mod connector;
 mod listener;
 mod stream;
@@ -10,6 +11,7 @@ pub mod waker;
 
 mod tls_tcp;
 
+pub use backend::*;
 pub use connector::*;
 pub use listener::*;
 pub use stream::*;

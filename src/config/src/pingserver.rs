@@ -178,3 +178,15 @@ impl Default for PingserverConfig {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use crate::PingserverConfig;
+
+    #[test]
+    fn it_should_render_the_config_with_the_default_io_backend() {
+        let config: PingserverConfig = Default::default();
+        let rendered_config = toml::to_string_pretty(&config).unwrap();
+        assert!(rendered_config.contains("io_backend = \"mio\""));
+    }
+}

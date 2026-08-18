@@ -11,6 +11,7 @@ const SERVER_HOST: &str = "0.0.0.0";
 const SERVER_PORT: &str = "12321";
 const SERVER_TIMEOUT: usize = 100;
 const SERVER_NEVENT: usize = 1024;
+const SERVER_IO_BACKEND: &str = "mio";
 
 // helper functions
 fn host() -> String {
@@ -29,6 +30,10 @@ fn nevent() -> usize {
     SERVER_NEVENT
 }
 
+fn io_backend() -> String {
+    SERVER_IO_BACKEND.to_string()
+}
+
 // definitions
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Server {
@@ -40,6 +45,8 @@ pub struct Server {
     timeout: usize,
     #[serde(default = "nevent")]
     nevent: usize,
+    #[serde(default = "io_backend")]
+    io_backend: String,
 }
 
 // implementation
@@ -68,6 +75,11 @@ impl Server {
     pub fn nevent(&self) -> usize {
         self.nevent
     }
+
+    /// I/O backend requested for the cache server
+    pub fn io_backend(&self) -> &str {
+        &self.io_backend
+    }
 }
 
 // trait implementations
@@ -78,6 +90,7 @@ impl Default for Server {
             port: port(),
             timeout: timeout(),
             nevent: nevent(),
+            io_backend: io_backend(),
         }
     }
 }
@@ -85,4 +98,27 @@ impl Default for Server {
 // trait definitions
 pub trait ServerConfig {
     fn server(&self) -> &Server;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn io_backend_defaults_to_mio() {
+        let server: Server = toml::from_str("").unwrap();
+        assert_eq!(server.io_backend(), "mio");
+    }
+
+    #[test]
+    fn io_backend_reads_ringline() {
+        let server: Server = toml::from_str("io_backend = 'ringline'").unwrap();
+        assert_eq!(server.io_backend(), "ringline");
+    }
+
+    #[test]
+    fn io_backend_retains_unknown_value_for_network_validation() {
+        let server: Server = toml::from_str("io_backend = 'other'").unwrap();
+        assert_eq!(server.io_backend(), "other");
+    }
 }

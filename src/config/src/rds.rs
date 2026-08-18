@@ -216,6 +216,7 @@ mod test {
             "merge_target",
             "merge_max",
             "compact_target",
+            "io_backend = \"mio\"",
         ];
         for key in expected_keys {
             assert!(rendered_config.contains(key));
