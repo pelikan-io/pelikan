@@ -991,6 +991,52 @@ of the same model."
 
 ---
 
+## Phase D-rev: lazy expiry in the engine; drop the maintenance thread
+
+> **Status 2026-08-18:** Added after Phase D landed (commit `37378e3`). Design
+> revision approved by the user: the engine gains lazy deadline checks
+> (segcache 0.4.1), after which pelikan needs no periodic `expire()` and the
+> maintenance thread is deleted. Supersedes the maintenance-thread parts of
+> Tasks D2/D3. The spec's section 4 has the full rationale.
+
+### Task A5: cache-rs — lazy deadline checks + segcache 0.4.1 release
+
+In /Users/brian/workspace/brayniac/cache-rs (branch from origin/main):
+
+- [ ] `get_pinned`: after the post-pin revalidation succeeds (key still maps to
+  `location`, segment pinned so its header is authoritative), check
+  `self.remaining_ttl(seg_id)`; on `Err` drop the guard and return `None`.
+  Covers `get` and `get_no_freq_incr`.
+- [ ] `cas`: after resolving the current item's location/seg_id, check
+  `remaining_ttl` and return `Err(SegcacheError::NotFound)` for expired items
+  (memcached: cas on expired key → NOT_FOUND).
+- [ ] `delete`: expired item → return `false` (memcached: NOT_FOUND).
+- [ ] TDD: failing tests first (insert with short TTL, wait past deadline, no
+  `expire()` call, assert get→None / cas→NotFound / delete→false), following
+  the existing TTL test patterns in the crate.
+- [ ] Docs: `get`/`cas`/`delete` doc comments + `docs/segcache.md` gain the
+  lazy-expiry statement.
+- [ ] PR per repo convention, CI green, merge; then version-bump PR
+  `segcache 0.4.1` (behavioral fix toward documented TTL semantics), merge.
+- [ ] Publish 0.4.1 from a refreshed clean clone (dry-run first). User already
+  approved this release in the design revision.
+
+### Task D4: pelikan — remove the maintenance thread
+
+- [ ] Bump workspace `segcache = "0.4.1"`, `cargo update -p segcache`.
+- [ ] Delete `src/core/server/src/workers/maintenance.rs`; remove the
+  `maintenance` module/field/builder from `workers/mod.rs` (`Workers` holds
+  only `Vec<Worker>`; `wakers()` = worker wakers only — process.rs wiring
+  still works since it only strips index 0 for the listener).
+- [ ] `worker.rs`: `Signal::FlushAll` handler becomes `self.storage.clear()`
+  (broadcast means every worker clears; duplicates are cheap no-ops).
+- [ ] Remove `EntryStore::expire` from the trait and its implementors (Seg,
+  Noop) — nothing calls it anymore. Keep `clear`.
+- [ ] Full build/clippy/test gate as in Phase D; verify a manual `flush_all`
+  smoke test against a running server; commit.
+
+---
+
 ## Phase E: docs, diagrams, journal (final commits)
 
 ### Task E1: Rewrite the thread-model documentation

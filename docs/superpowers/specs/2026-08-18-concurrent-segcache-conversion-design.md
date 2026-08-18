@@ -39,8 +39,18 @@ This removes the reason the storage thread exists.
    remaining user.
 3. **One unified worker model.** The single-worker special case collapses too;
    single-worker is just N=1 of the shared model.
-4. **Dedicated maintenance thread** drives `expire()` and handles
-   `FlushAll`/`Shutdown` signals. Keeps eager expiration off the request path.
+4. **Lazy-on-get + eager-on-pressure expiration; no maintenance thread**
+   (revised 2026-08-18, superseding the original dedicated-maintenance-thread
+   decision after it briefly landed). The engine's eviction path already
+   reclaims whole expired segments before real eviction ("eager on
+   pressure"), and `incr`/`decr` already treat expired items as missing
+   ("lazy"). The missing piece was a lazy deadline check in `get` — added to
+   cache-rs (segcache 0.4.1) mirroring `numeric_update`, and extended to
+   `cas` and `delete` for full memcached lazy-expiry parity. With that,
+   pelikan needs no periodic `expire()` at all: no maintenance thread, no
+   expire calls in worker loops, and `EntryStore::expire` is removed as dead
+   API. `FlushAll` is handled by every worker (the admin signal is broadcast;
+   each calls `clear()`, and the duplicate clears are cheap no-ops).
 5. **Publish `segcache 0.4.0` first.** The `&self` API is a breaking change;
    pelikan depends on the published crate, keeping pelikan's crates publishable
    and CI reproducible.
@@ -107,18 +117,31 @@ and never outlive `execute()`.
   `Signal::FlushAll` (the maintenance thread owns both); they still act on
   `Signal::Shutdown`.
 
-### 4. Maintenance thread
+### 4. Expiration model (revised: no maintenance thread)
 
-New `workers/maintenance.rs` (thread name `pelikan_maint`):
+Prerequisite in cache-rs (segcache 0.4.1): a lazy deadline check in the read
+path — `get_pinned` (covering `get` and `get_no_freq_incr`) returns `None`
+for items whose pinned segment is past `create_at + ttl`, and `cas`/`delete`
+gain the same check — mirroring the existing `numeric_update` behavior and
+matching memcached's expired-items-act-missing semantics.
 
-- Owns an `Arc<Storage>` clone plus its own Poll/Waker registered with the
-  admin signal fan-out.
-- Loop: poll with timeout → `storage.expire()` each pass → drain signal queue:
-  `FlushAll` → `storage.clear()`, `Shutdown` → return.
-- Expiration cadence matches today's storage thread (every loop pass, bounded
-  by the poll timeout).
-- Net thread count: unchanged in multi-worker mode (maintenance replaces
-  storage); +1 thread in single-worker mode.
+With that in place:
+
+- **Correctness** comes from the lazy checks: expired items are never served,
+  regardless of when their segments are reclaimed.
+- **Memory reclamation** comes from write pressure: the engine's eviction
+  path drops whole expired segments as its cheap first path before any real
+  eviction. Under low load, expired segments may linger in memory — accepted;
+  there is no demand for that memory until there is write pressure, at which
+  point it is reclaimed first.
+- Pelikan calls `expire()` nowhere. `EntryStore::expire` is removed from the
+  trait (and its implementors) as dead API; the engine keeps its public
+  `expire()` for callers that want eager reclamation.
+- `FlushAll` is handled by each worker: the admin signal fan-out is a
+  broadcast, every worker receives it, and each calls `storage.clear()` —
+  the second..Nth calls find already-drained buckets and are cheap no-ops.
+- Net thread count: one fewer than the original multi-worker model (the
+  storage thread is not replaced by anything).
 
 ### 5. Process wiring
 
@@ -169,10 +192,12 @@ New `workers/maintenance.rs` (thread name `pelikan_maint`):
   engine `cas` is atomic, but the follow-up delete used to emulate
   immediate expiry can remove a value a concurrent `set` stored in between.
   Same category and same eventual fix as add/replace; obscure path.
-- **Expiration driver:** expiration moves from the storage thread (multi) or
-  the worker loop (single) to the maintenance thread. Cadence is equivalent;
-  single-worker deployments gain a thread but lose per-loop expire work on the
-  request path.
+- **Expiration driver:** no periodic `expire()` at all. Expired items become
+  invisible via lazy deadline checks in the engine's read/mutate paths
+  (segcache 0.4.1); expired segments are reclaimed by the eviction path under
+  write pressure. Under low load expired segments linger in memory (metrics
+  show them as used) — accepted, since that memory has no competing demand
+  until write pressure exists.
 
 ## Payoff
 
