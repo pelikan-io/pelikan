@@ -9,6 +9,9 @@ mod stream;
 mod tcp;
 pub mod waker;
 
+#[cfg(target_os = "linux")]
+pub mod ringline;
+
 mod tls_tcp;
 
 pub use backend::*;
