@@ -1,6 +1,7 @@
 use super::single::{
     record_receive, record_send, record_send_bytes, record_transport_receive_error,
 };
+use crate::workers::{STORAGE_EVENT_LOOP, STORAGE_QUEUE_DEPTH};
 use crate::PROCESS_REQ;
 use crossbeam_channel::{Receiver, Sender, TrySendError};
 use entrystore::EntryStore;
@@ -22,6 +23,19 @@ use std::time::Duration;
     description = "Ringline cache requests rejected because the storage queue is full"
 )]
 pub static RINGLINE_STORAGE_QUEUE_FULL: Counter = Counter::new();
+
+#[metric(
+    name = "ringline_storage_response_queue_full",
+    description = "Ringline storage responses blocked by a full worker response queue"
+)]
+pub static RINGLINE_STORAGE_RESPONSE_QUEUE_FULL: Counter = Counter::new();
+
+#[metric(
+    name = "ringline_storage_response_queue_depth",
+    description = "Depth of a Ringline worker response queue when storage enqueues a response"
+)]
+pub static RINGLINE_STORAGE_RESPONSE_QUEUE_DEPTH: metriken::AtomicHistogram =
+    metriken::AtomicHistogram::new(7, 20);
 
 thread_local! {
     static WORKER_STATE: RefCell<Option<Box<dyn Any>>> = RefCell::new(None);
@@ -58,10 +72,32 @@ pub(crate) struct StorageRequest<Request> {
     pub(crate) request: Request,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SubmitError {
+    Full,
+    Disconnected,
+}
+
+fn try_submit_request<Request>(
+    sender: &Sender<StorageRequest<Request>>,
+    request: StorageRequest<Request>,
+) -> Result<(), SubmitError> {
+    match sender.try_send(request) {
+        Ok(()) => Ok(()),
+        Err(TrySendError::Full(_)) => {
+            RINGLINE_STORAGE_QUEUE_FULL.increment();
+            Err(SubmitError::Full)
+        }
+        Err(TrySendError::Disconnected(_)) => Err(SubmitError::Disconnected),
+    }
+}
+
 pub(crate) struct ResponseSender<T> {
     sender: Sender<StorageResponse<T>>,
-    wake: AttachOnce<WakeHandle>,
+    wake: AttachOnce<WakeCallback>,
 }
+
+type WakeCallback = Arc<dyn Fn() + Send + Sync>;
 
 struct AttachOnce<T>(Arc<OnceLock<T>>);
 
@@ -100,16 +136,36 @@ impl<T> Clone for ResponseSender<T> {
 
 impl<T> ResponseSender<T> {
     pub(crate) fn attach(&self, wake: WakeHandle) -> Result<(), WakeHandle> {
-        self.wake.attach(wake)
+        let preserved = wake.clone();
+        self.wake
+            .attach(Arc::new(move || wake.wake()))
+            .map_err(|_| preserved)
     }
 
     fn wake(&self) -> Result<(), io::Error> {
         self.wake
             .get()
             .ok_or_else(|| io::Error::other("Ringline worker wake handle is not attached"))?
-            .wake();
+            .as_ref()();
         Ok(())
     }
+}
+
+#[cfg(test)]
+fn response_channel_with_callback<T, Factory, Callback>(
+    capacity: usize,
+    factory: Factory,
+) -> (ResponseSender<T>, Receiver<StorageResponse<T>>)
+where
+    Factory: FnOnce(Receiver<StorageResponse<T>>) -> Callback,
+    Callback: Fn() + Send + Sync + 'static,
+{
+    let (sender, receiver) = response_channel(capacity);
+    sender
+        .wake
+        .attach(Arc::new(factory(receiver.clone())))
+        .unwrap_or_else(|_| panic!("test response wake already attached"));
+    (sender, receiver)
 }
 
 pub(crate) fn response_channel<T>(
@@ -297,18 +353,20 @@ where
                 };
 
                 let (completion_id, completion) = completions.insert();
-                match requests.try_send(StorageRequest {
-                    worker_id,
-                    completion_id,
-                    request,
-                }) {
+                match try_submit_request(
+                    &requests,
+                    StorageRequest {
+                        worker_id,
+                        completion_id,
+                        request,
+                    },
+                ) {
                     Ok(()) => {}
-                    Err(TrySendError::Full(_)) => {
-                        RINGLINE_STORAGE_QUEUE_FULL.increment();
+                    Err(SubmitError::Full) => {
                         error!("Ringline storage request queue is full");
                         break;
                     }
-                    Err(TrySendError::Disconnected(_)) => {
+                    Err(SubmitError::Disconnected) => {
                         error!("Ringline storage request queue is disconnected");
                         break;
                     }
@@ -405,7 +463,9 @@ where
 
     pub(crate) fn run(mut self) {
         let expiration = crossbeam_channel::tick(self.timeout);
+        let mut requests = Vec::with_capacity(1024);
         loop {
+            STORAGE_EVENT_LOOP.increment();
             crossbeam_channel::select! {
                 recv(self.signals) -> signal => match signal {
                     Ok(common::signal::Signal::FlushAll) => self.storage.clear(),
@@ -413,34 +473,58 @@ where
                 },
                 recv(self.requests) -> request => {
                     let Ok(request) = request else { return; };
+                    requests.push(request);
+                    requests.extend(self.requests.try_iter());
+                    let _ = STORAGE_QUEUE_DEPTH.increment(requests.len() as u64);
                     self.storage.expire();
-                    let response = self.storage.execute(&request.request);
-                    PROCESS_REQ.increment();
-                    let Some(sender) = self.responses.get(request.worker_id) else {
-                        error!("Ringline storage response has invalid worker id {}", request.worker_id);
-                        continue;
-                    };
-                    let response = StorageResponse::new(
-                        request.completion_id,
-                        ResponseEnvelope { request: request.request, response },
-                    );
-                    loop {
-                        crossbeam_channel::select! {
-                            send(sender.sender, response) -> result => {
-                                if result.is_err() {
-                                    error!("Ringline response queue disconnected");
-                                    return;
-                                }
+                    for request in requests.drain(..) {
+                        let response = self.storage.execute(&request.request);
+                        PROCESS_REQ.increment();
+                        let Some(sender) = self.responses.get(request.worker_id) else {
+                            error!("Ringline storage response has invalid worker id {}", request.worker_id);
+                            continue;
+                        };
+                        let response = StorageResponse::new(
+                            request.completion_id,
+                            ResponseEnvelope { request: request.request, response },
+                        );
+                        match sender.sender.try_send(response) {
+                            Ok(()) => {
+                                let _ = RINGLINE_STORAGE_RESPONSE_QUEUE_DEPTH
+                                    .increment(sender.sender.len() as u64);
                                 if let Err(error) = sender.wake() {
                                     error!("failed to wake Ringline response worker: {error}");
                                     return;
                                 }
-                                break;
-                            },
-                            recv(self.signals) -> signal => match signal {
-                                Ok(common::signal::Signal::FlushAll) => self.storage.clear(),
-                                Ok(common::signal::Signal::Shutdown) | Err(_) => return,
-                            },
+                            }
+                            Err(TrySendError::Disconnected(_)) => {
+                                error!("Ringline response queue disconnected");
+                                return;
+                            }
+                            Err(TrySendError::Full(response)) => {
+                                RINGLINE_STORAGE_RESPONSE_QUEUE_FULL.increment();
+                                let _ = RINGLINE_STORAGE_RESPONSE_QUEUE_DEPTH
+                                    .increment(sender.sender.len() as u64);
+                                loop {
+                                    crossbeam_channel::select! {
+                                        send(sender.sender, response) -> result => {
+                                            if result.is_err() {
+                                                error!("Ringline response queue disconnected");
+                                                return;
+                                            }
+                                            if let Err(error) = sender.wake() {
+                                                error!("failed to wake Ringline response worker: {error}");
+                                                return;
+                                            }
+                                            break;
+                                        },
+                                        recv(self.signals) -> signal => match signal {
+                                            Ok(common::signal::Signal::FlushAll) => self.storage.clear(),
+                                            Ok(common::signal::Signal::Shutdown) | Err(_) => return,
+                                        },
+                                    }
+                                }
+                            }
                         }
                     }
                 },
@@ -452,14 +536,82 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{DrainStats, StorageResponse};
+    use super::{DrainStats, StorageRequest, StorageResponse};
+    use crate::workers::{STORAGE_EVENT_LOOP, STORAGE_QUEUE_DEPTH};
+    use common::signal::Signal;
+    use entrystore::EntryStore;
     use pelikan_net::ringline::Completion;
+    use protocol_common::{BufMut, Compose, Execute};
     use std::future::Future;
     use std::pin::Pin;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex};
     use std::task::{Context, Poll, Waker};
+    use std::thread;
+    use std::time::Duration;
+
+    static TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    fn test_guard() -> std::sync::MutexGuard<'static, ()> {
+        TEST_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    fn wait_until(message: &str, condition: impl Fn() -> bool) {
+        let deadline = std::time::Instant::now() + Duration::from_secs(1);
+        while !condition() {
+            assert!(std::time::Instant::now() < deadline, "{message}");
+            thread::yield_now();
+        }
+    }
 
     #[derive(Clone)]
     struct LineProtocol;
+
+    #[derive(Debug, Eq, PartialEq)]
+    struct TestResponse(u64);
+
+    impl Compose for TestResponse {
+        fn compose(&self, dst: &mut dyn BufMut) -> usize {
+            let bytes = self.0.to_string();
+            dst.put_slice(bytes.as_bytes());
+            bytes.len()
+        }
+    }
+
+    #[derive(Default)]
+    struct StorageCounts {
+        clear: AtomicUsize,
+        execute: AtomicUsize,
+        expire: AtomicUsize,
+    }
+
+    struct TestStorage(Arc<StorageCounts>);
+
+    impl EntryStore for TestStorage {
+        fn expire(&mut self) {
+            self.0.expire.fetch_add(1, Ordering::SeqCst);
+        }
+
+        fn clear(&mut self) {
+            self.0.clear.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+
+    impl Execute<u64, TestResponse> for TestStorage {
+        fn execute(&mut self, request: &u64) -> TestResponse {
+            self.0.execute.fetch_add(1, Ordering::SeqCst);
+            TestResponse(*request + 100)
+        }
+    }
+
+    fn completion(slot: u32) -> pelikan_net::ringline::CompletionId {
+        pelikan_net::ringline::CompletionId {
+            slot,
+            generation: 0,
+        }
+    }
 
     fn poll_once<T>(
         future: &mut Completion<T>,
@@ -546,5 +698,272 @@ mod tests {
         assert!(!second.is_attached());
         assert_eq!(second.attach(22), Ok(()));
         assert!(first.is_attached() && second.is_attached());
+    }
+
+    #[test]
+    fn saturated_request_queue_rejects_and_increments_pressure_metric() {
+        let _guard = test_guard();
+        let (sender, _receiver) = crossbeam_channel::bounded(1);
+        sender
+            .send(StorageRequest {
+                worker_id: 0,
+                completion_id: completion(0),
+                request: 1_u64,
+            })
+            .unwrap();
+        let before = super::RINGLINE_STORAGE_QUEUE_FULL.value();
+
+        let result = super::try_submit_request(
+            &sender,
+            StorageRequest {
+                worker_id: 0,
+                completion_id: completion(1),
+                request: 2_u64,
+            },
+        );
+
+        assert_eq!(result, Err(super::SubmitError::Full));
+        assert_eq!(super::RINGLINE_STORAGE_QUEUE_FULL.value() - before, 1);
+    }
+
+    #[test]
+    fn responses_route_exactly_and_are_enqueued_before_worker_wake() {
+        let _guard = test_guard();
+        let counts = Arc::new(StorageCounts::default());
+        let (request_tx, request_rx) = crossbeam_channel::bounded(4);
+        let (signal_tx, signal_rx) = crossbeam_channel::bounded(4);
+        let wake_zero = Arc::new(AtomicUsize::new(0));
+        let wake_one = Arc::new(AtomicUsize::new(0));
+        let (observed_zero_tx, observed_zero_rx) = crossbeam_channel::bounded(2);
+        let (observed_one_tx, observed_one_rx) = crossbeam_channel::bounded(2);
+        let wake_zero_assert = Arc::clone(&wake_zero);
+        let (sender_zero, receiver_zero) =
+            super::response_channel_with_callback(2, move |receiver| {
+                let wakes = Arc::clone(&wake_zero);
+                move || {
+                    observed_zero_tx
+                        .send(receiver.try_recv().expect("wake preceded enqueue"))
+                        .unwrap();
+                    wakes.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+        let wake_one_assert = Arc::clone(&wake_one);
+        let (sender_one, receiver_one) =
+            super::response_channel_with_callback(2, move |receiver| {
+                let wakes = Arc::clone(&wake_one);
+                move || {
+                    observed_one_tx
+                        .send(receiver.try_recv().expect("wake preceded enqueue"))
+                        .unwrap();
+                    wakes.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+        let worker = super::RinglineStorageWorker::new(
+            request_rx,
+            vec![sender_zero, sender_one],
+            signal_rx,
+            TestStorage(Arc::clone(&counts)),
+            Duration::from_secs(60),
+        );
+        let join = thread::spawn(move || worker.run());
+
+        request_tx
+            .send(StorageRequest {
+                worker_id: 1,
+                completion_id: completion(11),
+                request: 7,
+            })
+            .unwrap();
+        request_tx
+            .send(StorageRequest {
+                worker_id: 0,
+                completion_id: completion(10),
+                request: 5,
+            })
+            .unwrap();
+
+        let one = observed_one_rx
+            .recv_timeout(Duration::from_secs(1))
+            .unwrap();
+        let zero = observed_zero_rx
+            .recv_timeout(Duration::from_secs(1))
+            .unwrap();
+        assert_eq!(one.completion_id, completion(11));
+        assert_eq!(one.value.response, TestResponse(107));
+        assert_eq!(zero.completion_id, completion(10));
+        assert_eq!(zero.value.response, TestResponse(105));
+        assert_eq!(wake_zero_assert.load(Ordering::SeqCst), 1);
+        assert_eq!(wake_one_assert.load(Ordering::SeqCst), 1);
+        assert!(receiver_zero.is_empty());
+        assert!(receiver_one.is_empty());
+        signal_tx.send(Signal::Shutdown).unwrap();
+        join.join().unwrap();
+    }
+
+    #[test]
+    fn saturated_response_queue_blocks_until_space_and_shutdown_interrupts_it() {
+        let _guard = test_guard();
+        let counts = Arc::new(StorageCounts::default());
+        let (request_tx, request_rx) = crossbeam_channel::bounded(2);
+        let (signal_tx, signal_rx) = crossbeam_channel::bounded(2);
+        let wakes = Arc::new(AtomicUsize::new(0));
+        let wake_callback = Arc::clone(&wakes);
+        let pressure_before = super::RINGLINE_STORAGE_RESPONSE_QUEUE_FULL.value();
+        let depth_before = super::RINGLINE_STORAGE_RESPONSE_QUEUE_DEPTH.load();
+        let (sender, receiver) = super::response_channel_with_callback(1, move |_receiver| {
+            let wakes = Arc::clone(&wake_callback);
+            move || {
+                wakes.fetch_add(1, Ordering::SeqCst);
+            }
+        });
+        sender
+            .sender
+            .send(StorageResponse::new(
+                completion(99),
+                super::ResponseEnvelope {
+                    request: 99,
+                    response: TestResponse(199),
+                },
+            ))
+            .unwrap();
+        let worker = super::RinglineStorageWorker::new(
+            request_rx,
+            vec![sender],
+            signal_rx,
+            TestStorage(Arc::clone(&counts)),
+            Duration::from_secs(60),
+        );
+        let join = thread::spawn(move || worker.run());
+        request_tx
+            .send(StorageRequest {
+                worker_id: 0,
+                completion_id: completion(1),
+                request: 1,
+            })
+            .unwrap();
+        wait_until("storage did not execute saturated response", || {
+            counts.execute.load(Ordering::SeqCst) > 0
+        });
+        assert_eq!(wakes.load(Ordering::SeqCst), 0);
+
+        signal_tx.send(Signal::Shutdown).unwrap();
+        join.join().unwrap();
+        assert_eq!(receiver.len(), 1);
+        assert_eq!(
+            super::RINGLINE_STORAGE_RESPONSE_QUEUE_FULL.value() - pressure_before,
+            1
+        );
+        let depth_after = super::RINGLINE_STORAGE_RESPONSE_QUEUE_DEPTH.load().unwrap();
+        let depth_delta = match depth_before {
+            Some(before) => depth_after.wrapping_sub(&before).unwrap(),
+            None => depth_after,
+        };
+        assert!(depth_delta
+            .iter()
+            .any(|bucket| bucket.count() == 1 && bucket.range().contains(&1)));
+    }
+
+    #[test]
+    fn flush_during_saturated_response_send_preserves_the_blocked_response() {
+        let _guard = test_guard();
+        let counts = Arc::new(StorageCounts::default());
+        let (request_tx, request_rx) = crossbeam_channel::bounded(2);
+        let (signal_tx, signal_rx) = crossbeam_channel::bounded(2);
+        let (sender, receiver) = super::response_channel_with_callback(1, |_receiver| || {});
+        sender
+            .sender
+            .send(StorageResponse::new(
+                completion(99),
+                super::ResponseEnvelope {
+                    request: 99,
+                    response: TestResponse(199),
+                },
+            ))
+            .unwrap();
+        let worker = super::RinglineStorageWorker::new(
+            request_rx,
+            vec![sender],
+            signal_rx,
+            TestStorage(Arc::clone(&counts)),
+            Duration::from_secs(60),
+        );
+        let join = thread::spawn(move || worker.run());
+        request_tx
+            .send(StorageRequest {
+                worker_id: 0,
+                completion_id: completion(1),
+                request: 1,
+            })
+            .unwrap();
+        wait_until("storage did not execute blocked flush response", || {
+            counts.execute.load(Ordering::SeqCst) > 0
+        });
+
+        signal_tx.send(Signal::FlushAll).unwrap();
+        wait_until("storage did not process FlushAll", || {
+            counts.clear.load(Ordering::SeqCst) > 0
+        });
+        receiver.recv_timeout(Duration::from_secs(1)).unwrap();
+        let response = receiver.recv_timeout(Duration::from_secs(1)).unwrap();
+        assert_eq!(response.completion_id, completion(1));
+        assert_eq!(response.value.response, TestResponse(101));
+
+        signal_tx.send(Signal::Shutdown).unwrap();
+        join.join().unwrap();
+    }
+
+    #[test]
+    fn storage_batches_preserve_metrics_expiration_cadence_and_flush_ownership() {
+        let _guard = test_guard();
+        let counts = Arc::new(StorageCounts::default());
+        let (request_tx, request_rx) = crossbeam_channel::bounded(4);
+        let (signal_tx, signal_rx) = crossbeam_channel::bounded(4);
+        let (sender, receiver) = super::response_channel_with_callback(4, |_receiver| || {});
+        let loops_before = STORAGE_EVENT_LOOP.value();
+        let depth_before = STORAGE_QUEUE_DEPTH.load();
+        let worker = super::RinglineStorageWorker::new(
+            request_rx,
+            vec![sender],
+            signal_rx,
+            TestStorage(Arc::clone(&counts)),
+            Duration::from_secs(60),
+        );
+        request_tx
+            .send(StorageRequest {
+                worker_id: 0,
+                completion_id: completion(1),
+                request: 1,
+            })
+            .unwrap();
+        request_tx
+            .send(StorageRequest {
+                worker_id: 0,
+                completion_id: completion(2),
+                request: 2,
+            })
+            .unwrap();
+        let join = thread::spawn(move || worker.run());
+
+        receiver.recv_timeout(Duration::from_secs(1)).unwrap();
+        receiver.recv_timeout(Duration::from_secs(1)).unwrap();
+        signal_tx.send(Signal::FlushAll).unwrap();
+        wait_until("storage did not process batch FlushAll", || {
+            counts.clear.load(Ordering::SeqCst) > 0
+        });
+        signal_tx.send(Signal::Shutdown).unwrap();
+        join.join().unwrap();
+
+        assert_eq!(counts.execute.load(Ordering::SeqCst), 2);
+        assert_eq!(counts.expire.load(Ordering::SeqCst), 1);
+        assert_eq!(counts.clear.load(Ordering::SeqCst), 1);
+        assert!(STORAGE_EVENT_LOOP.value() > loops_before);
+        let depth_after = STORAGE_QUEUE_DEPTH.load().unwrap();
+        let depth_delta = match depth_before {
+            Some(before) => depth_after.wrapping_sub(&before).unwrap(),
+            None => depth_after,
+        };
+        assert!(depth_delta
+            .iter()
+            .any(|bucket| bucket.count() == 1 && bucket.range().contains(&2)));
     }
 }

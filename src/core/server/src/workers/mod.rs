@@ -13,6 +13,7 @@ mod storage;
 use multi::*;
 use single::*;
 use storage::*;
+pub(crate) use storage::{STORAGE_EVENT_LOOP, STORAGE_QUEUE_DEPTH};
 
 #[metric(
     name = "worker_event_depth",
