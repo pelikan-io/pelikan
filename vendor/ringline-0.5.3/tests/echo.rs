@@ -2897,6 +2897,84 @@ fn backpressured_send_registers_the_first_polling_task_after_move() {
     }
 }
 
+/// Moving a bounded-send future after its first poll transfers responsibility
+/// for every later capacity/completion wake to the task that most recently
+/// polled it on this worker.
+static REPOLLED_MOVED_SEND_COMPLETED: AtomicU32 = AtomicU32::new(0);
+
+struct BackpressuredRepollMovedFutureHandler;
+
+impl AsyncEventHandler for BackpressuredRepollMovedFutureHandler {
+    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
+        async move {
+            if conn
+                .with_data(|data| ParseResult::Consumed(data.len()))
+                .await
+                == 0
+            {
+                return;
+            }
+
+            let mut moved = Box::pin(conn.send_backpressured(b"MOVED---"));
+            std::future::poll_fn(|cx| {
+                assert!(moved.as_mut().poll(cx).is_pending());
+                std::task::Poll::Ready(())
+            })
+            .await;
+
+            let moved = ringline::spawn_with_handle(moved).expect("standalone spawn failed");
+            assert_eq!(moved.await.expect("moved send failed"), 8);
+            REPOLLED_MOVED_SEND_COMPLETED.store(1, Ordering::Release);
+        }
+    }
+
+    fn create_for_worker(_id: usize) -> Self {
+        BackpressuredRepollMovedFutureHandler
+    }
+}
+
+#[test]
+fn backpressured_send_refreshes_owner_after_first_poll_move() {
+    REPOLLED_MOVED_SEND_COMPLETED.store(0, Ordering::Release);
+    let port = free_port();
+    let addr = format!("127.0.0.1:{port}");
+    let config = test_config_builder()
+        .send_pool(1, 8)
+        .build()
+        .expect("valid config");
+    let (shutdown, handles) = RinglineBuilder::new(config)
+        .bind(addr.parse().unwrap())
+        .launch::<BackpressuredRepollMovedFutureHandler>()
+        .expect("launch failed");
+    wait_for_server(&addr);
+
+    let mut stream = TcpStream::connect(&addr).unwrap();
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    stream.write_all(b"go").unwrap();
+    let mut received = [0; 8];
+    stream.read_exact(&mut received).unwrap();
+    assert_eq!(&received, b"MOVED---");
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while REPOLLED_MOVED_SEND_COMPLETED.load(Ordering::Acquire) == 0
+        && std::time::Instant::now() < deadline
+    {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(
+        REPOLLED_MOVED_SEND_COMPLETED.load(Ordering::Acquire),
+        1,
+        "completion woke the task that polled the future before it moved"
+    );
+
+    shutdown.shutdown();
+    for handle in handles {
+        handle.join().unwrap().unwrap();
+    }
+}
+
 /// A completion belongs to the logical send that submitted it even if that
 /// future is canceled. It must not resolve a newer future on the connection.
 static CANCELED_SUBMISSION_RESULT: AtomicU32 = AtomicU32::new(0);

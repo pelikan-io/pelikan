@@ -3264,18 +3264,20 @@ impl Future for BackpressuredSendFuture<'_> {
 
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
+        let task_id = CURRENT_TASK_ID.with(|current| current.get());
         if this.registration.is_none() {
-            let task_id = CURRENT_TASK_ID.with(|current| current.get());
             this.registration = Some(with_state(|_driver, executor| {
                 executor.enqueue_send_capacity(this.conn_index, this.generation, task_id)
             }));
         }
-        if let Some(result) = this
+        let registration = this
             .registration
             .as_mut()
-            .expect("registered on first poll")
-            .take_result()
-        {
+            .expect("registered on first poll");
+        // This !Send future can move only between tasks on the same worker.
+        // Refresh before observing state so every later wake targets this poller.
+        registration.refresh_owner(task_id);
+        if let Some(result) = registration.take_result() {
             return Poll::Ready(result);
         }
         with_state(|driver, executor| {

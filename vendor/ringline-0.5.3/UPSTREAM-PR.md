@@ -2,7 +2,7 @@
 
 ## Provenance
 
-The startup transaction is the code merged in ringline-rs/ringline#309; no crates.io release contains it yet. The same standalone patch carries generic follow-ups for upstream review: atomic copy-send reservation, exact worker panic payload propagation, FIFO async send-capacity backpressure, and result-aware transport receive errors. None contains Pelikan protocol or fallback policy.
+The startup transaction is the code merged in ringline-rs/ringline#309; no crates.io release contains it yet. The same standalone patch carries generic follow-ups for upstream review: atomic copy-send reservation, exact worker panic payload propagation, FIFO async send-capacity backpressure with movable local-task ownership, ID-safe io_uring coalesced-send error completion, and result-aware transport receive errors. None contains Pelikan protocol or fallback policy.
 
 ## Problem
 
@@ -23,8 +23,8 @@ Every worker must complete fallible event-loop initialization before Ringline cr
 - Keep Mio worker read descriptors in `OwnedFd` until they transfer to a successfully constructed driver; io_uring ownership remains with `WakeHandle`.
 - Reserve every copy-pool slot for a logical multi-chunk send before submitting its first SQE, so pressure cannot commit a truncated prefix.
 - Carry worker setup errors and caught panic text through the startup channel and rollback result.
-- Add `ConnCtx::send_backpressured`, whose construction is inert and whose first poll registers the actual polling task in a worker-local FIFO. Its owned registration token unregisters without driver TLS, waits for enough configured pool slots, and rejects over-capacity buffers before submission.
-- Assign each admitted bounded send a unique logical-operation ID and carry it through Mio pending writes and io_uring pool/slab submission. Completion and abandonment are ID-scoped, so a canceled submitted send cannot resolve or clear a newer send on the same connection.
+- Add `ConnCtx::send_backpressured`, whose construction is inert and whose first poll registers the actual polling task in a worker-local FIFO. Every later poll refreshes that operation to the current local task; pending wakes carry the stable operation ID and resolve the latest owner at drain time. Its owned registration token unregisters without driver TLS, waits for enough configured pool slots, and rejects over-capacity buffers before submission.
+- Assign each admitted bounded send a unique logical-operation ID and carry it through Mio pending writes and io_uring pool/slab submission. Completion and abandonment are ID-scoped, so a canceled submitted send cannot resolve or clear a newer send on the same connection. io_uring coalesced-send cleanup captures the ID before releasing pool/slab state, including negative POLLOUT completions.
 - Retain Mio permits through the final socket write. Mio half-close completes each submitted bounded send with its exact write result, fails capacity-only waiters, returns permits, and wakes the next FIFO head.
 - Wake bounded senders on Mio permit release and io_uring CQ/SQ progress; connection teardown completes or abandons each exact logical operation and wakes the next FIFO head.
 - Add `ConnCtx::with_data_result`, preserving exact non-`WouldBlock` TCP receive errors while retaining `with_data` clean-EOF compatibility.
@@ -36,9 +36,10 @@ Every worker must complete fallible event-loop initialization before Ringline cr
 - A pool too small for a multi-slot send leaves every slot free (no partial reservation/submission).
 - A worker startup panic is returned with its original string payload.
 - Two real bounded sends contend for a one-slot Mio pool and arrive exactly once in FIFO order; an oversize send writes no prefix, and shutdown drops a demonstrably parked waiter without hanging.
-- Constructing or moving an unpolled future does not register a FIFO position; registration captures the first polling task. Dropping a queued registration without driver TLS unregisters only that waiter and advances FIFO safely.
+- Constructing or moving an unpolled future does not register a FIFO position; registration captures the first polling task. A future moved after its first poll refreshes both queued-capacity and submitted-completion wakes to its newest local-task owner, without waking the stale owner. Dropping a queued registration without driver TLS unregisters only that waiter and advances FIFO safely.
 - Canceling a submitted send before completion cannot donate its length/error to the next logical send on the connection.
 - Mio half-close completes a submitted bounded send, fails a capacity waiter, releases its permits, and leaves neither future stuck.
+- A deterministic io_uring state test proves negative coalesced-POLLOUT cleanup releases every pool/slab resource and completes the exact bounded operation with the CQE errno.
 - A real TCP reset is surfaced by `with_data_result`.
 
 ## Compatibility
@@ -51,7 +52,7 @@ Listener errors now surface after worker initialization and rollback. This inten
 
 Standalone patch: `ringline-v0.5.3-startup-transaction.patch`
 
-SHA-256: `a7eae83333e5b2a8f73336ea554a2647e56ba2d7a9d456a47b1b0308dfb8a036`
+SHA-256: `3755ff1bd37608c8b6b482f516186c8ccdfd3d96f951e56a5f8e87b45e42f706`
 
 Commands:
 
@@ -61,6 +62,8 @@ cargo test --features force-mio startup_gate_tests --lib -- --test-threads=1
 cargo test --features force-mio chunk_reservation_is_transactional_under_pool_pressure
 cargo test --features force-mio worker_startup_panic_payload_is_preserved
 cargo test --features force-mio backpressured_send
+cargo test --no-default-features --features force-mio backpressured_send_refreshes_owner_after_first_poll_move
+cargo test --lib coalesced_pollout_error_releases_resources_and_completes_bounded_operation
 cargo test --features force-mio with_data_result_surfaces_tcp_reset
 cargo test --features force-mio shutdown_drops_parked_backpressured_send_without_hanging
 cargo test --no-default-features --features force-mio

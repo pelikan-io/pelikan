@@ -415,14 +415,13 @@ pub(crate) struct SendCapacityWaiter {
     pub(crate) id: u64,
     pub(crate) conn_index: u32,
     pub(crate) generation: u32,
-    pub(crate) task_id: u32,
 }
 
 #[derive(Default)]
 struct SendCapacityQueue {
     waiters: VecDeque<SendCapacityWaiter>,
     operations: HashMap<u64, BoundedSendOperation>,
-    pending_wakes: VecDeque<u32>,
+    pending_wakes: VecDeque<u64>,
     next_id: u64,
 }
 
@@ -457,7 +456,6 @@ impl SendCapacityQueue {
             id,
             conn_index,
             generation,
-            task_id,
         });
         state.operations.insert(
             id,
@@ -475,13 +473,19 @@ impl SendCapacityQueue {
         }
     }
 
+    fn refresh_owner(&mut self, id: u64, task_id: u32) {
+        if let Some(operation) = self.operations.get_mut(&id) {
+            operation.task_id = task_id;
+        }
+    }
+
     fn cancel(&mut self, id: u64) {
         let was_head = self.waiters.front().is_some_and(|waiter| waiter.id == id);
         if let Some(position) = self.waiters.iter().position(|waiter| waiter.id == id) {
             self.waiters.remove(position);
         }
         if was_head && let Some(next) = self.waiters.front() {
-            self.pending_wakes.push_back(next.task_id);
+            self.pending_wakes.push_back(next.id);
         }
     }
 
@@ -517,7 +521,7 @@ impl SendCapacityQueue {
         match operation.status {
             BoundedSendStatus::Submitted => {
                 operation.status = BoundedSendStatus::Completed(result);
-                self.pending_wakes.push_back(operation.task_id);
+                self.pending_wakes.push_back(id);
             }
             BoundedSendStatus::Abandoned => {
                 self.operations.remove(&id);
@@ -561,7 +565,7 @@ impl SendCapacityQueue {
                         stdio::ErrorKind::ConnectionAborted,
                         "connection closed before bounded send completed",
                     )));
-                    self.pending_wakes.push_back(operation.task_id);
+                    self.pending_wakes.push_back(id);
                 }
                 BoundedSendStatus::Abandoned => {
                     self.operations.remove(&id);
@@ -570,7 +574,7 @@ impl SendCapacityQueue {
             }
         }
         if removed_head && let Some(next) = self.waiters.front() {
-            self.pending_wakes.push_back(next.task_id);
+            self.pending_wakes.push_back(next.id);
         }
     }
 
@@ -594,19 +598,19 @@ impl SendCapacityQueue {
                     stdio::ErrorKind::BrokenPipe,
                     "connection write side shut down before bounded send admission",
                 )));
-                self.pending_wakes.push_back(operation.task_id);
+                self.pending_wakes.push_back(id);
             }
         }
         if old_head != self.waiters.front().map(|waiter| waiter.id)
             && let Some(next) = self.waiters.front()
         {
-            self.pending_wakes.push_back(next.task_id);
+            self.pending_wakes.push_back(next.id);
         }
     }
 
     fn wake_head(&mut self) {
         if let Some(waiter) = self.waiters.front() {
-            self.pending_wakes.push_back(waiter.task_id);
+            self.pending_wakes.push_back(waiter.id);
         }
     }
 }
@@ -620,6 +624,11 @@ pub(crate) struct SendCapacityRegistration {
 impl SendCapacityRegistration {
     pub(crate) fn id(&self) -> u64 {
         self.id
+    }
+
+    pub(crate) fn refresh_owner(&mut self, task_id: u32) {
+        // Rc keeps this registration on one worker while local tasks may own it.
+        self.queue.borrow_mut().refresh_owner(self.id, task_id);
     }
 
     pub(crate) fn admit(&mut self) {
@@ -838,12 +847,15 @@ impl Executor {
     }
 
     fn drain_send_capacity_wakes(&mut self) {
-        let wakes: Vec<u32> = self
-            .send_capacity
-            .borrow_mut()
-            .pending_wakes
-            .drain(..)
-            .collect();
+        // Resolve operation IDs only at drain time so an owner refresh also
+        // retargets a wake that was queued before the future moved locally.
+        let wakes: Vec<u32> = {
+            let mut state = self.send_capacity.borrow_mut();
+            let ids: Vec<u64> = state.pending_wakes.drain(..).collect();
+            ids.into_iter()
+                .filter_map(|id| state.operations.get(&id).map(|operation| operation.task_id))
+                .collect()
+        };
         for task_id in wakes {
             let _ = self.wake_task(task_id);
         }
@@ -1150,6 +1162,40 @@ mod tests {
         exec.collect_wakeups();
         assert!(exec.send_capacity_turn(second.id()));
         assert!(exec.task_slab.take_ready(2).is_some());
+    }
+
+    #[test]
+    fn queued_capacity_wake_follows_refreshed_task_owner() {
+        let mut exec = Executor::new(8, 8, 8, 0, 0);
+        exec.task_slab
+            .spawn(1, Box::pin(std::future::pending::<()>()));
+        let old_future = exec.task_slab.take_ready(1).unwrap();
+        exec.task_slab.park(1, old_future);
+
+        let new_index = exec
+            .standalone_slab
+            .spawn(Box::pin(std::future::pending::<()>()))
+            .expect("standalone slab has capacity");
+        let new_future = exec
+            .standalone_slab
+            .take_ready(new_index)
+            .expect("new task starts ready");
+        exec.standalone_slab.park(new_index, new_future);
+        let new_task = new_index | waker::STANDALONE_BIT;
+
+        let mut registration = exec.enqueue_send_capacity(1, 7, 1);
+        exec.send_capacity.borrow_mut().wake_head();
+        registration.refresh_owner(new_task);
+        exec.drain_send_capacity_wakes();
+
+        assert!(
+            exec.task_slab.take_ready(1).is_none(),
+            "a wake queued before the move targeted the stale task owner"
+        );
+        assert!(
+            exec.standalone_slab.take_ready(new_index).is_some(),
+            "the most recent polling task did not receive the capacity wake"
+        );
     }
 
     #[test]

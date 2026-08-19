@@ -507,10 +507,41 @@ index 261a6fc..f5e8cf8 100644
  
      /// Create a UDP socket, bind with SO_REUSEPORT, register in fixed file table.
 diff --git a/src/backend/uring/event_loop.rs b/src/backend/uring/event_loop.rs
-index f7d2f3f..b461229 100644
+index f7d2f3f..e8dd8b7 100644
 --- a/src/backend/uring/event_loop.rs
 +++ b/src/backend/uring/event_loop.rs
-@@ -86,8 +86,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -25,6 +25,30 @@ pub(crate) struct AsyncEventLoop<A: AsyncEventHandler> {
+     executor: Executor,
+ }
+ 
++/// Capture the bounded logical-send identity before releasing a coalesced
++/// send's slab and copy-pool state. Slot release clears that identity.
++fn release_coalesced_resources(
++    send_slab: &mut crate::buffer::send_slab::InFlightSendSlab,
++    send_copy_pool: &mut crate::buffer::send_copy::SendCopyPool,
++    slab_idx: u16,
++) -> Option<u64> {
++    let bounded_send_id = send_slab
++        .coalesced_pool_slots(slab_idx)
++        .iter()
++        .find_map(|slot| send_copy_pool.bounded_send_id(*slot));
++    let mut slots = [u16::MAX; crate::buffer::send_slab::MAX_IOVECS];
++    let mut n = 0;
++    for &slot in send_slab.coalesced_pool_slots(slab_idx) {
++        slots[n] = slot;
++        n += 1;
++    }
++    for &slot in &slots[..n] {
++        send_copy_pool.release(slot);
++    }
++    send_slab.release(slab_idx);
++    bounded_send_id
++}
++
+ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+     /// Create a new async event loop for a worker thread.
+     #[allow(clippy::too_many_arguments)]
+@@ -86,8 +110,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
          })
      }
  
@@ -525,7 +556,7 @@ index f7d2f3f..b461229 100644
          // Always arm eventfd read — needed for shutdown wakeup even in client-only mode.
          self.driver
              .ring
-@@ -104,6 +108,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -104,6 +132,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              );
          }
  
@@ -537,7 +568,7 @@ index f7d2f3f..b461229 100644
          // Spawn UDP handler tasks for each bound UDP socket.
          for udp_idx in 0..self.driver.udp_sockets.len() {
              let udp_ctx = UdpCtx {
-@@ -663,6 +672,15 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -663,6 +696,15 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              }
          }
  
@@ -553,7 +584,7 @@ index f7d2f3f..b461229 100644
          // Eagerly return consumed recv buffers to the kernel ring in the same
          // iteration they were consumed, keeping the ring fuller under burst.
          self.flush_replenish_and_rearm();
-@@ -860,7 +878,8 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -860,7 +902,8 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
                  }
                  return;
              }
@@ -563,7 +594,7 @@ index f7d2f3f..b461229 100644
              self.driver.close_connection(conn_index);
              return;
          }
-@@ -1043,7 +1062,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -1043,7 +1086,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
                  self.maybe_rearm_throttled_forward(conn_index);
                  return;
              } else if !has_more {
@@ -577,7 +608,7 @@ index f7d2f3f..b461229 100644
                  self.driver.close_connection(conn_index);
              }
              return;
-@@ -1445,7 +1469,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -1445,7 +1493,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              } else if errno == libc::ECANCELED {
                  return;
              } else if !has_more {
@@ -591,7 +622,7 @@ index f7d2f3f..b461229 100644
                  self.driver.close_connection(conn_index);
              }
              return;
-@@ -1762,6 +1791,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -1762,6 +1815,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              let total = self.driver.send_copy_pool.original_len(pool_slot);
              // Read the end-of-send flag before releasing the slot.
              let end_of_send = self.driver.send_copy_pool.is_end_of_send(pool_slot);
@@ -599,7 +630,7 @@ index f7d2f3f..b461229 100644
              metrics::BYTES.add(metrics::bytes::SENT, total as u64);
              self.driver.send_copy_pool.release(pool_slot);
  
-@@ -1784,7 +1814,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -1784,7 +1838,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              if end_of_send {
                  let acked =
                      std::mem::take(&mut self.driver.send_queues[conn_index as usize].acked_bytes);
@@ -612,7 +643,7 @@ index f7d2f3f..b461229 100644
              }
              return;
          }
-@@ -1813,6 +1847,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -1813,6 +1871,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              return;
          }
  
@@ -620,7 +651,7 @@ index f7d2f3f..b461229 100644
          self.driver.send_copy_pool.release(pool_slot);
          self.driver.drain_conn_send_queue(conn_index);
          self.driver.note_send_finalized(conn_index);
-@@ -1822,7 +1857,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -1822,7 +1881,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
          } else {
              Err(io::Error::from_raw_os_error(-result))
          };
@@ -633,7 +664,7 @@ index f7d2f3f..b461229 100644
      }
  
      /// Handle a `POLLOUT` CQE armed after a `Send` returned `-EAGAIN`.
-@@ -1852,11 +1891,16 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -1852,11 +1915,16 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
          // the same as a generic send failure: drop everything for
          // this connection.
          if result < 0 {
@@ -652,30 +683,42 @@ index f7d2f3f..b461229 100644
              return;
          }
  
-@@ -1894,6 +1938,14 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
-         self.driver.send_slab.release(slab_idx);
+@@ -1880,18 +1948,13 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         }
      }
  
-+    fn coalesced_bounded_send_id(&self, slab_idx: u16) -> Option<u64> {
-+        self.driver
-+            .send_slab
-+            .coalesced_pool_slots(slab_idx)
-+            .iter()
-+            .find_map(|slot| self.driver.send_copy_pool.bounded_send_id(*slot))
-+    }
-+
+-    /// Release the backing pool slots of a coalesced send, then the slab entry.
+-    fn release_coalesced(&mut self, slab_idx: u16) {
+-        let mut slots = [u16::MAX; crate::buffer::send_slab::MAX_IOVECS];
+-        let mut n = 0;
+-        for &s in self.driver.send_slab.coalesced_pool_slots(slab_idx) {
+-            slots[n] = s;
+-            n += 1;
+-        }
+-        for &s in &slots[..n] {
+-            self.driver.send_copy_pool.release(s);
+-        }
+-        self.driver.send_slab.release(slab_idx);
++    /// Release coalesced resources while retaining bounded-send identity.
++    fn release_coalesced(&mut self, slab_idx: u16) -> Option<u64> {
++        release_coalesced_resources(
++            &mut self.driver.send_slab,
++            &mut self.driver.send_copy_pool,
++            slab_idx,
++        )
+     }
+ 
      /// Handle completion of a coalesced plaintext `sendmsg` (OpTag::SendMsgCoalesced).
-     /// Mirrors `handle_send` but the backing is a slab entry holding several
-     /// pool slots; partial sends advance the iovec array via `try_advance`.
-@@ -1926,6 +1978,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
-             let total = self.driver.send_slab.total_len(slab_idx);
+@@ -1927,7 +1990,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              // Read the end-of-send flag before releasing the slab entry.
              let end_of_send = self.driver.send_slab.is_end_of_send(slab_idx);
-+            let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
              metrics::BYTES.add(metrics::bytes::SENT, total as u64);
-             self.release_coalesced(slab_idx);
+-            self.release_coalesced(slab_idx);
++            let bounded_send_id = self.release_coalesced(slab_idx);
  
-@@ -1939,7 +1992,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             // Accumulate these chunks' bytes against the logical send, and wake
+             // the waiter once, when the entry carrying the send's final chunk
+@@ -1939,7 +2002,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              if end_of_send {
                  let acked =
                      std::mem::take(&mut self.driver.send_queues[conn_index as usize].acked_bytes);
@@ -688,15 +731,16 @@ index f7d2f3f..b461229 100644
              }
              return;
          }
-@@ -1964,6 +2021,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -1964,7 +2031,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
          }
  
          // Real error — release everything and drain the connection's queue.
-+        let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
-         self.release_coalesced(slab_idx);
+-        self.release_coalesced(slab_idx);
++        let bounded_send_id = self.release_coalesced(slab_idx);
          self.driver.drain_conn_send_queue(conn_index);
          self.driver.note_send_finalized(conn_index);
-@@ -1972,7 +2030,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         let io_result = if result == 0 {
+@@ -1972,7 +2039,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
          } else {
              Err(io::Error::from_raw_os_error(-result))
          };
@@ -709,7 +753,26 @@ index f7d2f3f..b461229 100644
      }
  
      /// Handle a POLLOUT CQE armed after a coalesced send returned `-EAGAIN`.
-@@ -2868,6 +2930,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -1988,11 +2059,15 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         }
+ 
+         if result < 0 {
+-            self.release_coalesced(slab_idx);
++            let error = io::Error::from_raw_os_error(-result);
++            let bounded_send_id = self.release_coalesced(slab_idx);
+             self.driver.drain_conn_send_queue(conn_index);
+             self.driver.note_send_finalized(conn_index);
+-            self.executor
+-                .wake_send(conn_index, Err(io::Error::from_raw_os_error(-result)));
++            if let Some(id) = bounded_send_id {
++                self.executor.complete_bounded_send(id, Err(error));
++            } else {
++                self.executor.wake_send(conn_index, Err(error));
++            }
+             return;
+         }
+ 
+@@ -2868,6 +2943,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              }
          }
  
@@ -717,7 +780,7 @@ index f7d2f3f..b461229 100644
          self.driver.send_copy_pool.release(pool_slot);
  
          // Intermediate TLS chunks are serialized through the per-connection
-@@ -2884,6 +2947,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -2884,6 +2960,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
          // and close.
          if result < 0 {
              self.driver.drain_conn_send_queue(conn_index);
@@ -730,12 +793,12 @@ index f7d2f3f..b461229 100644
              self.driver.close_connection(conn_index);
          }
      }
-@@ -3526,16 +3595,31 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -3526,16 +3608,29 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              if self.driver.connections.get(conn_index).is_none()
                  || self.driver.connections.generation(conn_index) != generation
              {
-+                let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
-                 self.release_coalesced(slab_idx);
+-                self.release_coalesced(slab_idx);
++                let bounded_send_id = self.release_coalesced(slab_idx);
 +                if let Some(id) = bounded_send_id {
 +                    self.executor.complete_bounded_send(
 +                        id,
@@ -750,8 +813,8 @@ index f7d2f3f..b461229 100644
              if retries >= 2 {
                  // Give up: fail the waiter and close so the connection isn't
                  // left open with a hole in its byte stream.
-+                let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
-                 self.release_coalesced(slab_idx);
+-                self.release_coalesced(slab_idx);
++                let bounded_send_id = self.release_coalesced(slab_idx);
                  self.driver.drain_conn_send_queue(conn_index);
                  let err = io::Error::other("max retries during coalesced send resubmit");
 -                self.executor.wake_send(conn_index, Err(err));
@@ -763,7 +826,7 @@ index f7d2f3f..b461229 100644
                  self.driver.close_connection(conn_index);
                  continue;
              }
-@@ -3626,16 +3710,31 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -3626,16 +3721,31 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              if self.driver.connections.get(conn_index).is_none()
                  || self.driver.connections.generation(conn_index) != generation
              {
@@ -796,7 +859,7 @@ index f7d2f3f..b461229 100644
                  self.driver.close_connection(conn_index);
                  continue;
              }
-@@ -3707,12 +3806,17 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -3707,12 +3817,17 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
                  self.driver.send_pollout_retry_scratch[idx];
              if retry >= 3 {
                  // Max retries exceeded — release pool + drain queue + close.
@@ -815,7 +878,7 @@ index f7d2f3f..b461229 100644
                  self.driver.close_connection(conn_index);
                  continue;
              }
-@@ -3729,9 +3833,19 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+@@ -3729,9 +3844,19 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
              if self.driver.connections.get(conn_index).is_none()
                  || self.driver.connections.generation(conn_index) != generation
              {
@@ -835,6 +898,62 @@ index f7d2f3f..b461229 100644
                  continue;
              }
              if self
+@@ -3951,6 +4076,55 @@ mod tests {
+         conn_index
+     }
+ 
++    #[test]
++    fn coalesced_pollout_error_releases_resources_and_completes_bounded_operation() {
++        let mut executor = Executor::new(4, 4, 4, 0, 0);
++        let mut registration = executor.enqueue_send_capacity(1, 7, 1);
++        let operation_id = registration.id();
++        registration.admit();
++
++        let mut pool = crate::buffer::send_copy::SendCopyPool::new(2, 8);
++        let (first_slot, first_ptr, first_len) = pool.copy_in(b"first").unwrap();
++        let (second_slot, second_ptr, second_len) = pool.copy_in(b"second").unwrap();
++        pool.set_bounded_send_id(first_slot, Some(operation_id));
++        pool.set_bounded_send_id(second_slot, Some(operation_id));
++        let iovecs = [
++            libc::iovec {
++                iov_base: first_ptr.cast_mut().cast(),
++                iov_len: first_len as usize,
++            },
++            libc::iovec {
++                iov_base: second_ptr.cast_mut().cast(),
++                iov_len: second_len as usize,
++            },
++        ];
++        let mut slab = crate::buffer::send_slab::InFlightSendSlab::new(1);
++        let (slab_idx, _) = slab
++            .allocate_coalesced(
++                1,
++                &iovecs,
++                &[first_slot, second_slot],
++                first_len + second_len,
++                true,
++            )
++            .expect("coalesced slab has capacity");
++
++        let retained_id = release_coalesced_resources(&mut slab, &mut pool, slab_idx);
++        assert_eq!(retained_id, Some(operation_id));
++        assert_eq!(pool.free_count(), 2);
++        assert!(!slab.in_use(slab_idx));
++
++        executor.complete_bounded_send(
++            retained_id.expect("bounded identity survived resource cleanup"),
++            Err(io::Error::from_raw_os_error(libc::EPIPE)),
++        );
++        let error = registration
++            .take_result()
++            .expect("bounded operation remained submitted")
++            .expect_err("negative POLLOUT completion reported success");
++        assert_eq!(error.raw_os_error(), Some(libc::EPIPE));
++    }
++
+     // ── Send path tests ────────────────────────────────────────────
+ 
+     #[test]
 diff --git a/src/backend/uring/ring.rs b/src/backend/uring/ring.rs
 index 57e7c7f..ee1a1b0 100644
 --- a/src/backend/uring/ring.rs
@@ -1287,7 +1406,7 @@ index 446f60e..67f4545 100644
  #[cfg(has_io_uring)]
  pub use runtime::io::WithSegmentsFuture;
 diff --git a/src/runtime/io.rs b/src/runtime/io.rs
-index e9000a4..c897fa5 100644
+index e9000a4..43d3afc 100644
 --- a/src/runtime/io.rs
 +++ b/src/runtime/io.rs
 @@ -806,6 +806,17 @@ impl ConnCtx {
@@ -1400,7 +1519,7 @@ index e9000a4..c897fa5 100644
  // ── WithBytesFuture ──────────────────────────────────────────────────
  
  /// Future returned by [`ConnCtx::with_bytes`].
-@@ -3169,6 +3245,114 @@ impl Future for RecvReadyFuture {
+@@ -3169,6 +3245,116 @@ impl Future for RecvReadyFuture {
  
  // ── SendFuture ───────────────────────────────────────────────────────
  
@@ -1423,18 +1542,20 @@ index e9000a4..c897fa5 100644
 +
 +    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
 +        let this = self.get_mut();
++        let task_id = CURRENT_TASK_ID.with(|current| current.get());
 +        if this.registration.is_none() {
-+            let task_id = CURRENT_TASK_ID.with(|current| current.get());
 +            this.registration = Some(with_state(|_driver, executor| {
 +                executor.enqueue_send_capacity(this.conn_index, this.generation, task_id)
 +            }));
 +        }
-+        if let Some(result) = this
++        let registration = this
 +            .registration
 +            .as_mut()
-+            .expect("registered on first poll")
-+            .take_result()
-+        {
++            .expect("registered on first poll");
++        // This !Send future can move only between tasks on the same worker.
++        // Refresh before observing state so every later wake targets this poller.
++        registration.refresh_owner(task_id);
++        if let Some(result) = registration.take_result() {
 +            return Poll::Ready(result);
 +        }
 +        with_state(|driver, executor| {
@@ -1516,7 +1637,7 @@ index e9000a4..c897fa5 100644
  /// by [`ConnCtx::send`] — this future only waits for the CQE result.
  /// No data stored in the future. No allocation.
 diff --git a/src/runtime/mod.rs b/src/runtime/mod.rs
-index 2dc8f51..5d685da 100644
+index 2dc8f51..cdc1c4b 100644
 --- a/src/runtime/mod.rs
 +++ b/src/runtime/mod.rs
 @@ -28,9 +28,10 @@ pub(crate) mod stream;
@@ -1531,7 +1652,7 @@ index 2dc8f51..5d685da 100644
  
  use self::task::{StandaloneTaskSlab, TaskSlab};
  use self::waker::drain_ready_queue;
-@@ -409,6 +410,247 @@ impl TimerSlotPool {
+@@ -409,6 +410,256 @@ impl TimerSlotPool {
      }
  }
  
@@ -1540,14 +1661,13 @@ index 2dc8f51..5d685da 100644
 +    pub(crate) id: u64,
 +    pub(crate) conn_index: u32,
 +    pub(crate) generation: u32,
-+    pub(crate) task_id: u32,
 +}
 +
 +#[derive(Default)]
 +struct SendCapacityQueue {
 +    waiters: VecDeque<SendCapacityWaiter>,
 +    operations: HashMap<u64, BoundedSendOperation>,
-+    pending_wakes: VecDeque<u32>,
++    pending_wakes: VecDeque<u64>,
 +    next_id: u64,
 +}
 +
@@ -1582,7 +1702,6 @@ index 2dc8f51..5d685da 100644
 +            id,
 +            conn_index,
 +            generation,
-+            task_id,
 +        });
 +        state.operations.insert(
 +            id,
@@ -1600,13 +1719,19 @@ index 2dc8f51..5d685da 100644
 +        }
 +    }
 +
++    fn refresh_owner(&mut self, id: u64, task_id: u32) {
++        if let Some(operation) = self.operations.get_mut(&id) {
++            operation.task_id = task_id;
++        }
++    }
++
 +    fn cancel(&mut self, id: u64) {
 +        let was_head = self.waiters.front().is_some_and(|waiter| waiter.id == id);
 +        if let Some(position) = self.waiters.iter().position(|waiter| waiter.id == id) {
 +            self.waiters.remove(position);
 +        }
 +        if was_head && let Some(next) = self.waiters.front() {
-+            self.pending_wakes.push_back(next.task_id);
++            self.pending_wakes.push_back(next.id);
 +        }
 +    }
 +
@@ -1642,7 +1767,7 @@ index 2dc8f51..5d685da 100644
 +        match operation.status {
 +            BoundedSendStatus::Submitted => {
 +                operation.status = BoundedSendStatus::Completed(result);
-+                self.pending_wakes.push_back(operation.task_id);
++                self.pending_wakes.push_back(id);
 +            }
 +            BoundedSendStatus::Abandoned => {
 +                self.operations.remove(&id);
@@ -1686,7 +1811,7 @@ index 2dc8f51..5d685da 100644
 +                        stdio::ErrorKind::ConnectionAborted,
 +                        "connection closed before bounded send completed",
 +                    )));
-+                    self.pending_wakes.push_back(operation.task_id);
++                    self.pending_wakes.push_back(id);
 +                }
 +                BoundedSendStatus::Abandoned => {
 +                    self.operations.remove(&id);
@@ -1695,7 +1820,7 @@ index 2dc8f51..5d685da 100644
 +            }
 +        }
 +        if removed_head && let Some(next) = self.waiters.front() {
-+            self.pending_wakes.push_back(next.task_id);
++            self.pending_wakes.push_back(next.id);
 +        }
 +    }
 +
@@ -1719,19 +1844,19 @@ index 2dc8f51..5d685da 100644
 +                    stdio::ErrorKind::BrokenPipe,
 +                    "connection write side shut down before bounded send admission",
 +                )));
-+                self.pending_wakes.push_back(operation.task_id);
++                self.pending_wakes.push_back(id);
 +            }
 +        }
 +        if old_head != self.waiters.front().map(|waiter| waiter.id)
 +            && let Some(next) = self.waiters.front()
 +        {
-+            self.pending_wakes.push_back(next.task_id);
++            self.pending_wakes.push_back(next.id);
 +        }
 +    }
 +
 +    fn wake_head(&mut self) {
 +        if let Some(waiter) = self.waiters.front() {
-+            self.pending_wakes.push_back(waiter.task_id);
++            self.pending_wakes.push_back(waiter.id);
 +        }
 +    }
 +}
@@ -1745,6 +1870,11 @@ index 2dc8f51..5d685da 100644
 +impl SendCapacityRegistration {
 +    pub(crate) fn id(&self) -> u64 {
 +        self.id
++    }
++
++    pub(crate) fn refresh_owner(&mut self, task_id: u32) {
++        // Rc keeps this registration on one worker while local tasks may own it.
++        self.queue.borrow_mut().refresh_owner(self.id, task_id);
 +    }
 +
 +    pub(crate) fn admit(&mut self) {
@@ -1779,7 +1909,7 @@ index 2dc8f51..5d685da 100644
  /// Per-worker async executor. Owns the task slab and coordinates
  /// CQE-driven wakeups with future polling.
  pub(crate) struct Executor {
-@@ -430,8 +672,12 @@ pub(crate) struct Executor {
+@@ -430,8 +681,12 @@ pub(crate) struct Executor {
      waker_drain_scratch: VecDeque<u32>,
      /// Per-connection: task is awaiting recv data.
      pub(crate) recv_waiters: Vec<bool>,
@@ -1792,7 +1922,7 @@ index 2dc8f51..5d685da 100644
      /// Per-connection: task is awaiting connect result.
      pub(crate) connect_waiters: Vec<bool>,
      /// Per-connection: CQE result storage for send/connect.
-@@ -529,7 +775,13 @@ impl Executor {
+@@ -529,7 +784,13 @@ impl Executor {
              woken_while_polling: false,
              waker_drain_scratch: VecDeque::with_capacity(64),
              recv_waiters: vec![false; cap],
@@ -1806,7 +1936,7 @@ index 2dc8f51..5d685da 100644
              connect_waiters: vec![false; cap],
              io_results: {
                  let mut v = Vec::with_capacity(cap);
-@@ -582,6 +834,19 @@ impl Executor {
+@@ -582,6 +843,22 @@ impl Executor {
          while let Some(id) = self.waker_drain_scratch.pop_front() {
              let _ = self.wake_task(id);
          }
@@ -1814,19 +1944,22 @@ index 2dc8f51..5d685da 100644
 +    }
 +
 +    fn drain_send_capacity_wakes(&mut self) {
-+        let wakes: Vec<u32> = self
-+            .send_capacity
-+            .borrow_mut()
-+            .pending_wakes
-+            .drain(..)
-+            .collect();
++        // Resolve operation IDs only at drain time so an owner refresh also
++        // retargets a wake that was queued before the future moved locally.
++        let wakes: Vec<u32> = {
++            let mut state = self.send_capacity.borrow_mut();
++            let ids: Vec<u64> = state.pending_wakes.drain(..).collect();
++            ids.into_iter()
++                .filter_map(|id| state.operations.get(&id).map(|operation| operation.task_id))
++                .collect()
++        };
 +        for task_id in wakes {
 +            let _ = self.wake_task(task_id);
 +        }
      }
  
      /// Reset all per-connection state for a connection that was closed.
-@@ -593,6 +858,10 @@ impl Executor {
+@@ -593,6 +870,10 @@ impl Executor {
              self.recv_sinks[idx] = None;
          }
          self.task_slab.remove(conn_index);
@@ -1837,7 +1970,7 @@ index 2dc8f51..5d685da 100644
          if idx < self.recv_waiters.len() {
              // If a *standalone* task was awaiting recv/send/connect on this
              // connection, it isn't removed by `task_slab.remove`. Push it
-@@ -647,6 +916,32 @@ impl Executor {
+@@ -647,6 +928,32 @@ impl Executor {
          false
      }
  
@@ -1870,7 +2003,7 @@ index 2dc8f51..5d685da 100644
      /// Wake a task that was waiting for recv data.
      ///
      /// Resolves through `owner_task` so that outbound connections correctly
-@@ -660,6 +955,47 @@ impl Executor {
+@@ -660,6 +967,47 @@ impl Executor {
          }
      }
  
@@ -1918,7 +2051,7 @@ index 2dc8f51..5d685da 100644
      /// Wake a task that was waiting for send completion.
      pub(crate) fn wake_send(&mut self, conn_index: u32, result: stdio::Result<u32>) {
          let idx = conn_index as usize;
-@@ -786,6 +1122,98 @@ impl Executor {
+@@ -786,6 +1134,132 @@ impl Executor {
  mod tests {
      use super::*;
  
@@ -1950,6 +2083,40 @@ index 2dc8f51..5d685da 100644
 +        exec.collect_wakeups();
 +        assert!(exec.send_capacity_turn(second.id()));
 +        assert!(exec.task_slab.take_ready(2).is_some());
++    }
++
++    #[test]
++    fn queued_capacity_wake_follows_refreshed_task_owner() {
++        let mut exec = Executor::new(8, 8, 8, 0, 0);
++        exec.task_slab
++            .spawn(1, Box::pin(std::future::pending::<()>()));
++        let old_future = exec.task_slab.take_ready(1).unwrap();
++        exec.task_slab.park(1, old_future);
++
++        let new_index = exec
++            .standalone_slab
++            .spawn(Box::pin(std::future::pending::<()>()))
++            .expect("standalone slab has capacity");
++        let new_future = exec
++            .standalone_slab
++            .take_ready(new_index)
++            .expect("new task starts ready");
++        exec.standalone_slab.park(new_index, new_future);
++        let new_task = new_index | waker::STANDALONE_BIT;
++
++        let mut registration = exec.enqueue_send_capacity(1, 7, 1);
++        exec.send_capacity.borrow_mut().wake_head();
++        registration.refresh_owner(new_task);
++        exec.drain_send_capacity_wakes();
++
++        assert!(
++            exec.task_slab.take_ready(1).is_none(),
++            "a wake queued before the move targeted the stale task owner"
++        );
++        assert!(
++            exec.standalone_slab.take_ready(new_index).is_some(),
++            "the most recent polling task did not receive the capacity wake"
++        );
 +    }
 +
 +    #[test]
@@ -2677,10 +2844,10 @@ index 90d02b1..f34a838 100644
 +    }
 +}
 diff --git a/tests/echo.rs b/tests/echo.rs
-index b49811f..3c98f02 100644
+index b49811f..f7c2b3d 100644
 --- a/tests/echo.rs
 +++ b/tests/echo.rs
-@@ -2714,6 +2714,328 @@ fn async_join_basic() {
+@@ -2714,6 +2714,406 @@ fn async_join_basic() {
      }
  }
  
@@ -2867,6 +3034,84 @@ index b49811f..3c98f02 100644
 +    }
 +}
 +
++/// Moving a bounded-send future after its first poll transfers responsibility
++/// for every later capacity/completion wake to the task that most recently
++/// polled it on this worker.
++static REPOLLED_MOVED_SEND_COMPLETED: AtomicU32 = AtomicU32::new(0);
++
++struct BackpressuredRepollMovedFutureHandler;
++
++impl AsyncEventHandler for BackpressuredRepollMovedFutureHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            if conn
++                .with_data(|data| ParseResult::Consumed(data.len()))
++                .await
++                == 0
++            {
++                return;
++            }
++
++            let mut moved = Box::pin(conn.send_backpressured(b"MOVED---"));
++            std::future::poll_fn(|cx| {
++                assert!(moved.as_mut().poll(cx).is_pending());
++                std::task::Poll::Ready(())
++            })
++            .await;
++
++            let moved = ringline::spawn_with_handle(moved).expect("standalone spawn failed");
++            assert_eq!(moved.await.expect("moved send failed"), 8);
++            REPOLLED_MOVED_SEND_COMPLETED.store(1, Ordering::Release);
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        BackpressuredRepollMovedFutureHandler
++    }
++}
++
++#[test]
++fn backpressured_send_refreshes_owner_after_first_poll_move() {
++    REPOLLED_MOVED_SEND_COMPLETED.store(0, Ordering::Release);
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let config = test_config_builder()
++        .send_pool(1, 8)
++        .build()
++        .expect("valid config");
++    let (shutdown, handles) = RinglineBuilder::new(config)
++        .bind(addr.parse().unwrap())
++        .launch::<BackpressuredRepollMovedFutureHandler>()
++        .expect("launch failed");
++    wait_for_server(&addr);
++
++    let mut stream = TcpStream::connect(&addr).unwrap();
++    stream
++        .set_read_timeout(Some(Duration::from_secs(2)))
++        .unwrap();
++    stream.write_all(b"go").unwrap();
++    let mut received = [0; 8];
++    stream.read_exact(&mut received).unwrap();
++    assert_eq!(&received, b"MOVED---");
++
++    let deadline = std::time::Instant::now() + Duration::from_secs(2);
++    while REPOLLED_MOVED_SEND_COMPLETED.load(Ordering::Acquire) == 0
++        && std::time::Instant::now() < deadline
++    {
++        std::thread::sleep(Duration::from_millis(10));
++    }
++    assert_eq!(
++        REPOLLED_MOVED_SEND_COMPLETED.load(Ordering::Acquire),
++        1,
++        "completion woke the task that polled the future before it moved"
++    );
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}
++
 +/// A completion belongs to the logical send that submitted it even if that
 +/// future is canceled. It must not resolve a newer future on the connection.
 +static CANCELED_SUBMISSION_RESULT: AtomicU32 = AtomicU32::new(0);
@@ -3009,7 +3254,7 @@ index b49811f..3c98f02 100644
  /// Handler that joins three futures: send_await + sleep + with_data.
  struct Join3Handler;
  
-@@ -5261,3 +5583,244 @@ fn connection_task_panic_does_not_kill_worker() {
+@@ -5261,3 +5661,244 @@ fn connection_task_panic_does_not_kill_worker() {
          let _ = h.join();
      }
  }

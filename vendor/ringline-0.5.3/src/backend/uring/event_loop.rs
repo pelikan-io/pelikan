@@ -25,6 +25,30 @@ pub(crate) struct AsyncEventLoop<A: AsyncEventHandler> {
     executor: Executor,
 }
 
+/// Capture the bounded logical-send identity before releasing a coalesced
+/// send's slab and copy-pool state. Slot release clears that identity.
+fn release_coalesced_resources(
+    send_slab: &mut crate::buffer::send_slab::InFlightSendSlab,
+    send_copy_pool: &mut crate::buffer::send_copy::SendCopyPool,
+    slab_idx: u16,
+) -> Option<u64> {
+    let bounded_send_id = send_slab
+        .coalesced_pool_slots(slab_idx)
+        .iter()
+        .find_map(|slot| send_copy_pool.bounded_send_id(*slot));
+    let mut slots = [u16::MAX; crate::buffer::send_slab::MAX_IOVECS];
+    let mut n = 0;
+    for &slot in send_slab.coalesced_pool_slots(slab_idx) {
+        slots[n] = slot;
+        n += 1;
+    }
+    for &slot in &slots[..n] {
+        send_copy_pool.release(slot);
+    }
+    send_slab.release(slab_idx);
+    bounded_send_id
+}
+
 impl<A: AsyncEventHandler> AsyncEventLoop<A> {
     /// Create a new async event loop for a worker thread.
     #[allow(clippy::too_many_arguments)]
@@ -1924,26 +1948,13 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         }
     }
 
-    /// Release the backing pool slots of a coalesced send, then the slab entry.
-    fn release_coalesced(&mut self, slab_idx: u16) {
-        let mut slots = [u16::MAX; crate::buffer::send_slab::MAX_IOVECS];
-        let mut n = 0;
-        for &s in self.driver.send_slab.coalesced_pool_slots(slab_idx) {
-            slots[n] = s;
-            n += 1;
-        }
-        for &s in &slots[..n] {
-            self.driver.send_copy_pool.release(s);
-        }
-        self.driver.send_slab.release(slab_idx);
-    }
-
-    fn coalesced_bounded_send_id(&self, slab_idx: u16) -> Option<u64> {
-        self.driver
-            .send_slab
-            .coalesced_pool_slots(slab_idx)
-            .iter()
-            .find_map(|slot| self.driver.send_copy_pool.bounded_send_id(*slot))
+    /// Release coalesced resources while retaining bounded-send identity.
+    fn release_coalesced(&mut self, slab_idx: u16) -> Option<u64> {
+        release_coalesced_resources(
+            &mut self.driver.send_slab,
+            &mut self.driver.send_copy_pool,
+            slab_idx,
+        )
     }
 
     /// Handle completion of a coalesced plaintext `sendmsg` (OpTag::SendMsgCoalesced).
@@ -1978,9 +1989,8 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             let total = self.driver.send_slab.total_len(slab_idx);
             // Read the end-of-send flag before releasing the slab entry.
             let end_of_send = self.driver.send_slab.is_end_of_send(slab_idx);
-            let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
             metrics::BYTES.add(metrics::bytes::SENT, total as u64);
-            self.release_coalesced(slab_idx);
+            let bounded_send_id = self.release_coalesced(slab_idx);
 
             // Accumulate these chunks' bytes against the logical send, and wake
             // the waiter once, when the entry carrying the send's final chunk
@@ -2021,8 +2031,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         }
 
         // Real error — release everything and drain the connection's queue.
-        let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
-        self.release_coalesced(slab_idx);
+        let bounded_send_id = self.release_coalesced(slab_idx);
         self.driver.drain_conn_send_queue(conn_index);
         self.driver.note_send_finalized(conn_index);
         let io_result = if result == 0 {
@@ -2050,11 +2059,15 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         }
 
         if result < 0 {
-            self.release_coalesced(slab_idx);
+            let error = io::Error::from_raw_os_error(-result);
+            let bounded_send_id = self.release_coalesced(slab_idx);
             self.driver.drain_conn_send_queue(conn_index);
             self.driver.note_send_finalized(conn_index);
-            self.executor
-                .wake_send(conn_index, Err(io::Error::from_raw_os_error(-result)));
+            if let Some(id) = bounded_send_id {
+                self.executor.complete_bounded_send(id, Err(error));
+            } else {
+                self.executor.wake_send(conn_index, Err(error));
+            }
             return;
         }
 
@@ -3595,8 +3608,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             if self.driver.connections.get(conn_index).is_none()
                 || self.driver.connections.generation(conn_index) != generation
             {
-                let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
-                self.release_coalesced(slab_idx);
+                let bounded_send_id = self.release_coalesced(slab_idx);
                 if let Some(id) = bounded_send_id {
                     self.executor.complete_bounded_send(
                         id,
@@ -3611,8 +3623,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             if retries >= 2 {
                 // Give up: fail the waiter and close so the connection isn't
                 // left open with a hole in its byte stream.
-                let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
-                self.release_coalesced(slab_idx);
+                let bounded_send_id = self.release_coalesced(slab_idx);
                 self.driver.drain_conn_send_queue(conn_index);
                 let err = io::Error::other("max retries during coalesced send resubmit");
                 if let Some(id) = bounded_send_id {
@@ -4063,6 +4074,55 @@ mod tests {
             cs.established = true;
         }
         conn_index
+    }
+
+    #[test]
+    fn coalesced_pollout_error_releases_resources_and_completes_bounded_operation() {
+        let mut executor = Executor::new(4, 4, 4, 0, 0);
+        let mut registration = executor.enqueue_send_capacity(1, 7, 1);
+        let operation_id = registration.id();
+        registration.admit();
+
+        let mut pool = crate::buffer::send_copy::SendCopyPool::new(2, 8);
+        let (first_slot, first_ptr, first_len) = pool.copy_in(b"first").unwrap();
+        let (second_slot, second_ptr, second_len) = pool.copy_in(b"second").unwrap();
+        pool.set_bounded_send_id(first_slot, Some(operation_id));
+        pool.set_bounded_send_id(second_slot, Some(operation_id));
+        let iovecs = [
+            libc::iovec {
+                iov_base: first_ptr.cast_mut().cast(),
+                iov_len: first_len as usize,
+            },
+            libc::iovec {
+                iov_base: second_ptr.cast_mut().cast(),
+                iov_len: second_len as usize,
+            },
+        ];
+        let mut slab = crate::buffer::send_slab::InFlightSendSlab::new(1);
+        let (slab_idx, _) = slab
+            .allocate_coalesced(
+                1,
+                &iovecs,
+                &[first_slot, second_slot],
+                first_len + second_len,
+                true,
+            )
+            .expect("coalesced slab has capacity");
+
+        let retained_id = release_coalesced_resources(&mut slab, &mut pool, slab_idx);
+        assert_eq!(retained_id, Some(operation_id));
+        assert_eq!(pool.free_count(), 2);
+        assert!(!slab.in_use(slab_idx));
+
+        executor.complete_bounded_send(
+            retained_id.expect("bounded identity survived resource cleanup"),
+            Err(io::Error::from_raw_os_error(libc::EPIPE)),
+        );
+        let error = registration
+            .take_result()
+            .expect("bounded operation remained submitted")
+            .expect_err("negative POLLOUT completion reported success");
+        assert_eq!(error.raw_os_error(), Some(libc::EPIPE));
     }
 
     // ── Send path tests ────────────────────────────────────────────
