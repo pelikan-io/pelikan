@@ -35,7 +35,7 @@ fn io_backend() -> String {
 }
 
 // definitions
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Server {
     #[serde(default = "host")]
     host: String,

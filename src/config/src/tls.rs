@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 // definitions
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Tls {
     #[serde(default)]
     certificate_chain: Option<String>,

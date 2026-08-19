@@ -119,7 +119,9 @@ mod workers;
 use listener::ListenerBuilder;
 use workers::WorkersBuilder;
 
-pub use process::{Process, ProcessBuilder};
+#[cfg(target_os = "linux")]
+pub use process::RinglineProcessBuilder;
+pub use process::{MioProcessBuilder, Process, ProcessBuilder};
 
 // TODO(bmartin): this *should* be plenty safe, the queue should rarely ever be
 // full, and a single wakeup should drain at least one message and make room for

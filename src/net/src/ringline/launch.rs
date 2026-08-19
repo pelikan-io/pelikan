@@ -1,6 +1,6 @@
 use std::any::Any;
 use std::io;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 type WorkerBootstrapSlots = Vec<Option<Box<dyn Any + Send>>>;
 
@@ -67,9 +67,24 @@ use super::RinglineRuntimeConfig;
 type WorkerJoin = JoinHandle<Result<(), ::ringline::Error>>;
 
 /// Handle to a running Ringline runtime and its worker threads.
+#[derive(Clone)]
+pub struct RinglineShutdown {
+    shutdown: Arc<::ringline::ShutdownHandle>,
+}
+
 pub struct RinglineRuntime {
-    shutdown: ::ringline::ShutdownHandle,
+    shutdown: Arc<::ringline::ShutdownHandle>,
     workers: Vec<WorkerJoin>,
+}
+
+impl RinglineShutdown {
+    pub fn shutdown(&self) {
+        self.shutdown.shutdown();
+    }
+
+    pub fn worker_wake_handle(&self, worker_id: usize) -> Option<::ringline::WakeHandle> {
+        self.shutdown.worker_wake_handle(worker_id)
+    }
 }
 
 impl RinglineRuntime {
@@ -88,10 +103,27 @@ impl RinglineRuntime {
         self.shutdown.worker_wake_handle(worker_id)
     }
 
+    /// Starts a monitor that joins workers and shuts the listener on exit.
+    pub fn monitor(self) -> (RinglineShutdown, JoinHandle<io::Result<()>>) {
+        let Self { shutdown, workers } = self;
+        let control = RinglineShutdown {
+            shutdown: Arc::clone(&shutdown),
+        };
+        let monitor = std::thread::Builder::new()
+            .name("pelikan_ringline_monitor".to_string())
+            .spawn(move || {
+                let result = join_workers(workers);
+                shutdown.shutdown();
+                result
+            })
+            .expect("failed to spawn Ringline monitor");
+        (control, monitor)
+    }
+
     /// Shuts down and joins every Ringline worker.
     pub fn join(self) -> io::Result<()> {
         let Self { shutdown, workers } = self;
-        drop(shutdown);
+        shutdown.shutdown();
         join_workers(workers)
     }
 }
@@ -135,25 +167,41 @@ pub fn launch<A: ::ringline::AsyncEventHandler>(
     config: RinglineRuntimeConfig,
     handlers: Vec<A>,
 ) -> Result<RinglineRuntime, ::ringline::Error> {
-    if handlers.len() != config.workers {
+    launch_with_bootstraps::<A, A>(addr, config, handlers)
+}
+
+/// Starts Ringline workers with distinct per-worker bootstrap values.
+pub fn launch_with_bootstraps<A, B>(
+    addr: SocketAddr,
+    config: RinglineRuntimeConfig,
+    bootstraps: Vec<B>,
+) -> Result<RinglineRuntime, ::ringline::Error>
+where
+    A: ::ringline::AsyncEventHandler,
+    B: Send + 'static,
+{
+    if bootstraps.len() != config.workers {
         return Err(::ringline::Error::Io(io::Error::new(
             io::ErrorKind::InvalidInput,
             format!(
-                "Ringline handler count {} does not match worker count {}",
-                handlers.len(),
+                "Ringline bootstrap count {} does not match worker count {}",
+                bootstraps.len(),
                 config.workers
             ),
         )));
     }
 
-    let slots = HandlerSlots::install(handlers)?;
+    let slots = HandlerSlots::install(bootstraps)?;
     let config = config.build()?;
     let (shutdown, workers) = ::ringline::RinglineBuilder::new(config)
         .bind(addr)
         .launch::<A>()?;
     drop(slots);
 
-    Ok(RinglineRuntime { shutdown, workers })
+    Ok(RinglineRuntime {
+        shutdown: Arc::new(shutdown),
+        workers,
+    })
 }
 
 #[cfg(test)]
@@ -270,6 +318,50 @@ mod tests {
 
         let guard = HandlerSlots::install(vec![7_u8]).unwrap();
         drop(guard);
+    }
+
+    struct BootstrapHandler;
+
+    impl ::ringline::AsyncEventHandler for BootstrapHandler {
+        #[allow(clippy::manual_async_fn)]
+        fn on_accept(
+            &self,
+            _conn: ::ringline::ConnCtx,
+        ) -> impl std::future::Future<Output = ()> + 'static {
+            async {}
+        }
+
+        fn create_for_worker(worker_id: usize) -> Self {
+            assert_eq!(
+                take_worker_bootstrap::<String>(worker_id),
+                "worker bootstrap"
+            );
+            Self
+        }
+    }
+
+    #[test]
+    fn launch_with_bootstraps_separates_handler_from_worker_state() {
+        let _test_guard = TEST_LOCK.lock().unwrap();
+        let guard = HandlerSlots::install(vec!["worker bootstrap".to_string()]).unwrap();
+
+        let _handler = <BootstrapHandler as ::ringline::AsyncEventHandler>::create_for_worker(0);
+
+        drop(guard);
+    }
+
+    #[test]
+    fn launch_with_bootstraps_rejects_bootstrap_count_mismatch() {
+        let _test_guard = TEST_LOCK.lock().unwrap();
+        let result = launch_with_bootstraps::<BootstrapHandler, String>(
+            "127.0.0.1:0".parse().unwrap(),
+            runtime_config(1, 128),
+            vec![],
+        );
+
+        assert!(
+            matches!(result, Err(::ringline::Error::Io(error)) if error.kind() == io::ErrorKind::InvalidInput)
+        );
     }
 
     #[test]

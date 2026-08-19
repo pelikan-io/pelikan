@@ -3,7 +3,9 @@ mod launch;
 
 pub use ::ringline::{AsyncEventHandler, ConnCtx, DriverCtx, Error, ParseResult, WakeHandle};
 pub use completion::{Completion, CompletionCanceled, CompletionId, CompletionTable};
-pub use launch::{launch, take_worker_bootstrap, RinglineRuntime};
+pub use launch::{
+    launch, launch_with_bootstraps, take_worker_bootstrap, RinglineRuntime, RinglineShutdown,
+};
 
 /// Settings for a Ringline cache-server runtime.
 #[derive(Clone, Copy, Debug)]
