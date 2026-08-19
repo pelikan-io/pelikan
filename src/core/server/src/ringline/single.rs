@@ -13,24 +13,24 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 static FLUSH_REQUESTED: AtomicBool = AtomicBool::new(false);
 
-fn record_receive(observed: usize, buffered: &mut usize) {
+pub(super) fn record_receive(observed: usize, buffered: &mut usize) {
     SESSION_RECV.increment();
     SESSION_RECV_BYTE.add(observed.saturating_sub(*buffered) as u64);
     *buffered = observed;
 }
 
-fn record_transport_receive_error() {
+pub(super) fn record_transport_receive_error() {
     // Mio Session::fill counts every read attempt, then counts only a
     // non-WouldBlock transport failure as a receive exception.
     SESSION_RECV.increment();
     SESSION_RECV_EX.increment();
 }
 
-fn record_send() {
+pub(super) fn record_send() {
     SESSION_SEND.increment();
 }
 
-fn record_send_bytes(bytes: usize) {
+pub(super) fn record_send_bytes(bytes: usize) {
     SESSION_SEND_BYTE.add(bytes as u64);
 }
 
