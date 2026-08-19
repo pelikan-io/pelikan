@@ -4,11 +4,9 @@ extern crate logger;
 use backtrace::Backtrace;
 use clap::{Arg, Command};
 use config::PingserverConfig;
-use entrystore::Noop;
-use logger::configure_logging;
 use metriken::*;
-use protocol_ping::{PingProtocol, Request, Response};
-use server::{ProcessBuilder, PERCENTILES};
+use pelikan_pingserver::Pingserver;
+use server::PERCENTILES;
 
 fn main() {
     // custom panic hook to terminate whole process after unwinding
@@ -92,25 +90,7 @@ fn main() {
         Default::default()
     };
 
-    // initialize logging
-    let log = configure_logging(&config);
-
-    // initialize metrics
-    common::metrics::init();
-
-    // initialize storage
-    let storage = Noop::new();
-
-    // initialize parser
-    let protocol = PingProtocol::default();
-
-    // initialize process
-    let process_builder = ProcessBuilder::<PingProtocol, Request, Response, Noop>::new(
-        &config, log, protocol, storage,
-    )
-    .expect("failed to initialize process");
-
-    // spawn threads and wait
-    let process = process_builder.spawn();
-    process.wait();
+    Pingserver::new(config)
+        .expect("failed to initialize process")
+        .wait();
 }

@@ -38,11 +38,13 @@ jobs:
           cargo test -p pelikan-net --features ringline-force-mio
           cargo test -p pelikan-net --features ringline
           cargo test -p server --features ringline
+          cargo test -p pelikan-pingserver --test integration --features ringline
           cargo test -p pelikan-rds --test integration --features ringline
           cargo test -p pelikan-rds --test integration_multi --features ringline
           cargo test -p pelikan-segcache --test integration --features ringline
           cargo test -p pelikan-segcache --test integration_multi --features ringline
           cargo test -p server --features ringline-force-mio
+          cargo test -p pelikan-pingserver --test integration --features ringline-force-mio
           cargo test -p pelikan-rds --test integration --features ringline-force-mio
           cargo test -p pelikan-rds --test integration_multi --features ringline-force-mio
           cargo test -p pelikan-segcache --test integration --features ringline-force-mio

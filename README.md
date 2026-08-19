@@ -215,7 +215,7 @@ included under the `config` directory.
 
 ### Cache-server I/O backend
 
-The Segcache and RDS plain-TCP data listeners can opt in to Ringline on Linux:
+The Pingserver, Segcache, and RDS plain-TCP data listeners can opt in to Ringline on Linux:
 
 ```toml
 [server]
@@ -224,7 +224,8 @@ io_backend = "ringline" # Linux only; defaults and falls back to "mio"
 
 The binary must also be built with its opt-in Cargo feature, for example
 `cargo build --release -p pelikan-segcache --features ringline` (or the
-equivalent `pelikan-rds` command). Without that feature, Linux builds are
+equivalent `pelikan-rds` or `pelikan-pingserver` command). Without that
+feature, Linux builds are
 Mio-only and do not include the Ringline or Ringline-only slab dependency.
 
 `mio` remains the default on every platform. The Ringline option uses version

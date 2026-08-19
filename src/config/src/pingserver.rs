@@ -133,6 +133,10 @@ impl WorkerConfig for PingserverConfig {
 
 // implementation
 impl PingserverConfig {
+    pub fn admin_mut(&mut self) -> &mut Admin {
+        &mut self.admin
+    }
+
     pub fn load(file: &str) -> Result<PingserverConfig, std::io::Error> {
         let mut file = std::fs::File::open(file)?;
         let mut content = String::new();
