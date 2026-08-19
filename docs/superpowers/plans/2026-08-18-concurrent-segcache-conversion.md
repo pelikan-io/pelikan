@@ -1120,6 +1120,17 @@ git add docs/journal && git commit -m "docs: journal the concurrent segcache con
   the rev as each engine fix merges; run the full pelikan gate against each
   rev. Adversarial re-review of the engine deltas once F1–F3 are all in.
   Iterate further as needed — releases wait until everything is fleshed out.
+- [ ] **F6 — numeric-safe relocation** (from the adversarial re-review of
+  the F1–F3 delta at hardening 33e49bf, which found one CRITICAL residual):
+  merge/s3fifo relocation raw-memcpys numeric items without the version
+  lock — can orphan an in-flight incr (lost ack) and publish a permanently
+  odd-version item that wedges get/incr/cas on that key and cascades into
+  the drain/chain-lock wedge. Fix: relocation becomes a version-lock
+  participant for numeric items (destination written with even version +
+  coherent CRC). Folded in, same class: `cas()` and `try_into_numeric`
+  retry through drains instead of returning false NOT_FOUND. Follow-up
+  (tracked, not fixed): delete racing copy_into aborts the remainder of a
+  segment copy (eviction-legal amplification).
 - [ ] **F5 — release + ship**: when hardening settles: keyvalue 0.3.1 +
   segcache 0.4.2 bump PRs, publish from refreshed clean clone, drop the
   pelikan git pin (swap to published 0.4.2), full gate, then Task E3.
