@@ -103,4 +103,4 @@ opt-level = 0
 # merging, swapping to the published release (see Task F5 of
 # docs/superpowers/plans/2026-08-18-concurrent-segcache-conversion.md).
 [patch.crates-io]
-segcache = { git = "https://github.com/pelikan-io/cache-rs", rev = "241b07d" }
+segcache = { git = "https://github.com/pelikan-io/cache-rs", rev = "666ffbc453c0f550f1c6d890de13a40331cdb0ce" }
