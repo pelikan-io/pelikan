@@ -1,5 +1,5 @@
 use bytes::BytesMut;
-use clocksource::precise::Instant;
+pub use clocksource::precise::Instant as RequestStart;
 use protocol_common::{Compose, Protocol};
 use session::REQUEST_LATENCY;
 use std::collections::VecDeque;
@@ -39,8 +39,8 @@ impl<Request> Parsed<Request> {
 pub struct RinglineSession<P, Request, Response> {
     protocol: P,
     compose_buffer: BytesMut,
-    pending: VecDeque<Instant>,
-    outstanding: VecDeque<(Option<Instant>, usize)>,
+    pending: VecDeque<RequestStart>,
+    outstanding: VecDeque<(Option<RequestStart>, usize)>,
     _request: PhantomData<Request>,
     _response: PhantomData<Response>,
 }
@@ -63,10 +63,26 @@ where
     }
 
     /// Parses at most one request from `data`.
+    ///
+    /// This captures the request timestamp immediately before parsing. A
+    /// Ringline read callback should instead call [`Self::parse_at`] with a
+    /// timestamp captured at its read boundary.
     pub fn parse(&mut self, data: &[u8]) -> io::Result<Parsed<Request>> {
+        self.parse_at(data, RequestStart::now())
+    }
+
+    /// Parses at most one request from `data` using its read-boundary timestamp.
+    ///
+    /// The timestamp is queued only after a complete request is parsed, so a
+    /// partial frame does not create an unmatched response timestamp.
+    pub fn parse_at(
+        &mut self,
+        data: &[u8],
+        request_started: RequestStart,
+    ) -> io::Result<Parsed<Request>> {
         match self.protocol.parse_request(data) {
             Ok(parsed) => {
-                self.pending.push_back(Instant::now());
+                self.pending.push_back(request_started);
                 Ok(Parsed::Complete {
                     consumed: parsed.consumed(),
                     request: parsed.into_inner(),
@@ -86,7 +102,7 @@ where
 
         if bytes == 0 {
             if let Some(timestamp) = timestamp {
-                let latency = Instant::now() - timestamp;
+                let latency = RequestStart::now() - timestamp;
                 let _ = REQUEST_LATENCY.increment(latency.as_nanos());
             }
         } else {
@@ -102,7 +118,7 @@ where
             return;
         }
 
-        let now = Instant::now();
+        let now = RequestStart::now();
         let mut bytes = bytes;
 
         while bytes > 0 {
@@ -126,9 +142,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{Parsed, RinglineSession};
+    use super::{Parsed, RequestStart, RinglineSession};
     use protocol_common::{BufMut, Compose, ParseOk, Protocol};
     use std::io::{self, ErrorKind};
+    use std::time::Duration;
 
     #[derive(Default)]
     struct LineProtocol;
@@ -178,6 +195,36 @@ mod tests {
         }
     }
 
+    struct SlowLineProtocol;
+
+    impl Protocol<Vec<u8>, LineResponse> for SlowLineProtocol {
+        fn parse_request(&self, buffer: &[u8]) -> io::Result<ParseOk<Vec<u8>>> {
+            std::thread::sleep(Duration::from_millis(10));
+            LineProtocol.parse_request(buffer)
+        }
+
+        fn compose_request(&self, request: &Vec<u8>, buffer: &mut dyn BufMut) -> io::Result<usize> {
+            LineProtocol.compose_request(request, buffer)
+        }
+
+        fn parse_response(
+            &self,
+            request: &Vec<u8>,
+            buffer: &[u8],
+        ) -> io::Result<ParseOk<LineResponse>> {
+            LineProtocol.parse_response(request, buffer)
+        }
+
+        fn compose_response(
+            &self,
+            request: &Vec<u8>,
+            response: &LineResponse,
+            buffer: &mut dyn BufMut,
+        ) -> io::Result<usize> {
+            LineProtocol.compose_response(request, response, buffer)
+        }
+    }
+
     #[test]
     fn parses_one_frame_and_reports_consumed_bytes() {
         let mut session = RinglineSession::new(LineProtocol);
@@ -193,6 +240,22 @@ mod tests {
         let mut session = RinglineSession::new(LineProtocol);
 
         assert!(matches!(session.parse(b"one"), Ok(Parsed::NeedMore)));
+    }
+
+    #[test]
+    fn supplied_read_timestamp_survives_parsing_before_becoming_pending() {
+        let mut session = RinglineSession::new(SlowLineProtocol);
+        let read_started = RequestStart::now();
+
+        let parsed = session.parse_at(b"one\n", read_started).unwrap();
+        let parse_finished = RequestStart::now();
+
+        assert_eq!(parsed.request(), b"one");
+        assert!(
+            parse_finished.duration_since(read_started).as_nanos()
+                >= Duration::from_millis(10).as_nanos() as u64
+        );
+        assert_eq!(session.pending.front(), Some(&read_started));
     }
 
     #[test]
