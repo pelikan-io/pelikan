@@ -161,6 +161,21 @@ and executing requests in place. Spec and plan:
     load, so every number now ships with its control spread and load
     average. "Unmeasured, control spread ±X%" is a result; a bare
     percentage is not.
+  - **Prefer structure over discipline — but check which way it points.**
+    The most-repeated decision of the effort: when a rule has to be
+    remembered at every call site, move it somewhere the compiler or the
+    type enforces it. Carry the tag inside `Metadata` so pack/unpack
+    round-trip it, rather than preserving bits at each site (the rule was
+    already forgotten once, in the change that introduced it). Compensate
+    per-item rather than in a tail block an early return can skip. Bump
+    the generation on the state transition, not in a queue helper a path
+    can legitimately bypass. Make the maximum segment id unissuable
+    rather than documenting the cliff. But it is a heuristic with a
+    direction, not a law: the two retry arms in `get_pinned` look alike
+    and terminate for genuinely different reasons — one because a drain
+    is bounded work that must finish, the other because a bound says so —
+    and unifying them would have hidden the asymmetry that makes each
+    correct. There, the *distinct* code is what carries the invariant.
   - **Attach the cheap check to the claim.** Every miss this week was a
     plausible statement nobody spent thirty seconds testing: "loom can't
     model this" (it could — the seam was already in production code),
