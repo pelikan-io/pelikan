@@ -152,6 +152,14 @@ pub static PERCENTILES: &[(&str, f64)] = &[
 #[metric(name = "process_req")]
 pub static PROCESS_REQ: Counter = Counter::new();
 
+/// Active cache-server data-plane backend: 0 = mio, 1 = Ringline.
+#[metric(name = "server_io_backend_active")]
+pub static SERVER_IO_BACKEND_ACTIVE: Gauge = Gauge::new();
+
+/// Number of requested backends that resolved to a startup fallback.
+#[metric(name = "server_io_backend_fallback")]
+pub static SERVER_IO_BACKEND_FALLBACK: Counter = Counter::new();
+
 fn map_err(e: std::io::Error) -> Result<()> {
     match e.kind() {
         ErrorKind::WouldBlock => Ok(()),

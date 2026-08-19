@@ -344,6 +344,69 @@ fn test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("status: passed\n");
 }
 
+pub fn smoke_exchange() {
+    let mut stream = connected_client();
+    exchange(&mut stream, b"get task7-smoke\r\n", b"END\r\n");
+}
+
+pub fn conformance_tests() {
+    partial_request_is_completed_after_second_write();
+    pipelined_requests_preserve_response_order();
+    client_disconnect_does_not_poison_runtime();
+    connection_burst_does_not_block_existing_clients();
+}
+
+fn connected_client() -> TcpStream {
+    let stream = TcpStream::connect("127.0.0.1:12321").expect("failed to connect");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    stream
+}
+
+fn exchange(stream: &mut TcpStream, request: &[u8], expected: &[u8]) {
+    stream.write_all(request).expect("request write failed");
+    let mut response = vec![0; expected.len()];
+    stream
+        .read_exact(&mut response)
+        .expect("response read failed");
+    assert_eq!(response, expected);
+}
+
+fn partial_request_is_completed_after_second_write() {
+    let mut stream = connected_client();
+    stream.write_all(b"get ").unwrap();
+    std::thread::sleep(Duration::from_millis(10));
+    exchange(&mut stream, b"missing\r\n", b"END\r\n");
+}
+
+fn pipelined_requests_preserve_response_order() {
+    let mut stream = connected_client();
+    exchange(
+        &mut stream,
+        b"set first 0 0 3\r\none\r\nset second 0 0 3\r\ntwo\r\nget first\r\nget second\r\n",
+        b"STORED\r\nSTORED\r\nVALUE first 0 3\r\none\r\nEND\r\nVALUE second 0 3\r\ntwo\r\nEND\r\n",
+    );
+}
+
+fn client_disconnect_does_not_poison_runtime() {
+    let mut abandoned = connected_client();
+    abandoned.write_all(b"set abandoned 0 0 4\r\npar").unwrap();
+    drop(abandoned);
+    let mut existing = connected_client();
+    exchange(&mut existing, b"get missing\r\n", b"END\r\n");
+}
+
+fn connection_burst_does_not_block_existing_clients() {
+    let mut existing = connected_client();
+    let burst: Vec<_> = (0..128).map(|_| connected_client()).collect();
+    exchange(&mut existing, b"get missing\r\n", b"END\r\n");
+    drop(burst);
+}
+
 pub fn admin_tests() {
     debug!("beginning admin tests");
     println!();

@@ -91,6 +91,10 @@ impl ServerConfig for PingserverConfig {
     fn server(&self) -> &Server {
         &self.server
     }
+
+    fn server_mut(&mut self) -> &mut Server {
+        &mut self.server
+    }
 }
 
 impl SockioConfig for PingserverConfig {

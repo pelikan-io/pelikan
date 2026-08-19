@@ -16,6 +16,16 @@ const OUT: &str = "docs/diagrams/dataflow.svg";
 
 const CLAIMS: &[Claim] = &[
     Claim {
+        path: "src/core/server/src/ringline/single.rs",
+        pattern: r"storage\.execute\(&request\)",
+        what: "Ringline single worker executes on worker-local storage",
+    },
+    Claim {
+        path: "src/core/server/src/ringline/multi.rs",
+        pattern: r"self\.storage\.execute\(&request\.request\)",
+        what: "Ringline storage thread executes queued requests",
+    },
+    Claim {
         path: "src/core/server/src/workers/single.rs",
         pattern: r"session\.receive\(\)",
         what: "single worker: session.receive parses a request",
@@ -506,10 +516,20 @@ pub fn generate() {
 
     let mut parts = vec![ARROW_DEFS.to_string()];
     let mut y = 24.0;
-    let (p1, h1) = panel(y, "single worker", &server_rows, Kind::Single);
+    let (p1, h1) = panel(
+        y,
+        "single worker · mio callback or Ringline task",
+        &server_rows,
+        Kind::Single,
+    );
     parts.extend(p1);
     y += h1 + 20.0;
-    let (p2, h2) = panel(y, "multiple workers", &server_rows, Kind::Multi);
+    let (p2, h2) = panel(
+        y,
+        "multiple workers · mio callback or Ringline task",
+        &server_rows,
+        Kind::Multi,
+    );
     parts.extend(p2);
     y += h2 + 20.0;
     let (p3, h3) = panel(y, "proxy", &proxy_rows, Kind::Proxy);

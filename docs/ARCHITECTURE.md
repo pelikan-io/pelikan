@@ -66,7 +66,9 @@ code registers — what you see in `top -H` is what the chart says:
 - **Proxy**: frontend threads (`pelikan_fe_i`) face clients, backend threads
   (`pelikan_be_i`) face upstream servers, connected by object queues.
 
-Servers pick between the first two models at runtime: the `[worker] threads`
+Cache servers select the data-plane I/O backend once during startup. `mio` is the portable default; on Linux, `server.io_backend = "ringline"` attempts a Ringline acceptor and `ringline-worker-*` task runtime before traffic is accepted. Unsupported kernel setup falls back to Mio and records both the requested and active backend. TLS, admin, and proxy sockets remain on Mio, and a live Ringline process never migrates established connections.
+
+Within either backend, the worker count picks between the first two storage models: the `[worker] threads`
 config option spawns the single-worker model at `1` (the default) and the
 multi-worker model — workers plus the dedicated storage thread — above it.
 

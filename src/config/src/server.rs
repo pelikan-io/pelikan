@@ -80,6 +80,11 @@ impl Server {
     pub fn io_backend(&self) -> &str {
         &self.io_backend
     }
+
+    /// Select the cache-server I/O backend before startup.
+    pub fn set_io_backend(&mut self, backend: impl Into<String>) {
+        self.io_backend = backend.into();
+    }
 }
 
 // trait implementations
@@ -98,6 +103,8 @@ impl Default for Server {
 // trait definitions
 pub trait ServerConfig {
     fn server(&self) -> &Server;
+
+    fn server_mut(&mut self) -> &mut Server;
 }
 
 #[cfg(test)]
@@ -120,5 +127,12 @@ mod tests {
     fn io_backend_retains_unknown_value_for_network_validation() {
         let server: Server = toml::from_str("io_backend = 'other'").unwrap();
         assert_eq!(server.io_backend(), "other");
+    }
+
+    #[test]
+    fn io_backend_can_be_selected_programmatically() {
+        let mut server = Server::default();
+        server.set_io_backend("ringline");
+        assert_eq!(server.io_backend(), "ringline");
     }
 }

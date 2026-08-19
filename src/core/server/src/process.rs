@@ -47,6 +47,10 @@ impl ServerConfig for CacheConfig {
     fn server(&self) -> &config::Server {
         &self.server
     }
+
+    fn server_mut(&mut self) -> &mut config::Server {
+        &mut self.server
+    }
 }
 
 impl TlsConfig for CacheConfig {
@@ -117,9 +121,7 @@ where
                     Ok(Self::Ringline(RinglineProcessBuilder::single(mio)?))
                 }
                 Err(error) => {
-                    error!(
-                        "cache server I/O backend requested=ringline active=mio fallback={error}"
-                    );
+                    log_ringline_fallback(&error);
                     Ok(Self::Mio(mio))
                 }
             },
@@ -144,14 +146,43 @@ where
     }
 }
 
+fn record_resolution(resolution: &pelikan_net::BackendResolution) {
+    SERVER_IO_BACKEND_ACTIVE.set(match resolution.active {
+        pelikan_net::IoBackend::Mio => 0,
+        pelikan_net::IoBackend::Ringline => 1,
+    });
+    if resolution.fallback.is_some() {
+        SERVER_IO_BACKEND_FALLBACK.increment();
+    }
+}
+
+fn log_ringline_active() {
+    log_resolution(&pelikan_net::BackendResolution {
+        requested: pelikan_net::IoBackend::Ringline,
+        active: pelikan_net::IoBackend::Ringline,
+        fallback: None,
+    });
+}
+
+fn log_ringline_fallback(cause: impl std::fmt::Display) {
+    log_resolution(&pelikan_net::BackendResolution {
+        requested: pelikan_net::IoBackend::Ringline,
+        active: pelikan_net::IoBackend::Mio,
+        fallback: Some(pelikan_net::FallbackReason::Initialization(
+            cause.to_string(),
+        )),
+    });
+}
+
 fn log_resolution(resolution: &pelikan_net::BackendResolution) {
+    record_resolution(resolution);
     match &resolution.fallback {
         Some(reason) => info!(
-            "cache server I/O backend requested={} active={} fallback={reason}",
+            "cache server I/O backend requested_backend={} active_backend={} fallback_cause={reason}",
             resolution.requested, resolution.active
         ),
         None => info!(
-            "cache server I/O backend requested={} active={}",
+            "cache server I/O backend requested_backend={} active_backend={}",
             resolution.requested, resolution.active
         ),
     }
@@ -340,7 +371,7 @@ where
                             "Ringline worker {worker_id} wake handle unavailable during startup"
                         ));
                         let _ = runtime.join();
-                        error!("cache server I/O backend requested=ringline active=mio fallback={error}");
+                        log_ringline_fallback(&error);
                         return Process::Mio(
                             MioProcessBuilder {
                                 admin,
@@ -359,7 +390,7 @@ where
                             "Ringline worker {worker_id} wake handle was attached more than once"
                         ));
                         let _ = runtime.join();
-                        error!("cache server I/O backend requested=ringline active=mio fallback={error}");
+                        log_ringline_fallback(&error);
                         return Process::Mio(
                             MioProcessBuilder {
                                 admin,
@@ -379,9 +410,7 @@ where
                         "Ringline storage cannot start before every worker wake handle is attached",
                     );
                     let _ = runtime.join();
-                    error!(
-                        "cache server I/O backend requested=ringline active=mio fallback={error}"
-                    );
+                    log_ringline_fallback(&error);
                     return Process::Mio(
                         MioProcessBuilder {
                             admin,
@@ -412,13 +441,11 @@ where
                         error!("Ringline control-plane initialization failed: {error}");
                         panic!("Ringline control-plane initialization failed: {error}")
                     });
-                info!("cache server I/O backend requested=ringline active=ringline");
+                log_ringline_active();
                 Process::Ringline(process)
             }
             Err(ringline_error) => {
-                error!(
-                    "cache server I/O backend requested=ringline active=mio fallback={ringline_error}"
-                );
+                log_ringline_fallback(&ringline_error);
                 Process::Mio(
                     MioProcessBuilder {
                         admin,
@@ -461,7 +488,7 @@ where
     ) {
         Ok(runtime) => {
             recovery.commit();
-            info!("cache server I/O backend requested=ringline active=ringline");
+            log_ringline_active();
             Process::Ringline(
                 spawn_ringline(admin, log_drain, runtime, None).unwrap_or_else(|error| {
                     error!("Ringline control-plane initialization failed: {error}");
@@ -470,9 +497,7 @@ where
             )
         }
         Err(ringline_error) => {
-            error!(
-                "cache server I/O backend requested=ringline active=mio fallback={ringline_error}"
-            );
+            log_ringline_fallback(&ringline_error);
             let (protocol, storage) = recovery.recover().unwrap_or_else(|recovery_error| {
                 panic!("Ringline initialization failed ({ringline_error}); mio fallback state recovery failed: {recovery_error}")
             });
@@ -863,8 +888,9 @@ impl RinglineProcess {
 mod tests {
     #[cfg(target_os = "linux")]
     use super::RINGLINE_MAX_CONNECTIONS;
-    use super::{process_kind, ProcessKind};
-    use pelikan_net::{resolve_backend, IoBackend};
+    use super::{process_kind, record_resolution, ProcessKind};
+    use crate::{SERVER_IO_BACKEND_ACTIVE, SERVER_IO_BACKEND_FALLBACK};
+    use pelikan_net::{resolve_backend, BackendResolution, FallbackReason, IoBackend};
     #[cfg(target_os = "linux")]
     use std::cell::Cell;
     #[cfg(target_os = "linux")]
@@ -905,6 +931,18 @@ mod tests {
     #[test]
     fn ringline_connection_limit_uses_ringline_default_not_mio_event_batch() {
         assert_eq!(RINGLINE_MAX_CONNECTIONS, 16_000);
+    }
+
+    #[test]
+    fn fallback_records_mio_active_and_increments_counter() {
+        let before = SERVER_IO_BACKEND_FALLBACK.value();
+        record_resolution(&BackendResolution {
+            requested: IoBackend::Ringline,
+            active: IoBackend::Mio,
+            fallback: Some(FallbackReason::Unavailable),
+        });
+        assert_eq!(SERVER_IO_BACKEND_ACTIVE.value(), 0);
+        assert_eq!(SERVER_IO_BACKEND_FALLBACK.value(), before + 1);
     }
 
     #[test]

@@ -3,7 +3,7 @@
 <rect width="100%" height="100%" fill="white"/>
 <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#4D4D4D"/></marker></defs>
 <rect x="24" y="24" width="2190" height="560" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
-<text x="2344" y="247" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">single worker</text>
+<text x="2344" y="247" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">single worker · mio or Ringline</text>
 <text x="2338" y="295" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
 <text x="2344" y="295" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#555" text-anchor="middle">:</text>
 <text x="2352" y="295" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
@@ -16,8 +16,8 @@
 <rect x="50" y="166" width="124" height="68" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
 <text x="112" y="200" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="380" y="104" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<text x="525" y="181" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_listener</text>
-<text x="525" y="215" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#333" text-anchor="middle">:12321</text>
+<text x="525" y="181" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_listener / ringline-acceptor</text>
+<text x="525" y="215" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#333" text-anchor="middle">:12321 · selected once at launch</text>
 <path d="M 174 200 L 380 200" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
 <text x="277" y="185" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">accept</text>
 <rect x="816" y="189" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
@@ -28,7 +28,7 @@
 <text x="841" y="173" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">sessions</text>
 <path d="M 670 200 L 816 200" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <rect x="1012" y="104" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<text x="1157" y="131" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_work</text>
+<text x="1157" y="131" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_work / ringline-worker-0</text>
 <rect x="1032" y="164" width="250" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <text x="1157" y="182" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="1032" y="206" width="250" height="36" fill="#B3CDE3" stroke="#4D4D4D" stroke-width="1" rx="0"/>
@@ -51,7 +51,7 @@
 <text x="396" y="334" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">signals</text>
 <path d="M 670 468 L 1157 468 L 1157 296" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <rect x="24" y="604" width="2190" height="792" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
-<text x="2344" y="943" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">multiple workers</text>
+<text x="2344" y="943" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">multiple workers · mio or Ringline</text>
 <text x="2338" y="991" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
 <text x="2344" y="991" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#555" text-anchor="middle">:</text>
 <text x="2352" y="991" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="start">memcache</text>
@@ -64,8 +64,8 @@
 <rect x="50" y="746" width="124" height="68" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
 <text x="112" y="780" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">clients</text>
 <rect x="380" y="684" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<text x="525" y="761" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_listener</text>
-<text x="525" y="795" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#333" text-anchor="middle">:12321</text>
+<text x="525" y="761" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_listener / ringline-acceptor</text>
+<text x="525" y="795" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#333" text-anchor="middle">:12321 · selected once at launch</text>
 <path d="M 174 780 L 380 780" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
 <text x="277" y="765" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">accept</text>
 <rect x="816" y="769" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
@@ -76,11 +76,11 @@
 <text x="841" y="753" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">sessions</text>
 <path d="M 670 780 L 816 780" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <rect x="1012" y="684" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<text x="1157" y="753" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_work_0</text>
+<text x="1157" y="753" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_work_0 / ringline-worker-0</text>
 <rect x="1032" y="786" width="250" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <text x="1157" y="804" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <rect x="1012" y="916" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
-<text x="1157" y="985" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_work_n-1</text>
+<text x="1157" y="985" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_work_n-1 / ringline-worker-n-1</text>
 <rect x="1032" y="1018" width="250" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <text x="1157" y="1036" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-*</text>
 <circle cx="1157" cy="888" r="2" fill="#777"/>

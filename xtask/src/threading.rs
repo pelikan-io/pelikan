@@ -14,6 +14,16 @@ const OUT: &str = "docs/diagrams/threading.svg";
 
 const CLAIMS: &[Claim] = &[
     Claim {
+        path: "vendor/ringline-0.5.3/src/worker.rs",
+        pattern: r#"name\(format!\("ringline-worker-\{worker_id\}"\)\)"#,
+        what: "Ringline worker thread spawn",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.3/src/worker.rs",
+        pattern: r#"name\("ringline-acceptor"\.to_string\(\)\)"#,
+        what: "Ringline acceptor thread spawn",
+    },
+    Claim {
         path: "src/core/server/src/process.rs",
         pattern: r#"name\(format!\("\{THREAD_PREFIX\}_admin"\)\)"#,
         what: "admin thread spawn",
@@ -45,12 +55,12 @@ const CLAIMS: &[Claim] = &[
     },
     Claim {
         path: "src/core/server/src/process.rs",
-        pattern: r"// queues for the `Admin` to send `Signal`s to all sibling threads",
+        pattern: r"let \(mut signal_queue_tx, mut signal_queue_rx\)",
         what: "admin signal broadcast queues",
     },
     Claim {
         path: "src/core/server/src/process.rs",
-        pattern: r"// queues for the `Listener` to send `Session`s to the worker threads",
+        pattern: r"let \(mut listener_session_queues, worker_session_queues\)",
         what: "listener->worker session queues",
     },
     Claim {
@@ -60,7 +70,7 @@ const CLAIMS: &[Claim] = &[
     },
     Claim {
         path: "src/core/server/src/process.rs",
-        pattern: r"thread_wakers\.extend_from_slice\(&self\.workers\.wakers\(\)\)",
+        pattern: r"thread_wakers\.extend_from_slice\(&workers\.wakers\(\)\)",
         what: "signal queues include all worker-side wakers (incl. storage)",
     },
     Claim {
@@ -290,8 +300,8 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
         &mut parts,
         li_x,
         row_a,
-        "pelikan_listener",
-        Some(":12321"),
+        "pelikan_listener / ringline-acceptor",
+        Some(":12321 · selected once at launch"),
         &[],
         false,
     );
@@ -321,7 +331,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
             &mut parts,
             wk_x,
             row_a,
-            "pelikan_work",
+            "pelikan_work / ringline-worker-0",
             None,
             &[CHIP_PROTOCOL, CHIP_ENTRYSTORE, CHIP_SEGCACHE],
             false,
@@ -334,7 +344,10 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
             &mut parts,
             wk_x,
             wk0_y,
-            ("pelikan_work_0", "pelikan_work_n-1"),
+            (
+                "pelikan_work_0 / ringline-worker-0",
+                "pelikan_work_n-1 / ringline-worker-n-1",
+            ),
             &[CHIP_PROTOCOL],
         );
         parts.push(
@@ -726,10 +739,10 @@ pub fn generate() {
 
     let mut parts = vec![ARROW_DEFS.to_string()];
     let mut y = 24.0;
-    let (p1, h1) = server_panel(y, "single worker", &server_rows, false);
+    let (p1, h1) = server_panel(y, "single worker · mio or Ringline", &server_rows, false);
     parts.extend(p1);
     y += h1 + 20.0;
-    let (p2, h2) = server_panel(y, "multiple workers", &server_rows, true);
+    let (p2, h2) = server_panel(y, "multiple workers · mio or Ringline", &server_rows, true);
     parts.extend(p2);
     y += h2 + 20.0;
     let (p3, h3) = proxy_panel(y, "proxy", &proxy_rows);

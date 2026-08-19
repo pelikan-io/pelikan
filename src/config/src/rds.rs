@@ -138,6 +138,10 @@ impl ServerConfig for RdsConfig {
     fn server(&self) -> &Server {
         &self.server
     }
+
+    fn server_mut(&mut self) -> &mut Server {
+        &mut self.server
+    }
 }
 
 impl SockioConfig for RdsConfig {
@@ -201,7 +205,14 @@ impl Default for RdsConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::RdsConfig;
+    use crate::{RdsConfig, ServerConfig};
+
+    #[test]
+    fn server_configuration_can_be_mutated_for_a_runtime_harness() {
+        let mut config = RdsConfig::default();
+        config.server_mut().set_io_backend("ringline");
+        assert_eq!(config.server().io_backend(), "ringline");
+    }
 
     #[test]
     fn it_should_render_the_config_with_some_expected_keys() {
