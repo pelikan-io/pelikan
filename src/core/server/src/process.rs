@@ -183,16 +183,19 @@ fn log_ringline_active() {
 }
 
 #[cfg(target_os = "linux")]
-fn ringline_fallback_reason(error: &pelikan_net::ringline::Error) -> pelikan_net::FallbackReason {
+fn ringline_fallback_reason(
+    error: &pelikan_net::ringline::StartupError,
+) -> pelikan_net::FallbackReason {
     match error {
-        pelikan_net::ringline::Error::RingSetup(_) => {
-            pelikan_net::FallbackReason::UnsupportedCapability(error.to_string())
-        }
-        pelikan_net::ringline::Error::Io(io_error)
-            if matches!(
-                io_error.raw_os_error(),
-                Some(libc::EINVAL | libc::EPERM | libc::ENOSYS | libc::EOPNOTSUPP)
-            ) =>
+        pelikan_net::ringline::StartupError::Runtime(pelikan_net::ringline::Error::RingSetup(
+            _,
+        )) => pelikan_net::FallbackReason::UnsupportedCapability(error.to_string()),
+        pelikan_net::ringline::StartupError::Runtime(pelikan_net::ringline::Error::Io(
+            io_error,
+        )) if matches!(
+            io_error.raw_os_error(),
+            Some(libc::EINVAL | libc::EPERM | libc::ENOSYS | libc::EOPNOTSUPP)
+        ) =>
         {
             pelikan_net::FallbackReason::UnsupportedCapability(error.to_string())
         }
@@ -201,7 +204,7 @@ fn ringline_fallback_reason(error: &pelikan_net::ringline::Error) -> pelikan_net
 }
 
 #[cfg(target_os = "linux")]
-fn log_ringline_runtime_fallback(error: &pelikan_net::ringline::Error) {
+fn log_ringline_runtime_fallback(error: &pelikan_net::ringline::StartupError) {
     log_resolution(&pelikan_net::BackendResolution {
         requested: pelikan_net::IoBackend::Ringline,
         active: pelikan_net::IoBackend::Mio,
@@ -291,6 +294,12 @@ where
     Response: 'static + Compose + Send,
     Storage: 'static + Execute<Request, Response> + EntryStore + Send,
 {
+    let admin_addr = admin
+        .local_addr()
+        .expect("bound admin listener has no address");
+    let data_addr = listener
+        .local_addr()
+        .expect("bound data listener has no address");
     let mut thread_wakers = vec![listener.waker()];
     thread_wakers.extend_from_slice(&workers.wakers());
 
@@ -321,6 +330,8 @@ where
     spawn_signal_handler(signal_tx.clone());
 
     MioProcess {
+        admin_addr,
+        data_addr,
         admin,
         listener,
         signal_tx,
@@ -569,6 +580,8 @@ pub enum Process {
 }
 
 pub struct MioProcess {
+    admin_addr: std::net::SocketAddr,
+    data_addr: std::net::SocketAddr,
     admin: JoinHandle<()>,
     listener: JoinHandle<()>,
     signal_tx: Sender<Signal>,
@@ -577,6 +590,8 @@ pub struct MioProcess {
 
 #[cfg(target_os = "linux")]
 pub struct RinglineProcess {
+    admin_addr: std::net::SocketAddr,
+    data_addr: std::net::SocketAddr,
     admin: JoinHandle<()>,
     bridge: JoinHandle<()>,
     signal_tx: Sender<Signal>,
@@ -589,6 +604,10 @@ fn spawn_ringline(
     runtime: pelikan_net::ringline::RinglineRuntime,
     pending_storage: Option<PendingRinglineStorage>,
 ) -> io::Result<RinglineProcess> {
+    let admin_addr = admin.local_addr()?;
+    let data_addr = runtime
+        .bound_addr()
+        .ok_or_else(|| io::Error::other("Ringline runtime has no bound address"))?;
     let mut bridge_poll = match Poll::new() {
         Ok(poll) => poll,
         Err(error) => return rollback_live_runtime(runtime, error),
@@ -760,6 +779,8 @@ fn spawn_ringline(
     }
 
     Ok(RinglineProcess {
+        admin_addr,
+        data_addr,
         admin,
         bridge,
         signal_tx,
@@ -883,6 +904,24 @@ fn panic_payload(payload: Box<dyn Any + Send + 'static>) -> String {
 }
 
 impl Process {
+    /// Returns the bound administrative-listener address.
+    pub fn admin_addr(&self) -> std::net::SocketAddr {
+        match self {
+            Self::Mio(process) => process.admin_addr,
+            #[cfg(target_os = "linux")]
+            Self::Ringline(process) => process.admin_addr,
+        }
+    }
+
+    /// Returns the bound cache data-listener address.
+    pub fn data_addr(&self) -> std::net::SocketAddr {
+        match self {
+            Self::Mio(process) => process.data_addr,
+            #[cfg(target_os = "linux")]
+            Self::Ringline(process) => process.data_addr,
+        }
+    }
+
     pub fn shutdown(self) {
         match &self {
             Self::Mio(process) => shutdown_signal(&process.signal_tx),
@@ -981,22 +1020,37 @@ mod tests {
     }
 
     #[test]
-    fn ring_setup_is_classified_as_unsupported_with_exact_cause() {
-        let reason = ringline_fallback_reason(&pelikan_net::ringline::Error::RingSetup(
-            "Operation not permitted (os error 1)".to_string(),
+    fn configuration_ring_setup_is_initialization_with_exact_cause() {
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Configuration(
+            pelikan_net::ringline::Error::RingSetup(
+                "Operation not permitted (os error 1)".to_string(),
+            ),
         ));
         assert_eq!(
             reason,
-            FallbackReason::UnsupportedCapability(
+            FallbackReason::Initialization(
                 "ring setup: Operation not permitted (os error 1)".to_string()
             )
         );
     }
 
     #[test]
+    fn runtime_ring_setup_is_classified_as_unsupported_with_exact_cause() {
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Runtime(
+            pelikan_net::ringline::Error::RingSetup("failed to submit initial receive".to_string()),
+        ));
+        assert_eq!(
+            reason,
+            FallbackReason::UnsupportedCapability(
+                "ring setup: failed to submit initial receive".to_string()
+            )
+        );
+    }
+
+    #[test]
     fn kernel_einval_is_classified_as_unsupported_with_exact_cause() {
-        let reason = ringline_fallback_reason(&pelikan_net::ringline::Error::Io(
-            io::Error::from_raw_os_error(libc::EINVAL),
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Runtime(
+            pelikan_net::ringline::Error::Io(io::Error::from_raw_os_error(libc::EINVAL)),
         ));
         assert_eq!(
             reason,
@@ -1008,10 +1062,12 @@ mod tests {
 
     #[test]
     fn unrelated_initialization_error_is_not_an_unsupported_capability() {
-        let reason = ringline_fallback_reason(&pelikan_net::ringline::Error::Io(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "broken bootstrap",
-        )));
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Runtime(
+            pelikan_net::ringline::Error::Io(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "broken bootstrap",
+            )),
+        ));
         assert_eq!(
             reason,
             FallbackReason::Initialization("I/O error: broken bootstrap".to_string())

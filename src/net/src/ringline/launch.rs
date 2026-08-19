@@ -178,6 +178,31 @@ fn join_workers(workers: Vec<WorkerJoin>) -> io::Result<()> {
     }
 }
 
+/// Identifies whether Ringline startup failed before or during runtime launch.
+#[derive(Debug)]
+pub enum StartupError {
+    /// Ringline rejected Pelikan runtime configuration or bootstrap state.
+    Configuration(::ringline::Error),
+    /// Ringline failed while launching its OS-backed runtime.
+    Runtime(::ringline::Error),
+}
+
+impl std::fmt::Display for StartupError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Configuration(error) | Self::Runtime(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for StartupError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Configuration(error) | Self::Runtime(error) => Some(error),
+        }
+    }
+}
+
 fn worker_panic_error(payload: Box<dyn Any + Send + 'static>) -> io::Error {
     let payload = match payload.downcast::<String>() {
         Ok(message) => {
@@ -197,7 +222,7 @@ pub fn launch<A: ::ringline::AsyncEventHandler>(
     addr: SocketAddr,
     config: RinglineRuntimeConfig,
     handlers: Vec<A>,
-) -> Result<RinglineRuntime, ::ringline::Error> {
+) -> Result<RinglineRuntime, StartupError> {
     launch_with_bootstraps::<A, A>(addr, config, handlers)
 }
 
@@ -206,27 +231,30 @@ pub fn launch_with_bootstraps<A, B>(
     addr: SocketAddr,
     config: RinglineRuntimeConfig,
     bootstraps: Vec<B>,
-) -> Result<RinglineRuntime, ::ringline::Error>
+) -> Result<RinglineRuntime, StartupError>
 where
     A: ::ringline::AsyncEventHandler,
     B: Send + 'static,
 {
     if bootstraps.len() != config.workers {
-        return Err(::ringline::Error::Io(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!(
-                "Ringline bootstrap count {} does not match worker count {}",
-                bootstraps.len(),
-                config.workers
+        return Err(StartupError::Configuration(::ringline::Error::Io(
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!(
+                    "Ringline bootstrap count {} does not match worker count {}",
+                    bootstraps.len(),
+                    config.workers
+                ),
             ),
         )));
     }
 
-    let slots = HandlerSlots::install(bootstraps)?;
-    let config = config.build()?;
+    let slots = HandlerSlots::install(bootstraps).map_err(StartupError::Configuration)?;
+    let config = config.build().map_err(StartupError::Configuration)?;
     let (shutdown, workers) = ::ringline::RinglineBuilder::new(config)
         .bind(addr)
-        .launch::<A>()?;
+        .launch::<A>()
+        .map_err(StartupError::Runtime)?;
     drop(slots);
 
     Ok(RinglineRuntime {
@@ -330,7 +358,7 @@ mod tests {
         );
 
         match result {
-            Err(::ringline::Error::Io(error)) => {
+            Err(StartupError::Configuration(::ringline::Error::Io(error))) => {
                 assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
             }
             _ => panic!("handler count mismatch must be an invalid-input error"),
@@ -345,7 +373,7 @@ mod tests {
             runtime_config(1, 0),
             vec![TestHandler],
         );
-        assert!(result.is_err());
+        assert!(matches!(result, Err(StartupError::Configuration(_))));
 
         let guard = HandlerSlots::install(vec![7_u8]).unwrap();
         drop(guard);
@@ -482,7 +510,7 @@ mod tests {
         );
 
         assert!(
-            matches!(result, Err(::ringline::Error::Io(error)) if error.kind() == io::ErrorKind::InvalidInput)
+            matches!(result, Err(StartupError::Configuration(::ringline::Error::Io(error))) if error.kind() == io::ErrorKind::InvalidInput)
         );
     }
 

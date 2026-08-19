@@ -5,6 +5,7 @@ pub use ::ringline::{AsyncEventHandler, ConnCtx, DriverCtx, Error, ParseResult, 
 pub use completion::{Completion, CompletionCanceled, CompletionId, CompletionTable};
 pub use launch::{
     launch, launch_with_bootstraps, take_worker_bootstrap, RinglineRuntime, RinglineShutdown,
+    StartupError,
 };
 
 /// Settings for a Ringline cache-server runtime.

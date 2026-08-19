@@ -13,29 +13,18 @@ use crate::common::*;
 use config::{SegcacheConfig, ServerConfig, WorkerConfig};
 use pelikan_segcache::Segcache;
 use server::{backend_resolution, FallbackReason, IoBackend, SERVER_IO_BACKEND_FALLBACK};
-use std::net::{SocketAddr, TcpListener, TcpStream};
+use std::net::{SocketAddr, TcpStream};
 use std::time::{Duration, Instant};
 
-fn reserved_address() -> SocketAddr {
-    TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-}
-
-fn configure(backend: &str) -> (SegcacheConfig, SocketAddr, SocketAddr) {
-    let data = reserved_address();
-    let admin = reserved_address();
-    assert_ne!(data, admin);
+fn configure(backend: &str) -> SegcacheConfig {
     let mut config = SegcacheConfig::default();
     config.server_mut().set_host("127.0.0.1");
-    config.server_mut().set_port(data.port().to_string());
+    config.server_mut().set_port("0");
     config.server_mut().set_io_backend(backend);
     config.worker_mut().set_threads(2);
     config.admin_mut().set_host("127.0.0.1");
-    config.admin_mut().set_port(admin.port().to_string());
-    set_test_addresses(data, admin);
-    (config, data, admin)
+    config.admin_mut().set_port("0");
+    config
 }
 
 fn wait_until_listening(addr: SocketAddr) {
@@ -61,8 +50,14 @@ fn assert_ringline_resolution() {
 
 fn run_backend(backend: &str) {
     let fallback_before = SERVER_IO_BACKEND_FALLBACK.value();
-    let (config, data, admin) = configure(backend);
+    let config = configure(backend);
     let server = Segcache::new(config).expect("failed to launch segcache");
+    let data = server.data_addr();
+    let admin = server.admin_addr();
+    assert_ne!(data, admin);
+    assert_ne!(data.port(), 0);
+    assert_ne!(admin.port(), 0);
+    set_test_addresses(data, admin);
     wait_until_listening(data);
     wait_until_listening(admin);
     if backend == "ringline" {
@@ -84,8 +79,12 @@ fn run_backend(backend: &str) {
 #[cfg(target_os = "linux")]
 fn repeated_ringline_startup_releases_resources() {
     for _ in 0..8 {
-        let (config, data, admin) = configure("ringline");
+        let config = configure("ringline");
         let server = Segcache::new(config).expect("repeated Ringline startup failed");
+        let data = server.data_addr();
+        let admin = server.admin_addr();
+        assert_ne!(data, admin);
+        set_test_addresses(data, admin);
         wait_until_listening(data);
         wait_until_listening(admin);
         assert_ringline_resolution();
