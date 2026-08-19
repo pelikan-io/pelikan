@@ -135,8 +135,13 @@ impl<T> CompletionTable<T> {
     pub fn cancel(&self, id: CompletionId) -> bool {
         let waker = {
             let mut entries = self.entries.borrow_mut();
-            if !matches!(entries.get(id.slot as usize), Some(entry) if !entry.retired && entry.generation == id.generation)
-            {
+            if !matches!(
+                entries.get(id.slot as usize),
+                Some(entry)
+                    if !entry.retired
+                        && entry.generation == id.generation
+                        && entry.value.is_none()
+            ) {
                 return false;
             }
             entries.remove(id.slot as usize).waker
@@ -365,6 +370,20 @@ mod tests {
         assert_eq!(table.complete(id, 1), Ok(()));
         assert_eq!(table.complete(id, 2), Err(2));
         assert_eq!(poll_with(&mut future, &waker), Poll::Ready(Ok(1)));
+    }
+
+    #[test]
+    fn cancel_after_completion_preserves_ready_value() {
+        let table = CompletionTable::new();
+        let (id, mut future) = table.insert();
+        let (waker, counts) = counting_waker();
+        assert!(poll_with(&mut future, &waker).is_pending());
+
+        table.complete(id, 42).unwrap();
+        assert!(!table.cancel(id));
+
+        assert_eq!(counts.wakes.load(Ordering::Relaxed), 1);
+        assert_eq!(poll_with(&mut future, &waker), Poll::Ready(Ok(42)));
     }
 
     #[test]
