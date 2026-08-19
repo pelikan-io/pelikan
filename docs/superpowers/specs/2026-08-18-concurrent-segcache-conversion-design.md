@@ -207,13 +207,50 @@ With that in place:
   write pressure. Under low load expired segments linger in memory (metrics
   show them as used) — accepted, since that memory has no competing demand
   until write pressure exists.
-- **flush_all is applied by each worker independently (broadcast):** even
-  with the admin thread waking workers on the broadcast, a write acked
-  between the first and last worker's `clear()` can be destroyed by a later
-  duplicate `clear()` — a small smear window. This differs in kind from the
-  old model, where queued requests could straddle the flush but a write
-  acked after the flush was never destroyed. Exactly-once flush via an
-  admin-held clear handle is possible follow-up work if ever needed.
+- **flush_all is applied by each worker independently (broadcast).**
+  *Measured 2026-08-19 with a concurrent multi-connection driver; the
+  earlier description here was written from reasoning and understated it
+  in two separate ways.*
+
+  **(a) Ack precedes effect, at every worker count including one.** The
+  admin thread replies `OK` once the broadcast is *queued*, before any
+  worker has cleared. At `threads = 1` — where there is no first/last
+  worker interval at all — writes acked *after* the client received `OK`
+  were still destroyed. So the client-visible contract "flush returned
+  OK, therefore my later writes survive" does not hold at any worker
+  count. This mechanism is distinct from the smear below and is believed
+  to predate the conversion (the old model also acked on enqueue while a
+  separate storage thread performed the clear) — verification pending.
+
+  **(b) The inter-worker smear scales badly with worker count.** Workers
+  drain the signal queue once per event-loop iteration, and an idle
+  worker sits in `poll` for up to the 100 ms worker timeout, so the last
+  `clear()` is bounded by that timeout rather than by anything tight —
+  despite the admin waking workers on the broadcast:
+
+  | workers | measured smear | acked-then-destroyed writes |
+  |---|---|---|
+  | 1 | 0.33 ms | 4 |
+  | 2 | 0.47–0.56 ms | 6–7 |
+  | 4 | 0.41 ms | 7 |
+  | 8 | **37–49 ms** | 5–20 |
+
+  Two orders of magnitude wider at 8 workers, reproducible across five
+  runs. "Between the first and last worker's clear" sounds tight; it is
+  tens of milliseconds. Under investigation: the wake added specifically
+  to make this prompt appears not to be effective at 8 workers, which may
+  be a defect rather than an inherent property.
+
+  Exactly-once flush via an admin-held clear handle remains the
+  structural fix.
+- **add/replace race magnitude, measured:** the accepted check-then-act
+  race scales with worker count — concurrent `add`s on one hot key
+  double-win 10–13% of the time at 2 workers and **32.7%** at 8, with 24
+  racing connections. Everything else held under the same driver: 48,000
+  verified reads with zero false misses, 96k mixed ops with zero phantom
+  values, 48,000 increments with zero lost updates, and zero `cas`
+  successes against a stale token — on both segcache 0.4.2 and the
+  unreleased engine, which were indistinguishable.
 
 ## Payoff
 
