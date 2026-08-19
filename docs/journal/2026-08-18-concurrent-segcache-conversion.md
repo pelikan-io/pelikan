@@ -134,6 +134,40 @@ and executing requests in place. Spec and plan:
   miss is legal for a cache; the false *absence* leaking into
   check-then-act commands is what made it a contract violation.
 
+- **The durable outcome is a verification standard, not the bug list.**
+  Four patterns came out of chasing these, and each was earned by a claim
+  that turned out to be unbacked:
+  - **A test must be proven able to fail.** #60 shipped a control test
+    that passed unchanged against deliberately broken code — it asserted
+    coverage it did not have. Every model and guard test since is
+    neutered on purpose to watch it go red first. The same check applied
+    per-function ("break this and see if anything notices") found a
+    production path — S3-FIFO promotion — that could degrade to a
+    complete no-op with the entire suite still green.
+  - **Cost properties belong in deterministic checkers, not benchmarks.**
+    The #65 fix asserts convergence as a loom invariant on *lookup
+    count*, falsifiable two independent ways. Expressed as a benchmark it
+    would have been at the mercy of the noise floor; expressed as an
+    invariant, machine load is irrelevant. Correctness models are
+    routine; a cost model is not, and it is the better home for a
+    property like "this retry converges".
+  - **A performance claim must carry its resolution.** Read-path numbers
+    were cited from `get/*` benchmarks that never insert and therefore
+    measure only the miss path — structurally incapable of detecting a
+    hit-path regression, which is what they were being cited for. Renamed
+    to `get_miss/*`, with verified `get_hit/*` groups added; a hit costs
+    ~2.5x a miss. And on a shared machine the same code and benchmark
+    produced an A/A control of ±1.26% quiet versus −13.0%..+2.6% under
+    load, so every number now ships with its control spread and load
+    average. "Unmeasured, control spread ±X%" is a result; a bare
+    percentage is not.
+  - **Attach the cheap check to the claim.** Every miss this week was a
+    plausible statement nobody spent thirty seconds testing: "loom can't
+    model this" (it could — the seam was already in production code),
+    "16 lifecycles bounds the aliasing window" (a lost election bumps the
+    counter for free), "these busy-loops are the other session's live
+    work" (`ps -o ppid` showed a dead parent, 5.5 hours of orphans).
+
 ## Open
 
 - PR against pelikan-io/pelikan (plan Task E3): final verification,
