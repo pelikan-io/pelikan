@@ -794,7 +794,10 @@ impl Ring {
                 self.ring.submit()?;
                 if self.ring.submission().push(&entry).is_err() {
                     crate::metrics::RING.increment(crate::metrics::ring::SQE_SUBMIT_FAILURES);
-                    return Err(io::Error::other("SQ still full after submit"));
+                    return Err(io::Error::new(
+                        io::ErrorKind::WouldBlock,
+                        "SQ still full after submit",
+                    ));
                 }
             }
         }

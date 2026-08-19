@@ -56,6 +56,28 @@ impl SendCopyPool {
         )
     }
 
+    /// Reserve `required` empty slots as capacity permits.
+    ///
+    /// Returns `None` without changing the pool unless all requested slots
+    /// are available. Reserved slots must be released by the caller.
+    #[cfg(not(has_io_uring))]
+    pub fn reserve_slots(&mut self, required: usize) -> Option<Vec<u16>> {
+        if required > self.free_list.len() {
+            crate::metrics::POOL.increment(crate::metrics::pool::SEND_EXHAUSTED);
+            return None;
+        }
+        let mut slots = Vec::with_capacity(required);
+        for _ in 0..required {
+            let slot = self.free_list.pop().expect("capacity was checked");
+            self.in_use[slot as usize] = true;
+            self.slot_offset[slot as usize] = 0;
+            self.slot_remaining[slot as usize] = 0;
+            self.slot_end_of_send[slot as usize] = true;
+            slots.push(slot);
+        }
+        Some(slots)
+    }
+
     /// Allocate a slot, copy `data` into it, and return (slot_index, ptr, len).
     /// Returns `None` if no slots are free or data exceeds slot size.
     pub fn copy_in(&mut self, data: &[u8]) -> Option<(u16, *const u8, u32)> {
@@ -220,9 +242,13 @@ impl SendCopyPool {
     }
 
     /// Number of free slots.
-    #[cfg(test)]
     pub fn free_count(&self) -> usize {
         self.free_list.len()
+    }
+
+    /// Total number of slots.
+    pub fn slot_count(&self) -> usize {
+        self.count as usize
     }
 }
 

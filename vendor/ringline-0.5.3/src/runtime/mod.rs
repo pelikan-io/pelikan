@@ -409,6 +409,14 @@ impl TimerSlotPool {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct SendCapacityWaiter {
+    pub(crate) id: u64,
+    pub(crate) conn_index: u32,
+    pub(crate) generation: u32,
+    pub(crate) task_id: u32,
+}
+
 /// Per-worker async executor. Owns the task slab and coordinates
 /// CQE-driven wakeups with future polling.
 pub(crate) struct Executor {
@@ -430,8 +438,14 @@ pub(crate) struct Executor {
     waker_drain_scratch: VecDeque<u32>,
     /// Per-connection: task is awaiting recv data.
     pub(crate) recv_waiters: Vec<bool>,
+    /// Exact non-WouldBlock transport read errors for result-aware receivers.
+    pub(crate) recv_errors: Vec<Option<(u32, stdio::Error)>>,
     /// Per-connection: task is awaiting send completion.
     pub(crate) send_waiters: Vec<bool>,
+    /// FIFO of logical sends parked until the bounded copy pool has capacity.
+    pub(crate) send_capacity_waiters: VecDeque<SendCapacityWaiter>,
+    /// Monotonic identity used to cancel one future without disturbing peers.
+    pub(crate) next_send_capacity_id: u64,
     /// Per-connection: task is awaiting connect result.
     pub(crate) connect_waiters: Vec<bool>,
     /// Per-connection: CQE result storage for send/connect.
@@ -529,7 +543,14 @@ impl Executor {
             woken_while_polling: false,
             waker_drain_scratch: VecDeque::with_capacity(64),
             recv_waiters: vec![false; cap],
+            recv_errors: {
+                let mut errors = Vec::with_capacity(cap);
+                errors.resize_with(cap, || None);
+                errors
+            },
             send_waiters: vec![false; cap],
+            send_capacity_waiters: VecDeque::new(),
+            next_send_capacity_id: 0,
             connect_waiters: vec![false; cap],
             io_results: {
                 let mut v = Vec::with_capacity(cap);
@@ -593,6 +614,20 @@ impl Executor {
             self.recv_sinks[idx] = None;
         }
         self.task_slab.remove(conn_index);
+        let removed_capacity_tasks: Vec<u32> = self
+            .send_capacity_waiters
+            .iter()
+            .filter(|waiter| waiter.conn_index == conn_index)
+            .map(|waiter| waiter.task_id)
+            .collect();
+        self.send_capacity_waiters
+            .retain(|waiter| waiter.conn_index != conn_index);
+        for task_id in removed_capacity_tasks {
+            if task_id & waker::STANDALONE_BIT != 0 || task_id != conn_index {
+                let _ = self.wake_task(task_id);
+            }
+        }
+        self.wake_send_capacity();
         if idx < self.recv_waiters.len() {
             // If a *standalone* task was awaiting recv/send/connect on this
             // connection, it isn't removed by `task_slab.remove`. Push it
@@ -647,6 +682,32 @@ impl Executor {
         false
     }
 
+    /// Preserve a transport receive failure for `with_data_result` and wake
+    /// the registered reader. Existing `with_data` callers continue to see EOF.
+    pub(crate) fn fail_recv(&mut self, conn_index: u32, generation: u32, error: stdio::Error) {
+        let idx = conn_index as usize;
+        if idx < self.recv_errors.len() {
+            self.recv_errors[idx] = Some((generation, error));
+        }
+        self.wake_recv(conn_index);
+    }
+
+    pub(crate) fn take_recv_error(
+        &mut self,
+        conn_index: u32,
+        generation: u32,
+    ) -> Option<stdio::Error> {
+        let slot = self.recv_errors.get_mut(conn_index as usize)?;
+        if slot
+            .as_ref()
+            .is_some_and(|(error_generation, _)| *error_generation == generation)
+        {
+            slot.take().map(|(_, error)| error)
+        } else {
+            None
+        }
+    }
+
     /// Wake a task that was waiting for recv data.
     ///
     /// Resolves through `owner_task` so that outbound connections correctly
@@ -657,6 +718,52 @@ impl Executor {
             self.recv_waiters[idx] = false;
             let task_id = self.owner_task[idx].unwrap_or(conn_index);
             self.wake_task(task_id);
+        }
+    }
+
+    /// Allocate and enqueue a FIFO copy-pool capacity waiter.
+    pub(crate) fn enqueue_send_capacity(
+        &mut self,
+        conn_index: u32,
+        generation: u32,
+        task_id: u32,
+    ) -> u64 {
+        let id = self.next_send_capacity_id;
+        self.next_send_capacity_id = self.next_send_capacity_id.wrapping_add(1);
+        self.send_capacity_waiters.push_back(SendCapacityWaiter {
+            id,
+            conn_index,
+            generation,
+            task_id,
+        });
+        id
+    }
+
+    /// Whether this waiter is first in the FIFO and may attempt reservation.
+    pub(crate) fn send_capacity_turn(&self, id: u64) -> bool {
+        self.send_capacity_waiters
+            .front()
+            .is_some_and(|waiter| waiter.id == id)
+    }
+
+    /// Remove one waiter. If it was the head, wake its successor.
+    pub(crate) fn cancel_send_capacity(&mut self, id: u64) {
+        let was_head = self
+            .send_capacity_waiters
+            .front()
+            .is_some_and(|w| w.id == id);
+        if let Some(position) = self.send_capacity_waiters.iter().position(|w| w.id == id) {
+            self.send_capacity_waiters.remove(position);
+        }
+        if was_head {
+            self.wake_send_capacity();
+        }
+    }
+
+    /// Wake only the FIFO head when send capacity may have increased.
+    pub(crate) fn wake_send_capacity(&mut self) {
+        if let Some(waiter) = self.send_capacity_waiters.front().copied() {
+            self.wake_task(waiter.task_id);
         }
     }
 
@@ -786,6 +893,54 @@ impl Executor {
 mod tests {
     use super::*;
 
+    #[test]
+    fn send_capacity_waiters_are_fifo_and_cancel_safe() {
+        let mut exec = Executor::new(8, 8, 8, 0, 0);
+        for task_id in [1, 2] {
+            exec.task_slab
+                .spawn(task_id, Box::pin(std::future::pending::<()>()));
+            let future = exec.task_slab.take_ready(task_id).unwrap();
+            exec.task_slab.park(task_id, future);
+        }
+
+        let first = exec.enqueue_send_capacity(1, 7, 1);
+        let second = exec.enqueue_send_capacity(2, 9, 2);
+        assert!(exec.send_capacity_turn(first));
+        assert!(!exec.send_capacity_turn(second));
+        assert_eq!(exec.send_capacity_waiters.front().unwrap().generation, 7);
+
+        exec.cancel_send_capacity(first);
+        assert!(exec.send_capacity_turn(second));
+        assert!(exec.task_slab.take_ready(2).is_some());
+    }
+
+    #[test]
+    fn connection_removal_retains_tagged_receive_error_for_stale_owner() {
+        let mut exec = Executor::new(4, 4, 4, 0, 0);
+        exec.fail_recv(1, 7, stdio::Error::from_raw_os_error(libc::ECONNRESET));
+        exec.remove_connection(1);
+        assert!(exec.take_recv_error(1, 8).is_none());
+        let error = exec
+            .take_recv_error(1, 7)
+            .expect("error was discarded or stolen by a reused generation");
+        assert_eq!(error.raw_os_error(), Some(libc::ECONNRESET));
+    }
+
+    #[test]
+    fn connection_removal_cancels_capacity_waiter_and_advances_fifo() {
+        let mut exec = Executor::new(8, 8, 8, 0, 0);
+        exec.task_slab
+            .spawn(2, Box::pin(std::future::pending::<()>()));
+        let future = exec.task_slab.take_ready(2).unwrap();
+        exec.task_slab.park(2, future);
+
+        let removed = exec.enqueue_send_capacity(1, 3, 1);
+        let survivor = exec.enqueue_send_capacity(2, 4, 2);
+        assert!(exec.send_capacity_turn(removed));
+        exec.remove_connection(1);
+        assert!(exec.send_capacity_turn(survivor));
+        assert!(exec.task_slab.take_ready(2).is_some());
+    }
     #[test]
     fn collect_wakeups_transitions_parked_to_ready() {
         // A std Waker pushes only the raw id onto the thread-local queue.

@@ -905,7 +905,9 @@ fn flush_tls_output_mio_inner(
         return;
     }
 
-    pending.push_back((std::mem::take(write_buf), 0, None));
+    pending.push_back(crate::backend::mio::driver::PendingSend::unbounded(
+        std::mem::take(write_buf),
+    ));
 }
 
 /// Direct-write flush for close paths (close_notify): the connection is

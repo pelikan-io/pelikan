@@ -4,10 +4,7 @@ use entrystore::EntryStore;
 use logger::Klog;
 use pelikan_net::ringline::{self, AsyncEventHandler, ConnCtx, ParseResult};
 use protocol_common::{Compose, Execute, Protocol};
-use session::{
-    SESSION_RECV, SESSION_RECV_BYTE, SESSION_RECV_EX, SESSION_SEND, SESSION_SEND_BYTE,
-    SESSION_SEND_EX,
-};
+use session::{SESSION_RECV, SESSION_RECV_BYTE, SESSION_RECV_EX, SESSION_SEND, SESSION_SEND_BYTE};
 use std::any::Any;
 use std::cell::RefCell;
 use std::io;
@@ -22,16 +19,15 @@ fn record_receive(observed: usize, buffered: &mut usize) {
     *buffered = observed;
 }
 
-fn record_receive_error() {
+fn record_transport_receive_error() {
+    // Mio Session::fill counts every read attempt, then counts only a
+    // non-WouldBlock transport failure as a receive exception.
+    SESSION_RECV.increment();
     SESSION_RECV_EX.increment();
 }
 
 fn record_send() {
     SESSION_SEND.increment();
-}
-
-fn record_send_error() {
-    SESSION_SEND_EX.increment();
 }
 
 fn record_send_bytes(bytes: usize) {
@@ -283,8 +279,8 @@ where
             loop {
                 let mut outcome = None;
                 let mut terminal_error = None;
-                let consumed = conn
-                    .with_data(|data| {
+                let receive_result = conn
+                    .with_data_result(|data| {
                         record_receive(data.len(), &mut buffered_bytes);
                         match Self::process_with_session(&mut session, data) {
                             Ok(ProcessOutcome::Complete {
@@ -304,9 +300,16 @@ where
                     })
                     .await;
 
+                let consumed = match receive_result {
+                    Ok(consumed) => consumed,
+                    Err(error) => {
+                        record_transport_receive_error();
+                        error!("Ringline transport receive failed: {error}");
+                        break;
+                    }
+                };
                 buffered_bytes = buffered_bytes.saturating_sub(consumed);
                 if let Some(error) = terminal_error {
-                    record_receive_error();
                     error!("Ringline request processing failed: {error}");
                     break;
                 }
@@ -327,18 +330,10 @@ where
                     continue;
                 }
 
-                let sent = match conn.send(&response) {
-                    Ok(completion) => match completion.await {
-                        Ok(sent) => sent,
-                        Err(error) => {
-                            record_send_error();
-                            error!("Ringline response send failed: {error}");
-                            break;
-                        }
-                    },
+                let sent = match conn.send_backpressured(&response).await {
+                    Ok(sent) => sent,
                     Err(error) => {
-                        record_send_error();
-                        error!("Ringline response submission failed: {error}");
+                        error!("Ringline response send failed: {error}");
                         break;
                     }
                 };
@@ -347,7 +342,6 @@ where
                 session.response_completed(sent);
 
                 if sent != response.len() {
-                    record_send_error();
                     error!(
                         "Ringline response send completed partially: sent {sent} of {} bytes",
                         response.len()
@@ -402,17 +396,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        record_receive, record_receive_error, record_send, record_send_bytes, record_send_error,
-        ProcessOutcome, SendAction, SingleHandler,
-    };
+    use super::{ProcessOutcome, SendAction, SingleHandler};
     use entrystore::EntryStore;
     use logger::Klog;
     use protocol_common::{BufMut, Compose, Execute, ParseOk, Protocol};
-    use session::{
-        SESSION_RECV, SESSION_RECV_BYTE, SESSION_RECV_EX, SESSION_SEND, SESSION_SEND_BYTE,
-        SESSION_SEND_EX,
-    };
     use std::cell::{Cell, RefCell};
     use std::io::{self, ErrorKind};
     use std::rc::Rc;
@@ -447,6 +434,9 @@ mod tests {
 
     impl Protocol<LineRequest, LineResponse> for LineProtocol {
         fn parse_request(&self, buffer: &[u8]) -> io::Result<ParseOk<LineRequest>> {
+            if buffer.starts_with(b"!") {
+                return Err(io::Error::new(ErrorKind::InvalidData, "invalid line"));
+            }
             let Some(end) = buffer.iter().position(|byte| *byte == b'\n') else {
                 return Err(io::Error::from(ErrorKind::WouldBlock));
             };
@@ -594,29 +584,145 @@ mod tests {
         assert_eq!(SendAction::for_response(&[]), SendAction::Skip);
     }
 
-    #[test]
-    fn ringline_io_updates_session_metrics_with_mio_semantics() {
-        let recv = SESSION_RECV.value();
-        let recv_byte = SESSION_RECV_BYTE.value();
-        let recv_ex = SESSION_RECV_EX.value();
-        let send = SESSION_SEND.value();
-        let send_byte = SESSION_SEND_BYTE.value();
-        let send_ex = SESSION_SEND_EX.value();
-        let mut buffered = 2;
+    #[cfg(feature = "ringline-force-mio")]
+    mod live_metrics {
+        use super::*;
+        use session::{
+            SESSION_RECV, SESSION_RECV_BYTE, SESSION_RECV_EX, SESSION_SEND, SESSION_SEND_BYTE,
+            SESSION_SEND_EX,
+        };
+        struct SendEchoStorage;
 
-        record_receive(7, &mut buffered);
-        record_receive_error();
-        record_send();
-        record_send_bytes(11);
-        record_send_error();
+        impl EntryStore for SendEchoStorage {
+            fn clear(&mut self) {}
+        }
 
-        assert_eq!(buffered, 7);
-        assert_eq!(SESSION_RECV.value() - recv, 1);
-        assert_eq!(SESSION_RECV_BYTE.value() - recv_byte, 5);
-        assert_eq!(SESSION_RECV_EX.value() - recv_ex, 1);
-        assert_eq!(SESSION_SEND.value() - send, 1);
-        assert_eq!(SESSION_SEND_BYTE.value() - send_byte, 11);
-        assert_eq!(SESSION_SEND_EX.value() - send_ex, 1);
+        impl Execute<LineRequest, LineResponse> for SendEchoStorage {
+            fn execute(&mut self, request: &LineRequest) -> LineResponse {
+                LineResponse {
+                    bytes: request.0.clone(),
+                    hangup: false,
+                }
+            }
+        }
+
+        static LIVE_METRIC_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+        fn launch_live_handler() -> pelikan_net::ringline::RinglineRuntime {
+            let (_handler, bootstrap, recovery) =
+                SingleHandler::<LineProtocol, LineRequest, LineResponse, SendEchoStorage>::new(
+                    LineProtocol,
+                    SendEchoStorage,
+                );
+            let runtime = pelikan_net::ringline::launch_with_bootstraps::<
+                SingleHandler<LineProtocol, LineRequest, LineResponse, SendEchoStorage>,
+                _,
+            >(
+                "127.0.0.1:0".parse().unwrap(),
+                pelikan_net::ringline::RinglineRuntimeConfig {
+                    workers: 1,
+                    max_connections: 16,
+                    recv_buffers: 16,
+                    recv_buffer_size: 4096,
+                    pin_to_core: false,
+                },
+                vec![bootstrap],
+            )
+            .expect("live Ringline launch failed");
+            recovery.commit();
+            runtime
+        }
+
+        fn wait_for_counter(counter: &metriken::Counter, before: u64) {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while counter.value() == before && std::time::Instant::now() < deadline {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            assert!(counter.value() > before, "metric did not advance");
+        }
+
+        #[test]
+        fn live_protocol_error_is_not_counted_as_transport_receive_error() {
+            use std::io::Write;
+
+            let _guard = LIVE_METRIC_TEST_LOCK
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let recv_before = SESSION_RECV.value();
+            let recv_ex_before = SESSION_RECV_EX.value();
+            let runtime = launch_live_handler();
+            let mut stream = std::net::TcpStream::connect(runtime.bound_addr().unwrap()).unwrap();
+            stream.write_all(b"!\n").unwrap();
+            wait_for_counter(&SESSION_RECV, recv_before);
+            assert_eq!(SESSION_RECV_EX.value(), recv_ex_before);
+            drop(stream);
+            runtime.join().unwrap();
+        }
+
+        #[cfg(unix)]
+        #[test]
+        fn live_tcp_reset_counts_one_transport_receive_error() {
+            use std::os::fd::AsRawFd;
+
+            let _guard = LIVE_METRIC_TEST_LOCK
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let recv_before = SESSION_RECV.value();
+            let recv_ex_before = SESSION_RECV_EX.value();
+            let runtime = launch_live_handler();
+            let stream = std::net::TcpStream::connect(runtime.bound_addr().unwrap()).unwrap();
+            let linger = libc::linger {
+                l_onoff: 1,
+                l_linger: 0,
+            };
+            assert_eq!(
+                unsafe {
+                    libc::setsockopt(
+                        stream.as_raw_fd(),
+                        libc::SOL_SOCKET,
+                        libc::SO_LINGER,
+                        &linger as *const _ as *const libc::c_void,
+                        std::mem::size_of_val(&linger) as libc::socklen_t,
+                    )
+                },
+                0
+            );
+            drop(stream);
+            wait_for_counter(&SESSION_RECV_EX, recv_ex_before);
+            assert_eq!(SESSION_RECV.value() - recv_before, 1);
+            assert_eq!(SESSION_RECV_EX.value() - recv_ex_before, 1);
+            runtime.join().unwrap();
+        }
+
+        #[test]
+        fn live_success_matches_mio_receive_and_send_metrics() {
+            use std::io::{Read, Write};
+
+            let _guard = LIVE_METRIC_TEST_LOCK
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let recv_before = SESSION_RECV.value();
+            let recv_byte_before = SESSION_RECV_BYTE.value();
+            let recv_ex_before = SESSION_RECV_EX.value();
+            let send_before = SESSION_SEND.value();
+            let send_byte_before = SESSION_SEND_BYTE.value();
+            let send_ex_before = SESSION_SEND_EX.value();
+            let runtime = launch_live_handler();
+            let mut stream = std::net::TcpStream::connect(runtime.bound_addr().unwrap()).unwrap();
+            stream.write_all(b"ok\n").unwrap();
+            let mut response = [0; 2];
+            stream.read_exact(&mut response).unwrap();
+            assert_eq!(&response, b"ok");
+            wait_for_counter(&SESSION_SEND_BYTE, send_byte_before);
+            assert_eq!(SESSION_RECV.value() - recv_before, 1);
+            assert_eq!(SESSION_RECV_BYTE.value() - recv_byte_before, 3);
+            assert_eq!(SESSION_RECV_EX.value(), recv_ex_before);
+            assert_eq!(SESSION_SEND.value() - send_before, 1);
+            assert_eq!(SESSION_SEND_BYTE.value() - send_byte_before, 2);
+            assert_eq!(SESSION_SEND_EX.value(), send_ex_before);
+            drop(stream);
+            runtime.join().unwrap();
+        }
     }
 
     #[test]

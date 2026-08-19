@@ -672,6 +672,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             }
         }
 
+        // Any completion may have returned a pool slot or made SQ room. Wake
+        // only the FIFO head; a still-blocked head parks again until progress.
+        if !self.driver.cqe_batch.is_empty() {
+            self.executor.wake_send_capacity();
+        }
+
         // Eagerly return consumed recv buffers to the kernel ring in the same
         // iteration they were consumed, keeping the ring fuller under burst.
         self.flush_replenish_and_rearm();
@@ -869,7 +875,8 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
                 }
                 return;
             }
-            self.executor.wake_recv(conn_index);
+            self.executor
+                .fail_recv(conn_index, owner_gen, io::Error::from_raw_os_error(-result));
             self.driver.close_connection(conn_index);
             return;
         }
@@ -1052,7 +1059,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
                 self.maybe_rearm_throttled_forward(conn_index);
                 return;
             } else if !has_more {
-                self.executor.wake_recv(conn_index);
+                let generation = self.driver.connections.generation(conn_index);
+                self.executor.fail_recv(
+                    conn_index,
+                    generation,
+                    io::Error::from_raw_os_error(errno),
+                );
                 self.driver.close_connection(conn_index);
             }
             return;
@@ -1454,7 +1466,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             } else if errno == libc::ECANCELED {
                 return;
             } else if !has_more {
-                self.executor.wake_recv(conn_index);
+                let generation = self.driver.connections.generation(conn_index);
+                self.executor.fail_recv(
+                    conn_index,
+                    generation,
+                    io::Error::from_raw_os_error(errno),
+                );
                 self.driver.close_connection(conn_index);
             }
             return;
