@@ -59,6 +59,50 @@ and executing requests in place. Spec and plan:
   until crates.io ownership of its `keyvalue 0.3.0` dependency was
   resolved; the branch carried a temporary git pin until keyvalue and
   segcache 0.4.0 landed, and 0.4.1 followed with the lazy-expiry checks.
+- **The pre-PR adversarial review found six critical engine bugs, and
+  that is the headline result of this effort.** Being the first workload
+  to drive the engine concurrently from many threads is what exposed
+  them; the engine's own unit and loom coverage had not, largely because
+  its tests exercised each mechanism in isolation (unique keys per
+  operation, cache sized so eviction never runs) and the bugs all lived
+  in the overlaps. In rough order of severity: concurrent `incr`/`decr`
+  lost updates (a non-atomic read-modify-write whose "writers are
+  serialized externally" precondition this conversion deleted — 8
+  threads × 10k increments landed 47,336 of 80,000); a replace whose old
+  value shared the tail segment with its new reservation deadlocked
+  against any drain of that segment, wedging two threads and the bucket
+  chain lock; `cas` racing `incr` returned false `STORED` and destroyed
+  acked increments (~13%); merge relocation raw-`memcpy`'d numeric items
+  outside the seqlock, which could orphan an in-flight increment or
+  publish a permanently odd-version item that wedged every later access
+  to that key; an acked `delete` could be resurrected by merge
+  relocation; and live keys read as missing during merge drains, which
+  also let `add` clobber them. All six were reproduced with a failing
+  test before being fixed.
+- **Fix, then re-review the fix.** Each fix got an adversarial pass of
+  its own, and that is what caught the fourth bug above: the cas-integrity
+  fix's "no residual window" claim was false, because the party it forgot
+  was the one the deadlock fix had just promoted to first-class. Two of
+  the fix rounds also discarded their own first design after analysis
+  (a double-apply window; an ABA hazard introduced by a fix for a
+  different ABA hazard). The rule that fell out and is now written into
+  the engine: *a publish superseding an item may proceed unpinned iff it
+  touches no segment bytes; a publish that must re-verify or freeze item
+  state requires a remover pin and fails safe with `EXISTS`.*
+- **Two independent reviews converged on the same deadlock.** A separate
+  effort in cache-rs found it from the engine side (issue #49) and fixed
+  it by never waiting — publishing through an unpinned slot CAS — while
+  this one found it from the integration side and fixed it by rolling
+  back and restarting. Reconciling them was worth more than either fix:
+  never-wait is the stronger property and better for `insert`, but is
+  unsound for token-gated `cas` on this base, because acquiring the
+  numeric version lock *writes* into segment bytes that nothing is
+  pinning against recycle. Rollback-restart shipped; the never-wait
+  design is recorded in cache-rs #56 with that constraint attached.
+  Merging the two branches naively would also have silently
+  double-subtracted the item gauges — two correct-looking fixes for the
+  same drift, in different places, that git auto-merges without a
+  conflict.
 
 ## Open
 
@@ -72,6 +116,15 @@ and executing requests in place. Spec and plan:
   they exist.
 - Exactly-once flush via an admin-held clear handle, if the flush smear
   window ever matters in practice.
+- Engine follow-ups tracked in cache-rs, none blocking: a `delete` racing
+  a merge copy aborts the remainder of that segment's copy
+  (eviction-legal amplification); unpinned unlinks retain an ABA class
+  (#50) that wants generation-tagged locations or a key-verifying remove;
+  the never-wait insert design (#56); and an item-gauge under-count under
+  S3Fifo promotion, fixed in a follow-up PR from the parallel effort.
+- Numeric values are stored typed when they parse as `u64`, so `set`ting
+  `007` reads back `7` — a memcached byte-transparency violation that
+  predates this work and survives it.
 
 ## Skill Feedback
 
