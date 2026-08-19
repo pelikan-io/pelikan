@@ -845,7 +845,7 @@ dependencies = [
 [[package]]
 name = "keyvalue"
 version = "0.3.0"
-source = "git+https://github.com/pelikan-io/cache-rs?rev=33e49bf#33e49bff9d87a1f8e20e694c7e3eca0a7c7bc732"
+source = "git+https://github.com/pelikan-io/cache-rs?rev=9f99ff0#9f99ff0085c6ae2b0242be7194b1f42c2b3e1628"
 dependencies = [
  "crc32fast",
 ]
@@ -1658,7 +1658,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 [[package]]
 name = "segcache"
 version = "0.4.1"
-source = "git+https://github.com/pelikan-io/cache-rs?rev=33e49bf#33e49bff9d87a1f8e20e694c7e3eca0a7c7bc732"
+source = "git+https://github.com/pelikan-io/cache-rs?rev=9f99ff0#9f99ff0085c6ae2b0242be7194b1f42c2b3e1628"
 dependencies = [
  "ahash",
  "clocksource",
