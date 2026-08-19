@@ -104,6 +104,36 @@ and executing requests in place. Spec and plan:
   same drift, in different places, that git auto-merges without a
   conflict.
 
+- **A seventh engine bug surfaced after the release, from a CI flake we
+  didn't write off.** A version-bump-only PR failed one job in the test
+  guarding the very invariant the drain fix had just established, then
+  passed on re-run. Triage found a distinct mechanism: the hashtable's
+  key verification (`SegmentsVerifier::verify`) compares key bytes by
+  reading raw segment memory at the location loaded from the bucket slot,
+  with no pin and no generation tag — so a reader that stalls while a
+  merge relocates the item and the segment is recycled and rewritten
+  verifies against the *new* occupant, concludes "different key", and the
+  lookup returns `None`. It returns before any retry logic, so the drain
+  fix's unbounded pin retry never runs. Reproduced ~1 in 2,400 runs at
+  24-way parallelism (a serial loop is nearly useless); ~1.3e-9 per
+  lookup under continuous full-heap turnover. The guard already existed
+  in the same file on the write path and had simply never been
+  generalized to the five read helpers. Two lessons worth keeping: a
+  green-on-re-run failure in a test that guards a just-fixed invariant
+  deserves triage, not a re-run; and a fix written for one path should be
+  audited against every path sharing its hazard, which is now written
+  into the engine as one named invariant the six sites reference.
+- **Pelikan's exposure to that bug is narrower than the engine's.**
+  Pelikan calls `get_no_freq_incr` only in `add` and `replace`, and never
+  `try_into_numeric` or `contains` — so the worst engine failure mode (a
+  live counter silently reset to its initial value via the
+  incr-with-initial path) does not apply here. What did apply: `add`
+  could clobber a live key, `replace` could return NOT_STORED for one,
+  `delete` could report NOT_FOUND without deleting, and `cas` could
+  return NOT_FOUND where memcached requires EXISTS. A spurious `get`
+  miss is legal for a cache; the false *absence* leaking into
+  check-then-act commands is what made it a contract violation.
+
 ## Open
 
 - PR against pelikan-io/pelikan (plan Task E3): final verification,
