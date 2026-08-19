@@ -113,14 +113,14 @@ use std::sync::Arc;
 
 mod listener;
 mod process;
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 pub mod ringline;
 mod workers;
 
 use listener::ListenerBuilder;
 use workers::WorkersBuilder;
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 pub use process::RinglineProcessBuilder;
 pub use process::{backend_resolution, MioProcessBuilder, Process, ProcessBuilder};
 

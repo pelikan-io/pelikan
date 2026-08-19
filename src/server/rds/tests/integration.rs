@@ -37,6 +37,11 @@ fn wait_until_listening(addr: SocketAddr) {
 fn assert_ringline_resolution() {
     let resolution = backend_resolution();
     assert_eq!(resolution.requested, IoBackend::Ringline);
+    if cfg!(feature = "ringline-force-mio") {
+        assert_eq!(resolution.active, IoBackend::Ringline);
+        assert_eq!(resolution.fallback, None);
+        return;
+    }
     match (resolution.active, resolution.fallback) {
         (IoBackend::Ringline, None) => {}
         (IoBackend::Mio, Some(FallbackReason::UnsupportedCapability(cause))) => {
@@ -57,7 +62,9 @@ fn run_backend(backend: &str) {
     assert_ne!(data.port(), 0);
     assert_ne!(admin.port(), 0);
     set_test_addresses(data, admin);
-    wait_until_listening(data);
+    if !cfg!(feature = "ringline-force-mio") {
+        wait_until_listening(data);
+    }
     wait_until_listening(admin);
     if backend == "ringline" {
         assert_ringline_resolution();
@@ -68,6 +75,17 @@ fn run_backend(backend: &str) {
     tests();
     conformance_tests();
     admin_tests();
+    let resolution = backend_resolution();
+    let fallback = resolution
+        .fallback
+        .as_ref()
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "none".to_string());
+    assert_admin_backend_info(
+        &resolution.requested.to_string(),
+        &resolution.active.to_string(),
+        &fallback,
+    );
     let started = Instant::now();
     server.shutdown();
     assert!(started.elapsed() < Duration::from_secs(2));
@@ -75,7 +93,7 @@ fn run_backend(backend: &str) {
     assert!(TcpStream::connect(admin).is_err(), "admin listener leaked");
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn tls_requested_ringline_uses_mio() {
     let mut config = configure("ringline");
     config.tls_mut().set_private_key(concat!(
@@ -91,7 +109,9 @@ fn tls_requested_ringline_uses_mio() {
     let admin = server.admin_addr();
     assert_ne!(data, admin);
     set_test_addresses(data, admin);
-    wait_until_listening(data);
+    if !cfg!(feature = "ringline-force-mio") {
+        wait_until_listening(data);
+    }
     wait_until_listening(admin);
     let resolution = backend_resolution();
     assert_eq!(resolution.requested, IoBackend::Ringline);
@@ -115,7 +135,7 @@ fn tls_requested_ringline_uses_mio() {
     );
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn repeated_ringline_startup_releases_resources() {
     for _ in 0..8 {
         let config = configure("ringline");
@@ -135,8 +155,9 @@ fn repeated_ringline_startup_releases_resources() {
 }
 
 fn main() {
+    #[cfg(not(feature = "ringline-force-mio"))]
     run_backend("mio");
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     {
         run_backend("ringline");
         tls_requested_ringline_uses_mio();

@@ -135,7 +135,7 @@ impl RinglineRuntime {
                     .unwrap_or_else(std::sync::PoisonError::into_inner)
                     .take()
                     .expect("monitor runtime handoff missing");
-                runtime.join()
+                runtime.wait()
             }) {
             Ok(monitor) => Ok((control, monitor)),
             Err(error) => {
@@ -153,8 +153,12 @@ impl RinglineRuntime {
 
     /// Shuts down and joins every Ringline worker.
     pub fn join(self) -> io::Result<()> {
-        let Self { shutdown, workers } = self;
-        shutdown.shutdown();
+        self.shutdown();
+        self.wait()
+    }
+
+    fn wait(self) -> io::Result<()> {
+        let Self { workers, .. } = self;
         join_workers(workers)
     }
 }
@@ -446,6 +450,32 @@ mod tests {
     }
 
     #[cfg(feature = "ringline-force-mio")]
+    #[test]
+    fn monitor_keeps_runtime_live_until_control_shutdown() {
+        use std::io::Read;
+        use std::net::TcpStream;
+        use std::time::Duration;
+
+        let _test_guard = TEST_LOCK.lock().unwrap();
+        let runtime = launch_with_bootstraps::<GreetingHandler, u8>(
+            "127.0.0.1:0".parse().unwrap(),
+            runtime_config(1, 128),
+            vec![7],
+        )
+        .unwrap();
+        let addr = runtime.bound_addr().unwrap();
+        let (control, monitor) = runtime.monitor().unwrap();
+        let mut stream = TcpStream::connect(addr).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let mut response = [0; 7];
+        stream.read_exact(&mut response).unwrap();
+        assert_eq!(&response, b"READY\r\n");
+        control.shutdown();
+        monitor.join().unwrap().unwrap();
+    }
+
     #[test]
     fn monitor_spawn_failure_shuts_down_joins_and_releases_listener() {
         use std::net::TcpListener;

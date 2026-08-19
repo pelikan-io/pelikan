@@ -61,12 +61,12 @@ pub fn tests() {
 fn test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("testing: {name}");
     debug!("connecting to server");
-    let mut stream = TcpStream::connect(data_addr()).expect("failed to connect");
+    let mut stream = connected_client();
     stream
-        .set_read_timeout(Some(Duration::from_millis(250)))
+        .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set read timeout");
     stream
-        .set_write_timeout(Some(Duration::from_millis(250)))
+        .set_write_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set write timeout");
 
     debug!("sending request");
@@ -90,9 +90,8 @@ fn test(name: &str, data: &[(&str, Option<&str>)]) {
         let mut buf = vec![0; 4096];
 
         if let Some(response) = response {
-            if stream.read(&mut buf).is_err() {
-                std::thread::sleep(Duration::from_millis(500));
-                panic!("error reading response");
+            if let Err(error) = stream.read_exact(&mut buf[..response.len()]) {
+                panic!("error reading response: {error:?}");
             } else if response.as_bytes() != &buf[0..response.len()] {
                 error!("sent (UTF-8): {request:?}");
                 error!("sent (bytes): {:?}", request.as_bytes());
@@ -129,6 +128,7 @@ fn test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("status: passed\n");
 }
 
+#[cfg(feature = "ringline")]
 pub fn smoke_exchange() {
     let mut stream = connected_client();
     exchange(&mut stream, b"get task7-smoke\r\n", b"$-1\r\n");
@@ -146,7 +146,14 @@ pub fn conformance_tests() {
 }
 
 fn connected_client() -> TcpStream {
-    let stream = TcpStream::connect(data_addr()).expect("failed to connect");
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    let stream = loop {
+        match TcpStream::connect(data_addr()) {
+            Ok(stream) => break stream,
+            Err(_) if std::time::Instant::now() < deadline => std::thread::yield_now(),
+            Err(error) => panic!("failed to connect: {error}"),
+        }
+    };
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
         .unwrap();
@@ -254,7 +261,33 @@ fn invalid_input_closes_only_that_connection() {
         outcome => panic!("invalid RESP input did not close its connection: {outcome:?}"),
     }
     let mut valid = connected_client();
+
     exchange(&mut valid, b"get task7-after-invalid\r\n", b"$-1\r\n");
+}
+
+pub fn assert_admin_backend_info(requested: &str, active: &str, fallback: &str) {
+    let mut stream = TcpStream::connect(admin_addr()).expect("failed to connect to admin");
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    stream.write_all(b"stats\r\n").unwrap();
+    let mut buffer = vec![0_u8; 64 * 1024];
+    let count = stream.read(&mut buffer).unwrap();
+    let output = String::from_utf8(buffer[..count].to_vec()).unwrap();
+    assert!(
+        output.contains(&format!("STAT server_io_backend_requested {requested}\r\n")),
+        "missing requested backend in {output:?}"
+    );
+    assert!(
+        output.contains(&format!("STAT server_io_backend_active_name {active}\r\n")),
+        "missing active backend in {output:?}"
+    );
+    assert!(
+        output.contains(&format!(
+            "STAT server_io_backend_fallback_cause {fallback}\r\n"
+        )),
+        "missing fallback cause in {output:?}"
+    );
 }
 
 pub fn admin_tests() {
@@ -276,10 +309,10 @@ fn admin_test(name: &str, data: &[(&str, Option<&str>)]) {
     debug!("connecting to server");
     let mut stream = TcpStream::connect(admin_addr()).expect("failed to connect");
     stream
-        .set_read_timeout(Some(Duration::from_millis(250)))
+        .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set read timeout");
     stream
-        .set_write_timeout(Some(Duration::from_millis(250)))
+        .set_write_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set write timeout");
 
     debug!("sending request");

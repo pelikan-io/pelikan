@@ -9,8 +9,9 @@ homepage = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 [features]
-ringline-force-mio = ["pelikan-net/ringline-force-mio"]
-
+default = []
+ringline = ["pelikan-net/ringline", "dep:bytes", "dep:clocksource"]
+ringline-force-mio = ["ringline", "pelikan-net/ringline-force-mio"]
 
 [dependencies]
 admin = { path = "../admin" }
@@ -30,5 +31,5 @@ slab = { workspace = true }
 queues = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-bytes = { workspace = true }
-clocksource = { workspace = true }
+bytes = { workspace = true, optional = true }
+clocksource = { workspace = true, optional = true }

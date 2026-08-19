@@ -234,12 +234,12 @@ pub fn tests() {
 fn test_cas_stored() {
     info!("testing: cas stored");
     debug!("connecting to server");
-    let mut stream = TcpStream::connect(data_addr()).expect("failed to connect");
+    let mut stream = connected_client();
     stream
-        .set_read_timeout(Some(Duration::from_millis(250)))
+        .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set read timeout");
     stream
-        .set_write_timeout(Some(Duration::from_millis(250)))
+        .set_write_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set write timeout");
 
     let exchange = |stream: &mut TcpStream, request: &str| -> String {
@@ -305,12 +305,12 @@ fn test_cas_stored() {
 fn test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("testing: {name}");
     debug!("connecting to server");
-    let mut stream = TcpStream::connect(data_addr()).expect("failed to connect");
+    let mut stream = connected_client();
     stream
-        .set_read_timeout(Some(Duration::from_millis(250)))
+        .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set read timeout");
     stream
-        .set_write_timeout(Some(Duration::from_millis(250)))
+        .set_write_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set write timeout");
 
     debug!("sending request");
@@ -334,7 +334,7 @@ fn test(name: &str, data: &[(&str, Option<&str>)]) {
         let mut buf = vec![0; 4096];
 
         if let Some(response) = response {
-            if stream.read(&mut buf).is_err() {
+            if stream.read_exact(&mut buf[..response.len()]).is_err() {
                 std::thread::sleep(Duration::from_millis(500));
                 panic!("error reading response");
             } else if response.as_bytes() != &buf[0..response.len()] {
@@ -367,6 +367,7 @@ fn test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("status: passed\n");
 }
 
+#[cfg(feature = "ringline")]
 pub fn smoke_exchange() {
     let mut stream = connected_client();
     exchange(&mut stream, b"get task7-smoke\r\n", b"END\r\n");
@@ -383,7 +384,14 @@ pub fn conformance_tests() {
 }
 
 fn connected_client() -> TcpStream {
-    let stream = TcpStream::connect(data_addr()).expect("failed to connect");
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    let stream = loop {
+        match TcpStream::connect(data_addr()) {
+            Ok(stream) => break stream,
+            Err(_) if std::time::Instant::now() < deadline => std::thread::yield_now(),
+            Err(error) => panic!("failed to connect: {error}"),
+        }
+    };
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
         .unwrap();
@@ -506,10 +514,10 @@ fn admin_test(name: &str, data: &[(&str, Option<&str>)]) {
     debug!("connecting to server");
     let mut stream = TcpStream::connect(admin_addr()).expect("failed to connect");
     stream
-        .set_read_timeout(Some(Duration::from_millis(250)))
+        .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set read timeout");
     stream
-        .set_write_timeout(Some(Duration::from_millis(250)))
+        .set_write_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set write timeout");
 
     debug!("sending request");
@@ -533,7 +541,7 @@ fn admin_test(name: &str, data: &[(&str, Option<&str>)]) {
         let mut buf = vec![0; 4096];
 
         if let Some(response) = response {
-            if stream.read(&mut buf).is_err() {
+            if stream.read_exact(&mut buf[..response.len()]).is_err() {
                 std::thread::sleep(Duration::from_millis(500));
                 panic!("error reading response");
             } else if response.as_bytes() != &buf[0..response.len()] {

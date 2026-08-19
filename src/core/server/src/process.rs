@@ -8,30 +8,31 @@ use protocol_common::Protocol;
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
 use std::any::Any;
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 use std::io;
 use std::thread::JoinHandle;
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 use crate::ringline::{
     all_response_wakes_attached, request_flush, response_channel, MultiHandler, ResponseEnvelope,
     RinglineStorageWorker, SingleHandler, StorageRequest,
 };
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 use pelikan_net::ringline::{launch_with_bootstraps, RinglineRuntimeConfig};
 
 #[derive(Debug, Eq, PartialEq)]
 enum ProcessKind {
     Mio,
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     Ringline,
 }
 
 fn process_kind(resolution: pelikan_net::BackendResolution) -> ProcessKind {
     match resolution.active {
         pelikan_net::IoBackend::Mio => ProcessKind::Mio,
-        #[cfg(target_os = "linux")]
+        #[cfg(all(feature = "ringline", target_os = "linux"))]
         pelikan_net::IoBackend::Ringline => ProcessKind::Ringline,
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(all(feature = "ringline", target_os = "linux")))]
         pelikan_net::IoBackend::Ringline => ProcessKind::Mio,
     }
 }
@@ -71,7 +72,7 @@ impl WorkerConfig for CacheConfig {
 
 pub enum ProcessBuilder<Parser, Request, Response, Storage> {
     Mio(MioProcessBuilder<Parser, Request, Response, Storage>),
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     Ringline(RinglineProcessBuilder<Parser, Request, Response, Storage>),
 }
 
@@ -85,7 +86,7 @@ pub struct MioProcessBuilder<Parser, Request, Response, Storage> {
     _response: PhantomData<Response>,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 pub struct RinglineProcessBuilder<Parser, Request, Response, Storage> {
     mio: MioProcessBuilder<Parser, Request, Response, Storage>,
 }
@@ -105,7 +106,7 @@ where
     ) -> Result<Self> {
         let requested = pelikan_net::IoBackend::parse(config.server().io_backend())
             .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
-        let available = cfg!(target_os = "linux");
+        let available = cfg!(all(feature = "ringline", target_os = "linux"));
         let resolution = pelikan_net::resolve_backend(requested, available);
         let mio = MioProcessBuilder::new(config, log_drain, protocol, storage)?;
 
@@ -114,7 +115,7 @@ where
                 log_resolution(&resolution);
                 Ok(Self::Mio(mio))
             }
-            #[cfg(target_os = "linux")]
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
             ProcessKind::Ringline => match ringline_preflight(&mio) {
                 Ok(()) => {
                     info!("cache server I/O backend requested=ringline active=pending");
@@ -131,7 +132,7 @@ where
     pub fn version(mut self, version: &str) -> Self {
         match &mut self {
             Self::Mio(builder) => builder.admin.version(version),
-            #[cfg(target_os = "linux")]
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
             Self::Ringline(builder) => builder.mio.admin.version(version),
         }
         self
@@ -140,7 +141,7 @@ where
     pub fn spawn(self) -> Process {
         match self {
             Self::Mio(builder) => Process::Mio(builder.spawn()),
-            #[cfg(target_os = "linux")]
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
             Self::Ringline(builder) => builder.spawn(),
         }
     }
@@ -174,6 +175,7 @@ fn record_resolution(resolution: &pelikan_net::BackendResolution) {
     }
 }
 
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn log_ringline_active() {
     log_resolution(&pelikan_net::BackendResolution {
         requested: pelikan_net::IoBackend::Ringline,
@@ -182,7 +184,7 @@ fn log_ringline_active() {
     });
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn ringline_fallback_reason(
     error: &pelikan_net::ringline::StartupError,
 ) -> pelikan_net::FallbackReason {
@@ -203,7 +205,7 @@ fn ringline_fallback_reason(
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn log_ringline_runtime_fallback(error: &pelikan_net::ringline::StartupError) {
     log_resolution(&pelikan_net::BackendResolution {
         requested: pelikan_net::IoBackend::Ringline,
@@ -212,6 +214,7 @@ fn log_ringline_runtime_fallback(error: &pelikan_net::ringline::StartupError) {
     });
 }
 
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn log_ringline_fallback(cause: impl std::fmt::Display) {
     log_resolution(&pelikan_net::BackendResolution {
         requested: pelikan_net::IoBackend::Ringline,
@@ -234,6 +237,18 @@ fn log_resolution(resolution: &pelikan_net::BackendResolution) {
             resolution.requested, resolution.active
         ),
     }
+}
+fn set_admin_backend_info(admin: &mut AdminBuilder, resolution: &pelikan_net::BackendResolution) {
+    let fallback = resolution
+        .fallback
+        .as_ref()
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "none".to_string());
+    admin.backend_info(
+        &resolution.requested.to_string(),
+        &resolution.active.to_string(),
+        &fallback,
+    );
 }
 
 impl<P, Request, Response, Storage> MioProcessBuilder<P, Request, Response, Storage>
@@ -283,7 +298,7 @@ where
 }
 
 fn spawn_mio<P, Request, Response, Storage>(
-    admin: AdminBuilder,
+    mut admin: AdminBuilder,
     listener: ListenerBuilder,
     workers: WorkersBuilder<P, Request, Response, Storage>,
     log_drain: LogDrain,
@@ -294,6 +309,7 @@ where
     Response: 'static + Compose + Send,
     Storage: 'static + Execute<Request, Response> + EntryStore + Send,
 {
+    set_admin_backend_info(&mut admin, &backend_resolution());
     let admin_addr = admin
         .local_addr()
         .expect("bound admin listener has no address");
@@ -339,7 +355,7 @@ where
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn ringline_preflight<P, Request, Response, Storage>(
     mio: &MioProcessBuilder<P, Request, Response, Storage>,
 ) -> Result<()> {
@@ -352,10 +368,10 @@ fn ringline_preflight<P, Request, Response, Storage>(
     Ok(())
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 const RINGLINE_MAX_CONNECTIONS: u32 = 16_000;
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 impl<P, Request, Response, Storage> RinglineProcessBuilder<P, Request, Response, Storage>
 where
     P: 'static + Protocol<Request, Response> + Clone + Send,
@@ -519,7 +535,7 @@ where
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn spawn_ringline_single<P, Request, Response, Storage>(
     admin: AdminBuilder,
     config: CacheConfig,
@@ -575,7 +591,7 @@ where
 
 pub enum Process {
     Mio(MioProcess),
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     Ringline(RinglineProcess),
 }
 
@@ -588,7 +604,7 @@ pub struct MioProcess {
     workers: Vec<JoinHandle<()>>,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 pub struct RinglineProcess {
     admin_addr: std::net::SocketAddr,
     data_addr: std::net::SocketAddr,
@@ -597,13 +613,21 @@ pub struct RinglineProcess {
     signal_tx: Sender<Signal>,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn spawn_ringline(
-    admin: AdminBuilder,
+    mut admin: AdminBuilder,
     log_drain: LogDrain,
     runtime: pelikan_net::ringline::RinglineRuntime,
     pending_storage: Option<PendingRinglineStorage>,
 ) -> io::Result<RinglineProcess> {
+    set_admin_backend_info(
+        &mut admin,
+        &pelikan_net::BackendResolution {
+            requested: pelikan_net::IoBackend::Ringline,
+            active: pelikan_net::IoBackend::Ringline,
+            fallback: None,
+        },
+    );
     let admin_addr = admin.local_addr()?;
     let data_addr = runtime
         .bound_addr()
@@ -787,13 +811,13 @@ fn spawn_ringline(
     })
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 struct PendingRinglineStorage {
     signal_tx: Sender<Signal>,
     run: Box<dyn FnOnce() + Send>,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 impl PendingRinglineStorage {
     fn start(self) -> io::Result<LiveRinglineStorage> {
         let join = std::thread::Builder::new()
@@ -806,13 +830,13 @@ impl PendingRinglineStorage {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 struct LiveRinglineStorage {
     signal_tx: Sender<Signal>,
     join: Option<JoinHandle<()>>,
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn stop_ringline_storage(storage: &mut Option<LiveRinglineStorage>) {
     let Some(mut storage) = storage.take() else {
         return;
@@ -828,13 +852,13 @@ fn stop_ringline_storage(storage: &mut Option<LiveRinglineStorage>) {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn fail_after_live<T>(error: io::Error, rollback: impl FnOnce()) -> io::Result<T> {
     rollback();
     Err(error)
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn rollback_live_runtime(
     runtime: pelikan_net::ringline::RinglineRuntime,
     error: io::Error,
@@ -846,15 +870,21 @@ fn rollback_live_runtime(
     })
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn log_ringline_monitor(worker_monitor: JoinHandle<io::Result<()>>) {
     match worker_monitor.join() {
         Ok(Ok(())) => {}
-        Ok(Err(error)) => error!("Ringline runtime terminated: {error}"),
-        Err(payload) => error!("Ringline monitor panicked: {}", panic_payload(payload)),
+        Ok(Err(error)) => {
+            error!("Ringline runtime terminated: {error}");
+        }
+        Err(payload) => {
+            let payload = panic_payload(payload);
+            error!("Ringline monitor panicked: {payload}");
+        }
     }
 }
 
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 fn try_spawn_signal_handler(signal_tx: Sender<Signal>) -> io::Result<()> {
     std::thread::Builder::new()
         .name(format!("{THREAD_PREFIX}_signal"))
@@ -908,7 +938,7 @@ impl Process {
     pub fn admin_addr(&self) -> std::net::SocketAddr {
         match self {
             Self::Mio(process) => process.admin_addr,
-            #[cfg(target_os = "linux")]
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
             Self::Ringline(process) => process.admin_addr,
         }
     }
@@ -917,7 +947,7 @@ impl Process {
     pub fn data_addr(&self) -> std::net::SocketAddr {
         match self {
             Self::Mio(process) => process.data_addr,
-            #[cfg(target_os = "linux")]
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
             Self::Ringline(process) => process.data_addr,
         }
     }
@@ -925,7 +955,7 @@ impl Process {
     pub fn shutdown(self) {
         match &self {
             Self::Mio(process) => shutdown_signal(&process.signal_tx),
-            #[cfg(target_os = "linux")]
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
             Self::Ringline(process) => shutdown_signal(&process.signal_tx),
         }
         self.wait()
@@ -934,7 +964,7 @@ impl Process {
     pub fn wait(self) {
         match self {
             Self::Mio(process) => process.wait(),
-            #[cfg(target_os = "linux")]
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
             Self::Ringline(process) => process.wait(),
         }
     }
@@ -956,7 +986,7 @@ impl MioProcess {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 impl RinglineProcess {
     fn wait(self) {
         if let Err(payload) = self.bridge.join() {
@@ -970,16 +1000,16 @@ impl RinglineProcess {
 
 #[cfg(test)]
 mod tests {
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    use super::ringline_fallback_reason;
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     use super::RINGLINE_MAX_CONNECTIONS;
-    use super::{
-        backend_resolution, process_kind, record_resolution, ringline_fallback_reason, ProcessKind,
-    };
+    use super::{backend_resolution, process_kind, record_resolution, ProcessKind};
     use crate::{SERVER_IO_BACKEND_ACTIVE, SERVER_IO_BACKEND_FALLBACK};
     use pelikan_net::{resolve_backend, BackendResolution, FallbackReason, IoBackend};
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     use std::cell::Cell;
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     use std::io;
 
     #[test]
@@ -990,7 +1020,7 @@ mod tests {
         );
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     #[test]
     fn resolved_ringline_builds_ringline_process() {
         assert_eq!(
@@ -999,7 +1029,7 @@ mod tests {
         );
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     #[test]
     fn post_live_construction_failure_runs_rollback_and_preserves_cause() {
         let rolled_back = Cell::new(false);
@@ -1013,12 +1043,13 @@ mod tests {
         assert_eq!(error.to_string(), "injected bridge spawn failure");
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     #[test]
     fn ringline_connection_limit_uses_ringline_default_not_mio_event_batch() {
         assert_eq!(RINGLINE_MAX_CONNECTIONS, 16_000);
     }
 
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     #[test]
     fn configuration_ring_setup_is_initialization_with_exact_cause() {
         let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Configuration(
@@ -1034,6 +1065,7 @@ mod tests {
         );
     }
 
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     #[test]
     fn runtime_ring_setup_is_classified_as_unsupported_with_exact_cause() {
         let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Runtime(
@@ -1047,6 +1079,7 @@ mod tests {
         );
     }
 
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     #[test]
     fn kernel_einval_is_classified_as_unsupported_with_exact_cause() {
         let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Runtime(
@@ -1060,6 +1093,7 @@ mod tests {
         );
     }
 
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
     #[test]
     fn unrelated_initialization_error_is_not_an_unsupported_capability() {
         let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Runtime(

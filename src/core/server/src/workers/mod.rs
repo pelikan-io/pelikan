@@ -13,6 +13,7 @@ mod storage;
 use multi::*;
 use single::*;
 use storage::*;
+#[cfg(all(feature = "ringline", target_os = "linux"))]
 pub(crate) use storage::{STORAGE_EVENT_LOOP, STORAGE_QUEUE_DEPTH};
 
 #[metric(

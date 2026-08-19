@@ -160,6 +160,7 @@ pub struct Admin {
     timeout: Duration,
     /// The version of the service
     version: String,
+    backend_info: Vec<(String, String)>,
     /// The waker for this thread
     waker: Arc<Waker>,
 }
@@ -173,6 +174,7 @@ pub struct AdminBuilder {
     sessions: Slab<ServerSession<AdminProtocol, AdminResponse, AdminRequest>>,
     timeout: Duration,
     version: String,
+    backend_info: Vec<(String, String)>,
     waker: Arc<Waker>,
 }
 
@@ -206,6 +208,7 @@ impl AdminBuilder {
         let sessions = Slab::new();
 
         let version = "unknown".to_string();
+        let backend_info = Vec::new();
 
         let backlog = VecDeque::new();
 
@@ -229,12 +232,29 @@ impl AdminBuilder {
             sessions,
             timeout,
             version,
+            backend_info,
             waker,
         })
     }
 
     pub fn version(&mut self, version: &str) {
         self.version = version.to_string();
+    }
+    pub fn backend_info(&mut self, requested: &str, active: &str, fallback: &str) {
+        self.backend_info = vec![
+            (
+                "server_io_backend_requested".to_string(),
+                requested.to_string(),
+            ),
+            (
+                "server_io_backend_active_name".to_string(),
+                active.to_string(),
+            ),
+            (
+                "server_io_backend_fallback_cause".to_string(),
+                fallback.to_string(),
+            ),
+        ];
     }
 
     pub fn local_addr(&self) -> std::io::Result<std::net::SocketAddr> {
@@ -263,6 +283,7 @@ impl AdminBuilder {
             signal_queue_tx,
             timeout: self.timeout,
             version: self.version,
+            backend_info: self.backend_info,
             waker: self.waker,
         }
     }
@@ -379,7 +400,7 @@ impl Admin {
                         return Err(Error::other("should hangup"));
                     }
                     AdminRequest::Stats => {
-                        session.send(AdminResponse::Stats)?;
+                        session.send(AdminResponse::stats_with_info(self.backend_info.clone()))?;
                     }
                     AdminRequest::Version => {
                         session.send(AdminResponse::version(self.version.clone()))?;

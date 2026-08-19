@@ -222,6 +222,11 @@ The Segcache and RDS plain-TCP data listeners can opt in to Ringline on Linux:
 io_backend = "ringline" # Linux only; defaults and falls back to "mio"
 ```
 
+The binary must also be built with its opt-in Cargo feature, for example
+`cargo build --release -p pelikan-segcache --features ringline` (or the
+equivalent `pelikan-rds` command). Without that feature, Linux builds are
+Mio-only and do not include the Ringline or Ringline-only slab dependency.
+
 `mio` remains the default on every platform. The Ringline option uses version
 `0.5.3`, vendored from the published crates.io archive and patched locally.
 Ringline reports Linux 6.0 or newer on x86_64 or ARM64 as its platform
