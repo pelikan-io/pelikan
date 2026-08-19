@@ -15,6 +15,8 @@ pub struct SendCopyPool {
     // is marked, so the send waiter is woken once per logical send rather
     // than once per chunk. Independent single-slot sends are always final.
     slot_end_of_send: Vec<bool>,
+    /// Bounded logical-send identity, carried through partial/POLLOUT CQEs.
+    slot_bounded_send_id: Vec<Option<u64>>,
 }
 
 impl SendCopyPool {
@@ -33,6 +35,7 @@ impl SendCopyPool {
             slot_remaining: vec![0u32; n],
             in_use: vec![false; n],
             slot_end_of_send: vec![true; n],
+            slot_bounded_send_id: vec![None; n],
         }
     }
 
@@ -73,6 +76,7 @@ impl SendCopyPool {
             self.slot_offset[slot as usize] = 0;
             self.slot_remaining[slot as usize] = 0;
             self.slot_end_of_send[slot as usize] = true;
+            self.slot_bounded_send_id[slot as usize] = None;
             slots.push(slot);
         }
         Some(slots)
@@ -98,6 +102,7 @@ impl SendCopyPool {
         self.slot_remaining[idx as usize] = data.len() as u32;
         self.in_use[idx as usize] = true;
         self.slot_end_of_send[idx as usize] = true;
+        self.slot_bounded_send_id[idx as usize] = None;
         Some((idx, ptr, data.len() as u32))
     }
 
@@ -133,6 +138,7 @@ impl SendCopyPool {
         self.slot_remaining[idx as usize] = total_len as u32;
         self.in_use[idx as usize] = true;
         self.slot_end_of_send[idx as usize] = true;
+        self.slot_bounded_send_id[idx as usize] = None;
         Some((idx, out_ptr, total_len as u32))
     }
 
@@ -154,6 +160,7 @@ impl SendCopyPool {
         self.slot_remaining[idx as usize] = 0;
         self.in_use[idx as usize] = true;
         self.slot_end_of_send[idx as usize] = true;
+        self.slot_bounded_send_id[idx as usize] = None;
         let ptr = self.backing.as_mut_ptr().wrapping_add(offset);
         Some((idx, ptr, self.slot_size))
     }
@@ -176,6 +183,7 @@ impl SendCopyPool {
         self.in_use[idx as usize] = false;
         self.slot_offset[idx as usize] = 0;
         self.slot_remaining[idx as usize] = 0;
+        self.slot_bounded_send_id[idx as usize] = None;
         self.free_list.push(idx);
     }
 
@@ -234,6 +242,14 @@ impl SendCopyPool {
     /// Whether this slot holds the final chunk of its logical send.
     pub fn is_end_of_send(&self, slot: u16) -> bool {
         self.slot_end_of_send[slot as usize]
+    }
+
+    pub fn set_bounded_send_id(&mut self, slot: u16, id: Option<u64>) {
+        self.slot_bounded_send_id[slot as usize] = id;
+    }
+
+    pub fn bounded_send_id(&self, slot: u16) -> Option<u64> {
+        self.slot_bounded_send_id[slot as usize]
     }
 
     /// Bytes per slot.
@@ -352,6 +368,19 @@ mod tests {
 
         pool.release(idx);
         assert_eq!(pool.free_count(), 4);
+    }
+
+    #[test]
+    fn bounded_send_identity_survives_partial_progress_and_clears_on_release() {
+        let mut pool = SendCopyPool::new(1, 16);
+        let (slot, _, _) = pool.copy_in(b"identity").unwrap();
+        pool.set_bounded_send_id(slot, Some(42));
+
+        assert!(pool.try_advance(slot, 3).is_some());
+        assert_eq!(pool.bounded_send_id(slot), Some(42));
+
+        pool.release(slot);
+        assert_eq!(pool.bounded_send_id(slot), None);
     }
 
     #[test]

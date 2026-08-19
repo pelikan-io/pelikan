@@ -24,6 +24,7 @@ pub(crate) struct PendingSend {
     pub(crate) data: Vec<u8>,
     pub(crate) offset: usize,
     pub(crate) notify_len: Option<u32>,
+    pub(crate) bounded_send_id: Option<u64>,
     pub(crate) pool_slots: Vec<u16>,
 }
 
@@ -33,15 +34,17 @@ impl PendingSend {
             data,
             offset: 0,
             notify_len: None,
+            bounded_send_id: None,
             pool_slots: Vec::new(),
         }
     }
 
-    pub(crate) fn bounded(data: Vec<u8>, pool_slots: Vec<u16>) -> Self {
+    pub(crate) fn bounded(data: Vec<u8>, pool_slots: Vec<u16>, bounded_send_id: u64) -> Self {
         Self {
             data,
             offset: 0,
             notify_len: None,
+            bounded_send_id: Some(bounded_send_id),
             pool_slots,
         }
     }
@@ -113,6 +116,8 @@ pub(crate) struct Driver {
     /// `DriverCtx::send_await()` pushes len here; the event loop drains
     /// these and calls `Executor::wake_send()` for each.
     pub(crate) send_completions: Vec<VecDeque<u32>>,
+    /// Exact logical-send completions for `send_backpressured` futures.
+    pub(crate) bounded_send_completions: VecDeque<(u64, io::Result<u32>)>,
     /// Bound UDP sockets (one per `config.udp_bind` address).
     pub(crate) udp_sockets: Vec<mio::net::UdpSocket>,
     /// Whether UDP GRO was requested; when set, the readable handler uses
@@ -261,6 +266,7 @@ impl Driver {
             wake_pipe_fd: eventfd,
             tcp_nodelay: config.tcp_nodelay,
             send_completions: (0..max_conn).map(|_| VecDeque::new()).collect(),
+            bounded_send_completions: VecDeque::new(),
             udp_sockets,
             udp_gro: config.udp_gro,
             udp_token_base,
@@ -321,6 +327,7 @@ impl Driver {
             poll: &mut self.poll,
             writable: &mut self.writable,
             send_completions: &mut self.send_completions,
+            bounded_send_completions: &mut self.bounded_send_completions,
             connect_deadlines: &mut self.connect_deadlines,
             disk_io_pool: &self.disk_io_pool,
             disk_io_tx: &self.disk_io_tx,
@@ -428,6 +435,13 @@ impl Driver {
         }
     }
 
+    pub(crate) fn pending_bounded_send_ids(&self, idx: usize) -> Vec<u64> {
+        self.pending_sends[idx]
+            .iter()
+            .filter_map(|pending| pending.bounded_send_id)
+            .collect()
+    }
+
     /// Record `idx` in the dirty-sends list so the event loop's flush pass
     /// visits it. Invariant: non-empty `pending_sends[idx]` ⇒ flag set.
     /// Every push into `pending_sends` — including the TLS paths that push
@@ -521,6 +535,10 @@ impl Driver {
                                 self.completions_dirty_flag[idx] = true;
                                 self.completions_dirty.push(idx as u32);
                             }
+                        }
+                        if let Some(id) = pending.bounded_send_id.take() {
+                            self.bounded_send_completions
+                                .push_back((id, Ok(pending.data.len() as u32)));
                         }
                         if let Some(completed) = self.pending_sends[idx].pop_front() {
                             for slot in completed.pool_slots {

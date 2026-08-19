@@ -677,6 +677,9 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         if !self.driver.cqe_batch.is_empty() {
             self.executor.wake_send_capacity();
         }
+        while let Some((id, error)) = self.driver.bounded_send_failures.pop_front() {
+            self.executor.complete_bounded_send(id, Err(error));
+        }
 
         // Eagerly return consumed recv buffers to the kernel ring in the same
         // iteration they were consumed, keeping the ring fuller under burst.
@@ -1788,6 +1791,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             let total = self.driver.send_copy_pool.original_len(pool_slot);
             // Read the end-of-send flag before releasing the slot.
             let end_of_send = self.driver.send_copy_pool.is_end_of_send(pool_slot);
+            let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
             metrics::BYTES.add(metrics::bytes::SENT, total as u64);
             self.driver.send_copy_pool.release(pool_slot);
 
@@ -1810,7 +1814,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             if end_of_send {
                 let acked =
                     std::mem::take(&mut self.driver.send_queues[conn_index as usize].acked_bytes);
-                self.executor.wake_send(conn_index, Ok(acked));
+                if let Some(id) = bounded_send_id {
+                    self.executor.complete_bounded_send(id, Ok(acked));
+                } else {
+                    self.executor.wake_send(conn_index, Ok(acked));
+                }
             }
             return;
         }
@@ -1839,6 +1847,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             return;
         }
 
+        let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
         self.driver.send_copy_pool.release(pool_slot);
         self.driver.drain_conn_send_queue(conn_index);
         self.driver.note_send_finalized(conn_index);
@@ -1848,7 +1857,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         } else {
             Err(io::Error::from_raw_os_error(-result))
         };
-        self.executor.wake_send(conn_index, io_result);
+        if let Some(id) = bounded_send_id {
+            self.executor.complete_bounded_send(id, io_result);
+        } else {
+            self.executor.wake_send(conn_index, io_result);
+        }
     }
 
     /// Handle a `POLLOUT` CQE armed after a `Send` returned `-EAGAIN`.
@@ -1878,11 +1891,16 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         // the same as a generic send failure: drop everything for
         // this connection.
         if result < 0 {
+            let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
+            let error = io::Error::from_raw_os_error(-result);
             self.driver.send_copy_pool.release(pool_slot);
             self.driver.drain_conn_send_queue(conn_index);
             self.driver.note_send_finalized(conn_index);
-            self.executor
-                .wake_send(conn_index, Err(io::Error::from_raw_os_error(-result)));
+            if let Some(id) = bounded_send_id {
+                self.executor.complete_bounded_send(id, Err(error));
+            } else {
+                self.executor.wake_send(conn_index, Err(error));
+            }
             return;
         }
 
@@ -1920,6 +1938,14 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         self.driver.send_slab.release(slab_idx);
     }
 
+    fn coalesced_bounded_send_id(&self, slab_idx: u16) -> Option<u64> {
+        self.driver
+            .send_slab
+            .coalesced_pool_slots(slab_idx)
+            .iter()
+            .find_map(|slot| self.driver.send_copy_pool.bounded_send_id(*slot))
+    }
+
     /// Handle completion of a coalesced plaintext `sendmsg` (OpTag::SendMsgCoalesced).
     /// Mirrors `handle_send` but the backing is a slab entry holding several
     /// pool slots; partial sends advance the iovec array via `try_advance`.
@@ -1952,6 +1978,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             let total = self.driver.send_slab.total_len(slab_idx);
             // Read the end-of-send flag before releasing the slab entry.
             let end_of_send = self.driver.send_slab.is_end_of_send(slab_idx);
+            let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
             metrics::BYTES.add(metrics::bytes::SENT, total as u64);
             self.release_coalesced(slab_idx);
 
@@ -1965,7 +1992,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             if end_of_send {
                 let acked =
                     std::mem::take(&mut self.driver.send_queues[conn_index as usize].acked_bytes);
-                self.executor.wake_send(conn_index, Ok(acked));
+                if let Some(id) = bounded_send_id {
+                    self.executor.complete_bounded_send(id, Ok(acked));
+                } else {
+                    self.executor.wake_send(conn_index, Ok(acked));
+                }
             }
             return;
         }
@@ -1990,6 +2021,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         }
 
         // Real error — release everything and drain the connection's queue.
+        let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
         self.release_coalesced(slab_idx);
         self.driver.drain_conn_send_queue(conn_index);
         self.driver.note_send_finalized(conn_index);
@@ -1998,7 +2030,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         } else {
             Err(io::Error::from_raw_os_error(-result))
         };
-        self.executor.wake_send(conn_index, io_result);
+        if let Some(id) = bounded_send_id {
+            self.executor.complete_bounded_send(id, io_result);
+        } else {
+            self.executor.wake_send(conn_index, io_result);
+        }
     }
 
     /// Handle a POLLOUT CQE armed after a coalesced send returned `-EAGAIN`.
@@ -2894,6 +2930,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             }
         }
 
+        let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
         self.driver.send_copy_pool.release(pool_slot);
 
         // Intermediate TLS chunks are serialized through the per-connection
@@ -2910,6 +2947,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
         // and close.
         if result < 0 {
             self.driver.drain_conn_send_queue(conn_index);
+            let error = io::Error::from_raw_os_error(-result);
+            if let Some(id) = bounded_send_id {
+                self.executor.complete_bounded_send(id, Err(error));
+            } else {
+                self.executor.wake_send(conn_index, Err(error));
+            }
             self.driver.close_connection(conn_index);
         }
     }
@@ -3552,16 +3595,31 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             if self.driver.connections.get(conn_index).is_none()
                 || self.driver.connections.generation(conn_index) != generation
             {
+                let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
                 self.release_coalesced(slab_idx);
+                if let Some(id) = bounded_send_id {
+                    self.executor.complete_bounded_send(
+                        id,
+                        Err(io::Error::new(
+                            io::ErrorKind::ConnectionAborted,
+                            "connection closed during coalesced send retry",
+                        )),
+                    );
+                }
                 continue;
             }
             if retries >= 2 {
                 // Give up: fail the waiter and close so the connection isn't
                 // left open with a hole in its byte stream.
+                let bounded_send_id = self.coalesced_bounded_send_id(slab_idx);
                 self.release_coalesced(slab_idx);
                 self.driver.drain_conn_send_queue(conn_index);
                 let err = io::Error::other("max retries during coalesced send resubmit");
-                self.executor.wake_send(conn_index, Err(err));
+                if let Some(id) = bounded_send_id {
+                    self.executor.complete_bounded_send(id, Err(err));
+                } else {
+                    self.executor.wake_send(conn_index, Err(err));
+                }
                 self.driver.close_connection(conn_index);
                 continue;
             }
@@ -3652,16 +3710,31 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             if self.driver.connections.get(conn_index).is_none()
                 || self.driver.connections.generation(conn_index) != generation
             {
+                let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
                 self.driver.send_copy_pool.release(pool_slot);
+                if let Some(id) = bounded_send_id {
+                    self.executor.complete_bounded_send(
+                        id,
+                        Err(io::Error::new(
+                            io::ErrorKind::ConnectionAborted,
+                            "connection closed during copied send retry",
+                        )),
+                    );
+                }
                 continue;
             }
             if retries >= 2 {
                 // Give up: fail the waiter and close so the connection isn't
                 // left open with a hole in its byte stream.
+                let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
                 self.driver.send_copy_pool.release(pool_slot);
                 self.driver.drain_conn_send_queue(conn_index);
                 let err = io::Error::other("max retries during send resubmit");
-                self.executor.wake_send(conn_index, Err(err));
+                if let Some(id) = bounded_send_id {
+                    self.executor.complete_bounded_send(id, Err(err));
+                } else {
+                    self.executor.wake_send(conn_index, Err(err));
+                }
                 self.driver.close_connection(conn_index);
                 continue;
             }
@@ -3733,12 +3806,17 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
                 self.driver.send_pollout_retry_scratch[idx];
             if retry >= 3 {
                 // Max retries exceeded — release pool + drain queue + close.
+                let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
                 if self.driver.send_copy_pool.in_use(pool_slot) {
                     self.driver.send_copy_pool.release(pool_slot);
                 }
                 self.driver.drain_conn_send_queue(conn_index);
                 let err = io::Error::other("max retries during send pollout retry");
-                self.executor.wake_send(conn_index, Err(err));
+                if let Some(id) = bounded_send_id {
+                    self.executor.complete_bounded_send(id, Err(err));
+                } else {
+                    self.executor.wake_send(conn_index, Err(err));
+                }
                 self.driver.close_connection(conn_index);
                 continue;
             }
@@ -3755,8 +3833,18 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
             if self.driver.connections.get(conn_index).is_none()
                 || self.driver.connections.generation(conn_index) != generation
             {
+                let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
                 if self.driver.send_copy_pool.in_use(pool_slot) {
                     self.driver.send_copy_pool.release(pool_slot);
+                }
+                if let Some(id) = bounded_send_id {
+                    self.executor.complete_bounded_send(
+                        id,
+                        Err(io::Error::new(
+                            io::ErrorKind::ConnectionAborted,
+                            "connection closed during send pollout retry",
+                        )),
+                    );
                 }
                 continue;
             }

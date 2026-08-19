@@ -221,6 +221,15 @@ impl<'a> DriverCtx<'a> {
     /// required slots are reserved before the first chunk is submitted, so
     /// pool pressure returns `Err` without committing a response prefix.
     pub fn send(&mut self, conn: ConnToken, data: &[u8]) -> io::Result<()> {
+        self.send_with_id(conn, data, None)
+    }
+
+    fn send_with_id(
+        &mut self,
+        conn: ConnToken,
+        data: &[u8],
+        bounded_send_id: Option<u64>,
+    ) -> io::Result<()> {
         let conn_state = self
             .connections
             .get(conn.index)
@@ -237,6 +246,12 @@ impl<'a> DriverCtx<'a> {
             if tls_table.get_mut(conn.index).is_some() {
                 let sends =
                     crate::tls::encrypt_to_sends(tls_table, self.send_copy_pool, conn.index, data)?;
+                for send in &sends {
+                    if send.pool_slot != u16::MAX {
+                        self.send_copy_pool
+                            .set_bounded_send_id(send.pool_slot, bounded_send_id);
+                    }
+                }
                 // Route every ciphertext chunk through the per-connection
                 // send queue: io_uring doesn't order independent SQEs, and
                 // a partial-send resubmit would interleave chunks on the
@@ -257,6 +272,8 @@ impl<'a> DriverCtx<'a> {
         for (chunk_index, (slot, ptr, len)) in chunks.into_iter().enumerate() {
             self.send_copy_pool
                 .set_end_of_send(slot, chunk_index == last);
+            self.send_copy_pool
+                .set_bounded_send_id(slot, bounded_send_id);
             let user_data = crate::completion::UserData::encode(
                 crate::completion::OpTag::Send,
                 conn.index,
@@ -279,8 +296,13 @@ impl<'a> DriverCtx<'a> {
 
     /// Bounded submission used by `ConnCtx::send_backpressured`. Capacity
     /// admission is performed by the future before this transactional send.
-    pub(crate) fn send_backpressured(&mut self, conn: ConnToken, data: &[u8]) -> io::Result<()> {
-        self.send(conn, data)
+    pub(crate) fn send_backpressured(
+        &mut self,
+        conn: ConnToken,
+        data: &[u8],
+        id: u64,
+    ) -> io::Result<()> {
+        self.send_with_id(conn, data, Some(id))
     }
 
     /// Allocate a unique 32-bit disk-I/O completion key: monotonic sequence
@@ -1847,6 +1869,8 @@ pub struct DriverCtx<'a> {
     pub(crate) writable: &'a mut Vec<bool>,
     /// Per-connection send completion queue (byte counts for awaitable sends).
     pub(crate) send_completions: &'a mut Vec<std::collections::VecDeque<u32>>,
+    /// ID-keyed completions for bounded sends.
+    pub(crate) bounded_send_completions: &'a mut std::collections::VecDeque<(u64, io::Result<u32>)>,
     /// Per-connection connect timeout deadlines.
     pub(crate) connect_deadlines: &'a mut Vec<Option<std::time::Instant>>,
     pub(crate) sends_dirty: &'a mut Vec<u32>,
@@ -1940,7 +1964,12 @@ impl<'a> DriverCtx<'a> {
     /// Bounded submission used by `ConnCtx::send_backpressured`. The copied
     /// bytes retain one configured send-pool permit per logical chunk until
     /// their pending socket write completes.
-    pub(crate) fn send_backpressured(&mut self, conn: ConnToken, data: &[u8]) -> io::Result<()> {
+    pub(crate) fn send_backpressured(
+        &mut self,
+        conn: ConnToken,
+        data: &[u8],
+        id: u64,
+    ) -> io::Result<()> {
         let conn_state = self
             .connections
             .get(conn.index)
@@ -1980,7 +2009,7 @@ impl<'a> DriverCtx<'a> {
 
         let idx = conn.index as usize;
         self.pending_sends[idx].push_back(crate::backend::mio::driver::PendingSend::bounded(
-            queued, slots,
+            queued, slots, id,
         ));
         self.mark_send_dirty(idx);
         Ok(())
@@ -2060,8 +2089,14 @@ impl<'a> DriverCtx<'a> {
         // Flush any pending send data before shutting down.
         if let Some(ref mut stream) = self.tcp_streams[idx] {
             use std::io::Write;
-            for pending in self.pending_sends[idx].drain(..) {
-                let _ = stream.write_all(&pending.data[pending.offset..]);
+            for mut pending in self.pending_sends[idx].drain(..) {
+                let logical_len = pending.data.len() as u32;
+                let result = stream
+                    .write_all(&pending.data[pending.offset..])
+                    .map(|()| logical_len);
+                if let Some(id) = pending.bounded_send_id.take() {
+                    self.bounded_send_completions.push_back((id, result));
+                }
                 for slot in pending.pool_slots {
                     self.send_copy_pool.release(slot);
                 }

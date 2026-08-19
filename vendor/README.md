@@ -34,13 +34,15 @@ Compared with the published archive, this vendor tree omits the package-local
   reviewed correction binds the io_uring event loop before submitting an SQE
   that references inline storage and uses `OwnedFd` for Mio read-end ownership.
   Generic follow-ups reserve all copy-send slots before committing a logical
-  send, add FIFO async capacity backpressure with exact transport receive-error
-  delivery, and preserve exact worker panic payloads through startup rollback.
+  send, add lazy FIFO async capacity backpressure with ID-keyed completion and
+  cancellation, preserve exact half-close results, deliver exact transport
+  receive errors, and preserve worker panic payloads through startup rollback.
 
 The Ringline changes are generic and contain no Pelikan-specific fallback or
 configuration behavior. The startup transaction merged as ringline-rs/ringline#309
 but is not released on crates.io; send reservation/backpressure, receive-error
-propagation, and panic-detail propagation are documented follow-ups for a separate upstream submission. See
+propagation, logical-send identity, and panic-detail propagation are documented
+follow-ups for a separate upstream submission. See
 `ringline-0.5.3/UPSTREAM-PR.md` for the standalone patch artifact and
 verification commands.
 

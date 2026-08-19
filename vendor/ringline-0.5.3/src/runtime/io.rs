@@ -1438,20 +1438,18 @@ impl ConnCtx {
 
     /// Send one logical buffer with bounded, FIFO copy-pool backpressure.
     ///
-    /// Unlike `send`, transient pool pressure parks this future. The whole
+    /// Construction is inert. On its first poll, the future registers the
+    /// polling task in the worker-local FIFO. Unlike `send`, transient pool
+    /// pressure parks this future. The whole
     /// logical buffer is admitted before submission, so callers never retry
     /// and cannot duplicate or truncate a response. A buffer larger than the
     /// configured pool capacity fails with `InvalidInput` before any bytes are
     /// submitted.
     pub fn send_backpressured<'a>(&self, data: &'a [u8]) -> BackpressuredSendFuture<'a> {
-        let task_id = CURRENT_TASK_ID.with(|current| current.get());
-        let waiter_id = with_state(|_driver, executor| {
-            executor.enqueue_send_capacity(self.conn_index, self.generation, task_id)
-        });
         BackpressuredSendFuture {
             conn_index: self.conn_index,
             generation: self.generation,
-            waiter_id,
+            registration: None,
             data,
             submitted: false,
         }
@@ -1573,9 +1571,13 @@ impl ConnCtx {
     ///
     /// Sends a TCP FIN to the peer. The read side remains open.
     pub fn shutdown_write(&self) {
-        with_state(|driver, _| {
-            let mut ctx = driver.make_ctx();
-            ctx.shutdown_write(self.token());
+        with_state(|driver, executor| {
+            executor.fail_bounded_capacity_for_connection(self.conn_index, self.generation);
+            {
+                let mut ctx = driver.make_ctx();
+                ctx.shutdown_write(self.token());
+            }
+            executor.wake_send_capacity();
         })
     }
 
@@ -3243,13 +3245,16 @@ impl Future for RecvReadyFuture {
 
 // ── SendFuture ───────────────────────────────────────────────────────
 
-/// Future returned by [`ConnCtx::send_backpressured`]. It owns no bytes: the
-/// caller's slice is copied only after this waiter reaches the FIFO head and
-/// the configured send pool can admit the complete logical buffer.
+/// Future returned by [`ConnCtx::send_backpressured`]. It owns no bytes and
+/// does not register for capacity until first poll. The caller's slice is
+/// copied only after this waiter reaches the FIFO head and the configured send
+/// pool can admit the complete logical buffer. Once submitted, a unique
+/// operation ID routes its completion; dropping the future abandons only that
+/// operation.
 pub struct BackpressuredSendFuture<'a> {
     conn_index: u32,
     generation: u32,
-    waiter_id: u64,
+    registration: Option<super::SendCapacityRegistration>,
     data: &'a [u8],
     submitted: bool,
 }
@@ -3259,11 +3264,23 @@ impl Future for BackpressuredSendFuture<'_> {
 
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.get_mut();
+        if this.registration.is_none() {
+            let task_id = CURRENT_TASK_ID.with(|current| current.get());
+            this.registration = Some(with_state(|_driver, executor| {
+                executor.enqueue_send_capacity(this.conn_index, this.generation, task_id)
+            }));
+        }
+        if let Some(result) = this
+            .registration
+            .as_mut()
+            .expect("registered on first poll")
+            .take_result()
+        {
+            return Poll::Ready(result);
+        }
         with_state(|driver, executor| {
             if driver.connections.generation(this.conn_index) != this.generation {
-                if !this.submitted {
-                    executor.cancel_send_capacity(this.waiter_id);
-                }
+                this.registration.take();
                 return Poll::Ready(Err(io::Error::new(
                     io::ErrorKind::ConnectionAborted,
                     "connection closed",
@@ -3271,19 +3288,16 @@ impl Future for BackpressuredSendFuture<'_> {
             }
 
             if this.submitted {
-                return match executor.io_results[this.conn_index as usize].take() {
-                    Some(IoResult::Send(result)) => Poll::Ready(result),
-                    _ => {
-                        executor.owner_task[this.conn_index as usize] =
-                            Some(CURRENT_TASK_ID.with(|current| current.get()));
-                        executor.send_waiters[this.conn_index as usize] = true;
-                        Poll::Pending
-                    }
-                };
+                return this
+                    .registration
+                    .as_mut()
+                    .expect("submitted send retains its identity")
+                    .take_result()
+                    .map_or(Poll::Pending, Poll::Ready);
             }
 
             if this.data.is_empty() {
-                executor.cancel_send_capacity(this.waiter_id);
+                this.registration.take();
                 return Poll::Ready(Ok(0));
             }
 
@@ -3291,7 +3305,7 @@ impl Future for BackpressuredSendFuture<'_> {
             let slot_count = driver.send_copy_pool.slot_count();
             let total_capacity = slot_size.saturating_mul(slot_count);
             if this.data.len() > total_capacity {
-                executor.cancel_send_capacity(this.waiter_id);
+                this.registration.take();
                 return Poll::Ready(Err(io::Error::new(
                     io::ErrorKind::InvalidInput,
                     format!(
@@ -3302,7 +3316,12 @@ impl Future for BackpressuredSendFuture<'_> {
                 )));
             }
 
-            if !executor.send_capacity_turn(this.waiter_id) {
+            let waiter_id = this
+                .registration
+                .as_ref()
+                .expect("registered on first poll")
+                .id();
+            if !executor.send_capacity_turn(waiter_id) {
                 return Poll::Pending;
             }
             let required = this.data.len().div_ceil(slot_size);
@@ -3311,44 +3330,26 @@ impl Future for BackpressuredSendFuture<'_> {
             }
 
             let mut ctx = driver.make_ctx();
-            match ctx
-                .send_backpressured(ConnToken::new(this.conn_index, this.generation), this.data)
-            {
+            match ctx.send_backpressured(
+                ConnToken::new(this.conn_index, this.generation),
+                this.data,
+                waiter_id,
+            ) {
                 Ok(()) => {
-                    #[cfg(not(has_io_uring))]
-                    ctx.mark_last_send_awaited(this.conn_index);
                     this.submitted = true;
-                    executor.cancel_send_capacity(this.waiter_id);
-                    executor.owner_task[this.conn_index as usize] =
-                        Some(CURRENT_TASK_ID.with(|current| current.get()));
-                    executor.send_waiters[this.conn_index as usize] = true;
+                    this.registration
+                        .as_mut()
+                        .expect("registered before submission")
+                        .admit();
                     Poll::Pending
                 }
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
                 Err(error) => {
-                    executor.cancel_send_capacity(this.waiter_id);
+                    this.registration.take();
                     Poll::Ready(Err(error))
                 }
             }
         })
-    }
-}
-
-impl Drop for BackpressuredSendFuture<'_> {
-    fn drop(&mut self) {
-        let Some(mut state_ptr) = CURRENT_DRIVER.with(|current| current.get()) else {
-            return;
-        };
-        let state = unsafe { state_ptr.as_mut() };
-        let driver = unsafe { &mut *state.driver.as_mut() };
-        let executor = unsafe { &mut *state.executor.as_mut() };
-        if self.submitted {
-            if driver.connections.generation(self.conn_index) == self.generation {
-                executor.send_waiters[self.conn_index as usize] = false;
-            }
-        } else {
-            executor.cancel_send_capacity(self.waiter_id);
-        }
     }
 }
 

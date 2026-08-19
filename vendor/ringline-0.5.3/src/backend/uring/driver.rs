@@ -419,6 +419,8 @@ pub(crate) struct Driver {
     pub(crate) pending_recv_forward_retries: Vec<(u32, u32, u16, u8)>,
     /// Pending close retries: (conn_index, retries). Drained each tick.
     pub(crate) pending_close_retries: Vec<(u32, u8)>,
+    /// Logical sends whose queued SQEs were discarded after terminal SQ pressure.
+    pub(crate) bounded_send_failures: VecDeque<(u64, io::Error)>,
     /// Scratch buffers swapped with the corresponding `pending_*_retries`
     /// queue at drain time so the per-tick drain reuses a single allocation
     /// across ticks (the primary queue is left empty for in-iteration
@@ -680,6 +682,7 @@ impl Driver {
             pending_coalesced_retries: Vec::new(),
             pending_recv_forward_retries: Vec::new(),
             pending_close_retries: Vec::new(),
+            bounded_send_failures: VecDeque::new(),
             zc_retry_scratch: Vec::new(),
             copy_retry_scratch: Vec::new(),
             send_pollout_retry_scratch: Vec::new(),
@@ -1155,6 +1158,7 @@ impl Driver {
     pub(crate) fn flush_queued_sends_or_release(&mut self, conn_index: u32) -> usize {
         let state = &mut self.send_queues[conn_index as usize];
         let mut pushed = 0usize;
+        let mut failed_ids = Vec::new();
         while let Some(built) = state.queue.pop_front() {
             match unsafe { self.ring.push_sqe(built.entry) } {
                 Ok(()) => {
@@ -1162,21 +1166,31 @@ impl Driver {
                 }
                 Err(_) => {
                     // SQ full — release this entry and drain remaining queue.
-                    Self::release_built_resources(
+                    failed_ids.extend(Self::release_built_resources(
                         &mut self.send_slab,
                         &mut self.send_copy_pool,
                         built.pool_slot,
                         built.slab_idx,
-                    );
-                    Self::release_queued_sends(
+                    ));
+                    failed_ids.extend(Self::release_queued_sends(
                         &mut state.queue,
                         &mut self.send_slab,
                         &mut self.send_copy_pool,
-                    );
+                    ));
                     state.in_flight = false;
                     break;
                 }
             }
+        }
+        failed_ids.sort_unstable();
+        failed_ids.dedup();
+        for id in failed_ids {
+            self.bounded_send_failures.push_back((
+                id,
+                io::Error::other(
+                    "io_uring submission queue remained full while draining bounded send",
+                ),
+            ));
         }
         pushed
     }
@@ -1301,16 +1315,30 @@ impl Driver {
                     Err(_) => {
                         // SQ full — release the coalesced slab entry + its pool
                         // slots, drain the rest of the queue, clear in_flight.
+                        let mut failed_ids = Vec::new();
                         for &s in &pool_slots[..n] {
+                            if let Some(id) = self.send_copy_pool.bounded_send_id(s) {
+                                failed_ids.push(id);
+                            }
                             self.send_copy_pool.release(s);
                         }
                         self.send_slab.release(slab_idx);
                         let state = &mut self.send_queues[ci];
-                        Self::release_queued_sends(
+                        failed_ids.extend(Self::release_queued_sends(
                             &mut state.queue,
                             &mut self.send_slab,
                             &mut self.send_copy_pool,
-                        );
+                        ));
+                        failed_ids.sort_unstable();
+                        failed_ids.dedup();
+                        for id in failed_ids {
+                            self.bounded_send_failures.push_back((
+                                id,
+                                io::Error::other(
+                                    "io_uring submission queue remained full while draining bounded send",
+                                ),
+                            ));
+                        }
                         state.in_flight = false;
                         state.shutdown_pending = false;
                         self.try_finalize_close(conn_index);
@@ -1330,17 +1358,27 @@ impl Driver {
                     Ok(()) => true,
                     Err(_) => {
                         // SQ full — release this entry and drain remaining queue.
-                        Self::release_built_resources(
+                        let mut failed_ids = Self::release_built_resources(
                             &mut self.send_slab,
                             &mut self.send_copy_pool,
                             pool_slot,
                             slab_idx,
                         );
-                        Self::release_queued_sends(
+                        failed_ids.extend(Self::release_queued_sends(
                             &mut state.queue,
                             &mut self.send_slab,
                             &mut self.send_copy_pool,
-                        );
+                        ));
+                        failed_ids.sort_unstable();
+                        failed_ids.dedup();
+                        for id in failed_ids {
+                            self.bounded_send_failures.push_back((
+                                id,
+                                io::Error::other(
+                                    "io_uring submission queue remained full while draining bounded send",
+                                ),
+                            ));
+                        }
                         state.in_flight = false;
                         state.shutdown_pending = false;
                         // If a deferred close was pending, fire it now that
@@ -1443,7 +1481,7 @@ impl Driver {
     /// Drain and release all queued sends for a connection.
     pub(crate) fn drain_conn_send_queue(&mut self, conn_index: u32) {
         let state = &mut self.send_queues[conn_index as usize];
-        Self::release_queued_sends(
+        let bounded_ids = Self::release_queued_sends(
             &mut state.queue,
             &mut self.send_slab,
             &mut self.send_copy_pool,
@@ -1455,6 +1493,15 @@ impl Driver {
         // The queue is now empty and nothing is in flight — fire a deferred
         // close if one was pending so the connection can't leak.
         self.try_finalize_close(conn_index);
+        for id in bounded_ids {
+            self.bounded_send_failures.push_back((
+                id,
+                io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "preceding send failed before queued bounded send was submitted",
+                ),
+            ));
+        }
     }
 
     /// Release all entries from a send queue.
@@ -1462,15 +1509,19 @@ impl Driver {
         queue: &mut VecDeque<BuiltSend>,
         send_slab: &mut InFlightSendSlab,
         send_copy_pool: &mut SendCopyPool,
-    ) {
+    ) -> Vec<u64> {
+        let mut bounded_ids = Vec::new();
         for built in queue.drain(..) {
-            Self::release_built_resources(
+            bounded_ids.extend(Self::release_built_resources(
                 send_slab,
                 send_copy_pool,
                 built.pool_slot,
                 built.slab_idx,
-            );
+            ));
         }
+        bounded_ids.sort_unstable();
+        bounded_ids.dedup();
+        bounded_ids
     }
 
     /// Release pool slot and/or slab entry for a single BuiltSend.
@@ -1479,15 +1530,28 @@ impl Driver {
         send_copy_pool: &mut SendCopyPool,
         pool_slot: u16,
         slab_idx: u16,
-    ) {
+    ) -> Vec<u64> {
+        let mut bounded_ids = Vec::new();
         if slab_idx != u16::MAX {
+            for slot in send_slab.coalesced_pool_slots(slab_idx) {
+                if let Some(id) = send_copy_pool.bounded_send_id(*slot) {
+                    bounded_ids.push(id);
+                }
+            }
             let ps = send_slab.release(slab_idx);
             if ps != u16::MAX {
+                if let Some(id) = send_copy_pool.bounded_send_id(ps) {
+                    bounded_ids.push(id);
+                }
                 send_copy_pool.release(ps);
             }
         } else if pool_slot != u16::MAX {
+            if let Some(id) = send_copy_pool.bounded_send_id(pool_slot) {
+                bounded_ids.push(id);
+            }
             send_copy_pool.release(pool_slot);
         }
+        bounded_ids
     }
 
     /// Create a UDP socket, bind with SO_REUSEPORT, register in fixed file table.

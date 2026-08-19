@@ -23,8 +23,10 @@ Every worker must complete fallible event-loop initialization before Ringline cr
 - Keep Mio worker read descriptors in `OwnedFd` until they transfer to a successfully constructed driver; io_uring ownership remains with `WakeHandle`.
 - Reserve every copy-pool slot for a logical multi-chunk send before submitting its first SQE, so pressure cannot commit a truncated prefix.
 - Carry worker setup errors and caught panic text through the startup channel and rollback result.
-- Add `ConnCtx::send_backpressured`, whose FIFO/cancel-safe future waits for enough configured pool slots, rejects over-capacity buffers before submission, and retains Mio permits through the final socket write.
-- Wake bounded senders on Mio permit release and io_uring CQ/SQ progress; connection teardown removes its queued waiters and wakes the next FIFO head.
+- Add `ConnCtx::send_backpressured`, whose construction is inert and whose first poll registers the actual polling task in a worker-local FIFO. Its owned registration token unregisters without driver TLS, waits for enough configured pool slots, and rejects over-capacity buffers before submission.
+- Assign each admitted bounded send a unique logical-operation ID and carry it through Mio pending writes and io_uring pool/slab submission. Completion and abandonment are ID-scoped, so a canceled submitted send cannot resolve or clear a newer send on the same connection.
+- Retain Mio permits through the final socket write. Mio half-close completes each submitted bounded send with its exact write result, fails capacity-only waiters, returns permits, and wakes the next FIFO head.
+- Wake bounded senders on Mio permit release and io_uring CQ/SQ progress; connection teardown completes or abandons each exact logical operation and wakes the next FIFO head.
 - Add `ConnCtx::with_data_result`, preserving exact non-`WouldBlock` TCP receive errors while retaining `with_data` clean-EOF compatibility.
 
 ## Tests
@@ -33,8 +35,10 @@ Every worker must complete fallible event-loop initialization before Ringline cr
 - Repeated startup failures do not grow `/proc/self/fd`; the assertion runs in an isolated child test process.
 - A pool too small for a multi-slot send leaves every slot free (no partial reservation/submission).
 - A worker startup panic is returned with its original string payload.
-- Two real bounded sends contend for a one-slot Mio pool and arrive exactly once in FIFO order; an oversize send writes no prefix, and shutdown drops a parked waiter without hanging.
-- FIFO head cancellation and connection removal advance and wake the next waiter.
+- Two real bounded sends contend for a one-slot Mio pool and arrive exactly once in FIFO order; an oversize send writes no prefix, and shutdown drops a demonstrably parked waiter without hanging.
+- Constructing or moving an unpolled future does not register a FIFO position; registration captures the first polling task. Dropping a queued registration without driver TLS unregisters only that waiter and advances FIFO safely.
+- Canceling a submitted send before completion cannot donate its length/error to the next logical send on the connection.
+- Mio half-close completes a submitted bounded send, fails a capacity waiter, releases its permits, and leaves neither future stuck.
 - A real TCP reset is surfaced by `with_data_result`.
 
 ## Compatibility
@@ -47,7 +51,7 @@ Listener errors now surface after worker initialization and rollback. This inten
 
 Standalone patch: `ringline-v0.5.3-startup-transaction.patch`
 
-SHA-256: `63d5ab837781d76e95290c5aa47884bed9ea4ebbb98340ebe48e6d8edfb2e356`
+SHA-256: `a7eae83333e5b2a8f73336ea554a2647e56ba2d7a9d456a47b1b0308dfb8a036`
 
 Commands:
 
@@ -59,11 +63,12 @@ cargo test --features force-mio worker_startup_panic_payload_is_preserved
 cargo test --features force-mio backpressured_send
 cargo test --features force-mio with_data_result_surfaces_tcp_reset
 cargo test --features force-mio shutdown_drops_parked_backpressured_send_without_hanging
-cargo test --features force-mio --lib
+cargo test --no-default-features --features force-mio
+cargo test --no-default-features --features force-mio mio_half_close_completes_submitted_send_and_cancels_capacity_waiter
 cargo clippy --all-targets -- -D warnings
-cargo clippy --features force-mio --all-targets -- -D warnings
+cargo clippy --no-default-features --features force-mio --all-targets -- -D warnings
 cargo check --all-targets
-cargo check --features force-mio --all-targets
+cargo check --no-default-features --features force-mio --all-targets
 ```
 
-The lifecycle, bounded-send, receive-error, and panic-detail tests pass with force-Mio. The startup transaction merged as ringline-rs/ringline#309; the generic follow-ups above still need a separate upstream submission.
+The lifecycle, bounded-send, receive-error, and panic-detail tests pass with force-Mio. Default io_uring targets compile and pass warning-denied clippy; the host used for this patch cannot execute native io_uring. The startup transaction merged as ringline-rs/ringline#309; the generic follow-ups above still need a separate upstream submission.
