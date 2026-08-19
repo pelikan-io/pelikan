@@ -148,7 +148,15 @@ def phase_incr(args):
         try:
             for _ in range(args.ops):
                 k = random.choice(keys)
-                r = mc_incr(c, k, 1)
+                if args.broken:
+                    # SELFTEST: networked read-modify-write is definitionally
+                    # racy; if the lost-update check cannot see this, it is
+                    # vacuous and cannot see a real engine lost update either.
+                    cur = mc_get(c, k)
+                    r = mc_store(c, b"set", k, b"%d" % (int(cur) + 1))
+                    r = b"1\r\n" if r == b"STORED\r\n" else r
+                else:
+                    r = mc_incr(c, k, 1)
                 if r.strip().isdigit():
                     local[k] += 1
                 else:
@@ -213,7 +221,13 @@ def phase_cas(args):
                         errors.append(("gets-miss", k))
                     continue
                 nv = b"%d" % (int(v) + 1)
-                r = mc_store(c, b"cas", k, nv, extra=b" %s" % tok.decode().encode())
+                if args.broken:
+                    # SELFTEST: ignore the token entirely. Every write "succeeds"
+                    # but updates are lost, which is exactly what a cas honouring
+                    # a stale token would look like.
+                    r = mc_store(c, b"set", k, nv)
+                else:
+                    r = mc_store(c, b"cas", k, nv, extra=b" %s" % tok.decode().encode())
                 if r == b"STORED\r\n":
                     local[k] += 1
                 elif r == b"EXISTS\r\n":
@@ -294,7 +308,8 @@ def phase_add(args):
         def worker2(tid):
             barrier.wait()
             val = b"r%03d" % tid
-            resp = mc_store(conns[tid], b"replace", key, val)
+            verb = b"set" if args.broken else b"replace"
+            resp = mc_store(conns[tid], verb, key, val)
             results[tid] = (resp, val)
 
         run_threads(worker2, args.threads, join=True)
@@ -337,8 +352,9 @@ def phase_mixed(args):
                 op = random.random()
                 if op < 0.40:
                     val = b"t%03d-s%06d" % (tid, i)
-                    with lock:
-                        ever[k].add(val)
+                    if not args.broken:
+                        with lock:
+                            ever[k].add(val)
                     r = mc_store(c, b"set", k, val)
                     local_counts["set" if r == b"STORED\r\n" else "set_other"] += 1
                 elif op < 0.50:
@@ -408,8 +424,15 @@ def phase_ryw(args):
                 if r != b"STORED\r\n":
                     le.append(("set", r))
                     continue
-                got = mc_get(c, k)
+                if args.broken and i % 2 == 0:
+                    # SELFTEST: read a key that was never written -> must
+                    # register as a false miss
+                    got = mc_get(c, k + b":never")
+                else:
+                    got = mc_get(c, k)
                 n += 1
+                if args.broken and i % 2 == 1:
+                    val = b"NEVER-WRITTEN"
                 if got is None:
                     lm.append((k, val))
                 elif got != val:
@@ -505,6 +528,15 @@ def phase_flush(args):
     for t in ths:
         t.join()
 
+    # ask the admin thread to dump the lock-free trace it recorded
+    try:
+        av = Conn(args.admin_port)
+        av.cmd(b"version\r\n")
+        av.line()
+        av.close()
+    except Exception:
+        pass
+
     with lock:
         acked.sort()
     c = Conn(port)
@@ -538,6 +570,23 @@ def phase_flush(args):
           f"survived={len(survived)}")
     print(f"[flush] acked AFTER admin OK but destroyed = {len(post_destroyed)}"
           f"   <-- the smear beyond the ack")
+    # Ack timeline around the flush: if writers STALL for the duration of
+    # clear(), no write can be acked-then-destroyed during the sweep, and the
+    # smear collapses to the pre-clear window regardless of how long clear()
+    # takes. This distinguishes "clear is slow but blocking" from "clear is
+    # slow and writes stream through it".
+    bins = defaultdict(lambda: [0, 0])
+    for t, k in window:
+        ms = int((t - t_sent) * 1000)
+        if -5 <= ms <= 120:
+            b = bins[ms // 5 * 5]
+            b[0] += 1
+            if (t, k) in set(destroyed):
+                b[1] += 1
+    print("[flush] ack timeline (ms from broadcast -> acked/destroyed):")
+    line = "   " + "  ".join(
+        f"{ms:+d}ms:{v[0]}/{v[1]}" for ms, v in sorted(bins.items()))
+    print(line)
     if last_destroyed is not None:
         print(f"[flush] SMEAR WINDOW: last destroyed ack at t_sent+"
               f"{(last_destroyed-t_sent)*1000:.2f}ms "
@@ -563,8 +612,9 @@ def phase_resp(args):
                 if random.random() < 0.5:
                     k = random.choice(hot)
                     val = b"t%03ds%06d" % (tid, i)
-                    with lock:
-                        ever[k].add(val)
+                    if not args.broken:
+                        with lock:
+                            ever[k].add(val)
                     r = resp_set(c, k, val)
                     lc["set_ok" if r == b"+OK\r\n" else "set_other"] += 1
                     if r != b"+OK\r\n":
@@ -582,7 +632,7 @@ def phase_resp(args):
                     if r != b"+OK\r\n":
                         le.append(("set", r))
                         continue
-                    got = resp_get(c, k)
+                    got = resp_get(c, k + b":never") if args.broken else resp_get(c, k)
                     lc["ryw"] += 1
                     if got is None:
                         lm.append((k, val))
@@ -648,6 +698,8 @@ def main():
     p.add_argument("--rounds", type=int, default=200)
     p.add_argument("--after", type=float, default=0.5)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--broken", action="store_true",
+                   help="SELFTEST: inject the defect this phase claims to detect")
     args = p.parse_args()
     random.seed(args.seed)
     t0 = time.time()

@@ -218,31 +218,53 @@ With that in place:
   worker interval at all — writes acked *after* the client received `OK`
   were still destroyed. So the client-visible contract "flush returned
   OK, therefore my later writes survive" does not hold at any worker
-  count. This mechanism is distinct from the smear below and is believed
-  to predate the conversion (the old model also acked on enqueue while a
-  separate storage thread performed the clear) — verification pending.
+  count. **Verified inherited, not introduced:** at the branch point
+  (`6dc2e98`) the admin handler was
+  `let _ = self.signal_queue_tx.try_send_all(Signal::FlushAll); session.send(Ok)?;`
+  — the same ack-on-enqueue, and with no `wake()` at all, so the storage
+  thread saw the signal only on its next poll. `b4c50a7` made this
+  strictly better, not worse.
 
-  **(b) The inter-worker smear scales badly with worker count.** Workers
-  drain the signal queue once per event-loop iteration, and an idle
-  worker sits in `poll` for up to the 100 ms worker timeout, so the last
-  `clear()` is bounded by that timeout rather than by anything tight —
-  despite the admin waking workers on the broadcast:
+  **(b) The window is the duration of `clear()`, not inter-worker skew.**
+  *Corrects an earlier revision of this section, which attributed the
+  window to workers waiting on the 100 ms poll timeout and questioned
+  whether the wake was effective. Both claims were wrong; they came from
+  a debug-build measurement reported without its profile.* Instrumenting
+  the admin broadcast and every worker's `clear()` with lock-free atomic
+  timestamps gives:
 
-  | workers | measured smear | acked-then-destroyed writes |
-  |---|---|---|
-  | 1 | 0.33 ms | 4 |
-  | 2 | 0.47–0.56 ms | 6–7 |
-  | 4 | 0.41 ms | 7 |
-  | 8 | **37–49 ms** | 5–20 |
+  | build | workers | wake latency | inter-worker skew | `clear()` | window |
+  |---|---|---|---|---|---|
+  | release | 1 | 51 µs | – | 5.65 ms | 0.64 ms |
+  | release | 2 | 35 µs | 5 µs | 8.44 ms | 0.37 ms |
+  | release | 4 | 40 µs | 9 µs | 8.59 ms | 8.64 ms |
+  | release | 8 | 35–82 µs | 29 µs | 6.2–7.4 ms | 6.7–8.2 ms |
+  | debug | 8 | 75–152 µs | 57–69 µs | 41–46 ms | 41–47 ms |
 
-  Two orders of magnitude wider at 8 workers, reproducible across five
-  runs. "Between the first and last worker's clear" sounds tight; it is
-  tens of milliseconds. Under investigation: the wake added specifically
-  to make this prompt appears not to be effective at 8 workers, which may
-  be a defect rather than an inherent property.
+  - **The wake works.** Every worker receives the broadcast within
+    **35–152 µs**, skew ≤ ~70 µs, at every worker count. No worker ever
+    waits on the poll timeout. `b4c50a7` is doing its job.
+  - **`clear()` is a fixed ~6–8 ms (release).** `TtlBuckets::clear` walks
+    all `TOTAL_BUCKETS = 256 × 4 = 1024` buckets, taking each bucket's
+    `std::sync::Mutex` chain lock. Measured identical at 64MB, 256MB and
+    1GB heaps: the cost is the bucket sweep, not the data discarded, so
+    even an empty cache pays it.
+  - **The window equals the sweep.** A write landing in a bucket the
+    sweep has not yet reached is acked and then destroyed by that sweep.
+    At 1–2 workers each connection stalls behind its own worker's sweep,
+    so little is acked mid-sweep and the window stays sub-millisecond; at
+    4–8 workers a worker that finishes early resumes serving while others
+    still sweep, widening the window to a full sweep. "Between the first
+    and last worker's clear" names a real multi-worker effect but
+    attributes it to a skew of ~70 µs — three orders of magnitude too
+    small to explain the observed window.
 
-  Exactly-once flush via an admin-held clear handle remains the
-  structural fix.
+  **The duplicate clear is new to this conversion.** At the branch point
+  `workers/multi.rs` explicitly ignored the signal (`Signal::FlushAll =>
+  {}`) and only the dedicated storage thread cleared; `workers/single.rs`
+  cleared once because it owned the storage. Exactly one `clear()` ever
+  ran. Exactly-once flush via an admin-held clear handle remains the
+  structural fix, and would also remove N-1 redundant 6–8 ms sweeps.
 - **add/replace race magnitude, measured:** the accepted check-then-act
   race scales with worker count — concurrent `add`s on one hot key
   double-win 10–13% of the time at 2 workers and **32.7%** at 8, with 24

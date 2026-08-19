@@ -1,0 +1,134 @@
+diff --git a/Cargo.lock b/Cargo.lock
+index 1a324c1..9230a4e 100644
+--- a/Cargo.lock
++++ b/Cargo.lock
+@@ -845,8 +845,7 @@ dependencies = [
+ [[package]]
+ name = "keyvalue"
+ version = "0.3.1"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "0603f65d986d7c324ddb3dc533fa980d8114468dd20b65050ead503d6b0fb2a6"
++source = "git+https://github.com/pelikan-io/cache-rs?rev=2788fcf#2788fcfc823345e1308e0a3a5231a5629e7efc6f"
+ dependencies = [
+  "crc32fast",
+ ]
+@@ -1659,8 +1658,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+ [[package]]
+ name = "segcache"
+ version = "0.4.2"
+-source = "registry+https://github.com/rust-lang/crates.io-index"
+-checksum = "7267742f824513da6d28f884c4389cf2f70d4f4b920151429f2f123abd506869"
++source = "git+https://github.com/pelikan-io/cache-rs?rev=2788fcf#2788fcfc823345e1308e0a3a5231a5629e7efc6f"
+ dependencies = [
+  "ahash",
+  "clocksource",
+diff --git a/Cargo.toml b/Cargo.toml
+index 8833a17..f5618ab 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -97,3 +97,8 @@ codegen-units = 1
+ [profile.dev]
+ debug = true
+ opt-level = 0
++
++# TEMPORARY (uncommitted, test-only): pin segcache to cache-rs main 2788fcf
++# to integration-test pelikan against the unreleased 0.4.3 engine line.
++[patch.crates-io]
++segcache = { git = "https://github.com/pelikan-io/cache-rs", rev = "2788fcf" }
+diff --git a/src/common/src/lib.rs b/src/common/src/lib.rs
+index 1bf56a9..8a96f4f 100644
+--- a/src/common/src/lib.rs
++++ b/src/common/src/lib.rs
+@@ -8,3 +8,45 @@ pub mod metrics;
+ pub mod signal;
+ pub mod ssl;
+ pub mod traits;
++
++// TEMPORARY INSTRUMENTATION (uncommitted): flush_all timing trace.
++// Recorded with plain atomic stores so the worker path takes no lock and makes
++// no syscall -- an eprintln! here perturbs the very interleaving we measure.
++pub mod flushtrace {
++    use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
++
++    pub const MAX: usize = 64;
++    pub static SLOT: AtomicUsize = AtomicUsize::new(0);
++    pub static RECV: [AtomicU64; MAX] = [const { AtomicU64::new(0) }; MAX];
++    pub static DONE: [AtomicU64; MAX] = [const { AtomicU64::new(0) }; MAX];
++    pub static BCAST: AtomicU64 = AtomicU64::new(0);
++
++    pub fn now() -> u64 {
++        std::time::SystemTime::now()
++            .duration_since(std::time::UNIX_EPOCH)
++            .unwrap()
++            .as_nanos() as u64
++    }
++
++    pub fn record(recv: u64, done: u64) {
++        let i = SLOT.fetch_add(1, Ordering::Relaxed);
++        if i < MAX {
++            RECV[i].store(recv, Ordering::Relaxed);
++            DONE[i].store(done, Ordering::Relaxed);
++        }
++    }
++
++    pub fn dump() -> String {
++        let n = SLOT.load(Ordering::Relaxed).min(MAX);
++        let b = BCAST.load(Ordering::Relaxed);
++        let mut s = format!("FLUSHTRACE bcast={b} workers={n}");
++        for i in 0..n {
++            s.push_str(&format!(
++                " [{i}] recv_us={:.1} done_us={:.1}",
++                (RECV[i].load(Ordering::Relaxed).wrapping_sub(b)) as f64 / 1000.0,
++                (DONE[i].load(Ordering::Relaxed).wrapping_sub(b)) as f64 / 1000.0
++            ));
++        }
++        s
++    }
++}
+diff --git a/src/core/admin/src/lib.rs b/src/core/admin/src/lib.rs
+index ac6105f..0c01255 100644
+--- a/src/core/admin/src/lib.rs
++++ b/src/core/admin/src/lib.rs
+@@ -368,6 +368,13 @@ impl Admin {
+                 // do some request handling
+                 match request {
+                     AdminRequest::FlushAll => {
++                        // TEMPORARY INSTRUMENTATION (uncommitted)
++                        common::flushtrace::SLOT
++                            .store(0, std::sync::atomic::Ordering::Relaxed);
++                        common::flushtrace::BCAST.store(
++                            common::flushtrace::now(),
++                            std::sync::atomic::Ordering::Relaxed,
++                        );
+                         if self.signal_queue_tx.try_send_all(Signal::FlushAll).is_err() {
+                             warn!("failed to broadcast flush_all signal");
+                         }
+@@ -383,6 +390,10 @@ impl Admin {
+                         session.send(AdminResponse::Stats)?;
+                     }
+                     AdminRequest::Version => {
++                        // TEMPORARY INSTRUMENTATION (uncommitted): dumping from
++                        // the admin thread, after the fact, keeps the worker
++                        // path free of the syscall that perturbs the measurement
++                        eprintln!("{}", common::flushtrace::dump());
+                         session.send(AdminResponse::version(self.version.clone()))?;
+                     }
+                 }
+diff --git a/src/core/server/src/workers/worker.rs b/src/core/server/src/workers/worker.rs
+index 7823fe1..6c6b421 100644
+--- a/src/core/server/src/workers/worker.rs
++++ b/src/core/server/src/workers/worker.rs
+@@ -286,7 +286,13 @@ where
+                         // "Accepted semantic changes" in the concurrent
+                         // segcache conversion design spec
+                         warn!("received flush_all");
++                        // TEMPORARY INSTRUMENTATION (uncommitted): separate
++                        // "woken late" from "woken but clear is slow". Atomic
++                        // stores only -- no lock, no syscall.
++                        let t_recv = common::flushtrace::now();
+                         self.storage.clear();
++                        let t_done = common::flushtrace::now();
++                        common::flushtrace::record(t_recv, t_done);
+                     }
+                     Signal::Shutdown => {
+                         // if we received a shutdown, we can return

@@ -32,7 +32,7 @@ nevent = 1024
 threads = $WORKERS
 [seg]
 hash_power = 20
-heap_size = "256MB"
+heap_size = "${HEAP:-256MB}"
 segment_size = "1MB"
 compact_target = 2
 merge_target = 4
@@ -58,7 +58,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-"$WT/target/debug/$PROD" "$CFG" > "$OUT.server.log" 2>&1 &
+"$WT/target/${PROFILE:-debug}/$PROD" "$CFG" > "$OUT.server.log" 2>&1 &
 SRV=$!
 sleep 4
 
