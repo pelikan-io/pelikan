@@ -113,9 +113,9 @@ and never outlive `execute()`.
 - Deleted along with the storage thread: the worker↔storage data queues, the
   `QUEUE_RETRIES` response shuttle, and the `storage_event_loop` /
   `storage_queue_depth` metrics. Worker metrics are unchanged.
-- Workers no longer call `expire()` in their event loop and ignore
-  `Signal::FlushAll` (the maintenance thread owns both); they still act on
-  `Signal::Shutdown`.
+- Workers no longer call `expire()` in their event loop. Each worker handles
+  `Signal::FlushAll` by calling `storage.clear()` (the admin signal is a
+  broadcast), and still acts on `Signal::Shutdown`.
 
 ### 4. Expiration model (revised: no maintenance thread)
 
@@ -147,10 +147,8 @@ With that in place:
 
 `process.rs`:
 
-- Signal queues fan out to listener + maintenance + workers.
+- Signal queues fan out to listener + workers.
 - Session queues go from listener to workers only.
-- Maintenance is spawned alongside workers; shutdown joins it like any other
-  worker thread.
 
 ### 6. Documentation
 
@@ -198,6 +196,13 @@ With that in place:
   write pressure. Under low load expired segments linger in memory (metrics
   show them as used) — accepted, since that memory has no competing demand
   until write pressure exists.
+- **flush_all is applied by each worker independently (broadcast):** even
+  with the admin thread waking workers on the broadcast, a write acked
+  between the first and last worker's `clear()` can be destroyed by a later
+  duplicate `clear()` — a small smear window. This differs in kind from the
+  old model, where queued requests could straddle the flush but a write
+  acked after the flush was never destroyed. Exactly-once flush via an
+  admin-held clear handle is possible follow-up work if ever needed.
 
 ## Payoff
 

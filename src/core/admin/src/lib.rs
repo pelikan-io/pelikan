@@ -368,7 +368,12 @@ impl Admin {
                 // do some request handling
                 match request {
                     AdminRequest::FlushAll => {
-                        let _ = self.signal_queue_tx.try_send_all(Signal::FlushAll);
+                        if self.signal_queue_tx.try_send_all(Signal::FlushAll).is_err() {
+                            warn!("failed to broadcast flush_all signal");
+                        }
+                        if self.signal_queue_tx.wake().is_err() {
+                            warn!("error waking threads for flush_all");
+                        }
                         session.send(AdminResponse::Ok)?;
                     }
                     AdminRequest::Quit => {

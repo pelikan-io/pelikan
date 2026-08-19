@@ -241,25 +241,6 @@ where
                             // trigger a wake-up in case there are more sessions
                             let _ = self.waker.wake();
                         }
-
-                        // check if we received any signals from the admin thread
-                        while let Some(signal) = self.signal_queue.try_recv() {
-                            match signal.into_inner() {
-                                Signal::FlushAll => {
-                                    // the admin thread broadcasts flush_all to
-                                    // every worker; each calls `clear()`, and
-                                    // the second..Nth calls find already
-                                    // drained buckets and are cheap no-ops
-                                    warn!("received flush_all");
-                                    self.storage.clear();
-                                }
-                                Signal::Shutdown => {
-                                    // if we received a shutdown, we can return
-                                    // and stop processing events
-                                    return;
-                                }
-                            }
-                        }
                     }
                     _ => {
                         if event.is_error() {
@@ -286,6 +267,31 @@ where
                                 continue;
                             }
                         }
+                    }
+                }
+            }
+
+            // check if we received any signals from the admin thread. this is
+            // drained once per event-loop iteration (try_recv on an empty
+            // queue is cheap) so signals are handled promptly even without a
+            // waker event
+            while let Some(signal) = self.signal_queue.try_recv() {
+                match signal.into_inner() {
+                    Signal::FlushAll => {
+                        // the admin thread broadcasts flush_all to every
+                        // worker and each calls `clear()`. duplicate clears
+                        // are cheap, but not semantically inert: a write
+                        // acked between the first and last worker's clear()
+                        // can be destroyed by a later duplicate clear — see
+                        // "Accepted semantic changes" in the concurrent
+                        // segcache conversion design spec
+                        warn!("received flush_all");
+                        self.storage.clear();
+                    }
+                    Signal::Shutdown => {
+                        // if we received a shutdown, we can return
+                        // and stop processing events
+                        return;
                     }
                 }
             }
