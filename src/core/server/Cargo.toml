@@ -25,3 +25,7 @@ session = { path = "../../session" }
 signal-hook = {workspace = true}
 slab = { workspace = true }
 queues = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+bytes = { workspace = true }
+clocksource = { workspace = true }

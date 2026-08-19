@@ -112,6 +112,8 @@ use std::sync::Arc;
 
 mod listener;
 mod process;
+#[cfg(target_os = "linux")]
+pub mod ringline;
 mod workers;
 
 use listener::ListenerBuilder;
