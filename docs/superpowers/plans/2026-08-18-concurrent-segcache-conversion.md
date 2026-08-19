@@ -1134,6 +1134,28 @@ git add docs/journal && git commit -m "docs: journal the concurrent segcache con
 - [ ] **F5 — release + ship**: when hardening settles: keyvalue 0.3.1 +
   segcache 0.4.2 bump PRs, publish from refreshed clean clone, drop the
   pelikan git pin (swap to published 0.4.2), full gate, then Task E3.
+  *(Done for 0.4.2; repeats for 0.4.3, which carries the verify-ABA
+  read-path guard plus the relocation gauge fixes.)*
+
+### Release checklist additions (each from a real near-miss)
+
+- [ ] **Re-verify the version line against `upstream/main` immediately
+  before cutting a bump PR.** A branch cut before a bump that also edits
+  the same manifest can silently revert the version line through a squash
+  merge, and nothing in CI catches it. It did not fire this time — the
+  salvage branch edited only the `[features]` table, so there was no
+  competing hunk — but the mechanism is live. Related: never quote repo
+  state from a worktree or branch base; re-check against main at the
+  moment of use. (A stale worktree reading is exactly how a false "main
+  is still 0.4.1" report reached this plan.)
+- [ ] **Run the feature-gated suites locally, not just `cargo test
+  --workspace`.** CI runs `--features debug` and `--features loom`; the
+  plain workspace run covers neither, which is why a real bug (the
+  verify-ABA false-absent) surfaced only as a one-in-3000 CI failure on a
+  version-bump-only PR.
+- [ ] **Triage a green-on-re-run CI failure rather than re-running it**,
+  especially in a test guarding a recently-fixed invariant. That habit is
+  what turned a dismissible flake into the seventh engine bug.
 
 Non-critical findings recorded for follow-up (cache-rs issues, not this PR):
 cas-vs-delete returns EXISTS where serialized execution gave NOT_FOUND;
