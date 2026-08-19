@@ -4,6 +4,10 @@ use entrystore::EntryStore;
 use logger::Klog;
 use pelikan_net::ringline::{self, AsyncEventHandler, ConnCtx, ParseResult};
 use protocol_common::{Compose, Execute, Protocol};
+use session::{
+    SESSION_RECV, SESSION_RECV_BYTE, SESSION_RECV_EX, SESSION_SEND, SESSION_SEND_BYTE,
+    SESSION_SEND_EX,
+};
 use std::any::Any;
 use std::cell::RefCell;
 use std::io;
@@ -11,6 +15,28 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 static FLUSH_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+fn record_receive(observed: usize, buffered: &mut usize) {
+    SESSION_RECV.increment();
+    SESSION_RECV_BYTE.add(observed.saturating_sub(*buffered) as u64);
+    *buffered = observed;
+}
+
+fn record_receive_error() {
+    SESSION_RECV_EX.increment();
+}
+
+fn record_send() {
+    SESSION_SEND.increment();
+}
+
+fn record_send_error() {
+    SESSION_SEND_EX.increment();
+}
+
+fn record_send_bytes(bytes: usize) {
+    SESSION_SEND_BYTE.add(bytes as u64);
+}
 
 pub(crate) fn request_flush() {
     FLUSH_REQUESTED.store(true, Ordering::Release);
@@ -252,13 +278,15 @@ where
                 }
             };
             let mut session = RinglineSession::new(protocol);
+            let mut buffered_bytes = 0_usize;
 
             loop {
                 let mut outcome = None;
                 let mut terminal_error = None;
                 let consumed = conn
-                    .with_data(
-                        |data| match Self::process_with_session(&mut session, data) {
+                    .with_data(|data| {
+                        record_receive(data.len(), &mut buffered_bytes);
+                        match Self::process_with_session(&mut session, data) {
                             Ok(ProcessOutcome::Complete {
                                 consumed,
                                 response,
@@ -272,11 +300,13 @@ where
                                 terminal_error = Some(error);
                                 ParseResult::Consumed(data.len())
                             }
-                        },
-                    )
+                        }
+                    })
                     .await;
 
+                buffered_bytes = buffered_bytes.saturating_sub(consumed);
                 if let Some(error) = terminal_error {
+                    record_receive_error();
                     error!("Ringline request processing failed: {error}");
                     break;
                 }
@@ -289,6 +319,7 @@ where
                     break;
                 };
 
+                record_send();
                 if SendAction::for_response(&response) == SendAction::Skip {
                     if hangup {
                         break;
@@ -300,19 +331,23 @@ where
                     Ok(completion) => match completion.await {
                         Ok(sent) => sent,
                         Err(error) => {
+                            record_send_error();
                             error!("Ringline response send failed: {error}");
                             break;
                         }
                     },
                     Err(error) => {
+                        record_send_error();
                         error!("Ringline response submission failed: {error}");
                         break;
                     }
                 };
                 let sent = sent as usize;
+                record_send_bytes(sent);
                 session.response_completed(sent);
 
                 if sent != response.len() {
+                    record_send_error();
                     error!(
                         "Ringline response send completed partially: sent {sent} of {} bytes",
                         response.len()
@@ -367,10 +402,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{ProcessOutcome, SendAction, SingleHandler};
+    use super::{
+        record_receive, record_receive_error, record_send, record_send_bytes, record_send_error,
+        ProcessOutcome, SendAction, SingleHandler,
+    };
     use entrystore::EntryStore;
     use logger::Klog;
     use protocol_common::{BufMut, Compose, Execute, ParseOk, Protocol};
+    use session::{
+        SESSION_RECV, SESSION_RECV_BYTE, SESSION_RECV_EX, SESSION_SEND, SESSION_SEND_BYTE,
+        SESSION_SEND_EX,
+    };
     use std::cell::{Cell, RefCell};
     use std::io::{self, ErrorKind};
     use std::rc::Rc;
@@ -550,6 +592,31 @@ mod tests {
     #[test]
     fn empty_response_skips_ringline_send() {
         assert_eq!(SendAction::for_response(&[]), SendAction::Skip);
+    }
+
+    #[test]
+    fn ringline_io_updates_session_metrics_with_mio_semantics() {
+        let recv = SESSION_RECV.value();
+        let recv_byte = SESSION_RECV_BYTE.value();
+        let recv_ex = SESSION_RECV_EX.value();
+        let send = SESSION_SEND.value();
+        let send_byte = SESSION_SEND_BYTE.value();
+        let send_ex = SESSION_SEND_EX.value();
+        let mut buffered = 2;
+
+        record_receive(7, &mut buffered);
+        record_receive_error();
+        record_send();
+        record_send_bytes(11);
+        record_send_error();
+
+        assert_eq!(buffered, 7);
+        assert_eq!(SESSION_RECV.value() - recv, 1);
+        assert_eq!(SESSION_RECV_BYTE.value() - recv_byte, 5);
+        assert_eq!(SESSION_RECV_EX.value() - recv_ex, 1);
+        assert_eq!(SESSION_SEND.value() - send, 1);
+        assert_eq!(SESSION_SEND_BYTE.value() - send_byte, 11);
+        assert_eq!(SESSION_SEND_EX.value() - send_ex, 1);
     }
 
     #[test]

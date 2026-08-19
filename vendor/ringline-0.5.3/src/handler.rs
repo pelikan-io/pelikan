@@ -247,23 +247,18 @@ impl<'a> DriverCtx<'a> {
             }
         }
 
-        let slot_size = self.send_copy_pool.slot_size() as usize;
-
-        // Chunk data that exceeds the send copy slot size. Each chunk gets its
-        // own pool slot and SQE; the per-connection send queue ensures they are
-        // transmitted in order. Only the final chunk is marked end-of-send, so
-        // the waiter is woken once for the whole logical send rather than once
-        // per chunk (which would report a short count and, for pipelined sends,
-        // wake the wrong future).
-        let mut chunks = data.chunks(slot_size).peekable();
-        while let Some(chunk) = chunks.next() {
-            let (slot, ptr, len) = self
-                .send_copy_pool
-                .copy_in(chunk)
-                .ok_or_else(|| io::Error::other("send copy pool exhausted"))?;
+        // Reserve every pool slot before submitting the first SQE. This is a
+        // logical-send transaction: pressure returns an error with no prefix
+        // queued to the socket, so callers never observe a truncated response.
+        let chunks = self
+            .send_copy_pool
+            .copy_in_chunks(data)
+            .ok_or_else(|| io::Error::other("send copy pool exhausted"))?;
+        let last = chunks.len().saturating_sub(1);
+        let mut sends = Vec::with_capacity(chunks.len());
+        for (chunk_index, (slot, ptr, len)) in chunks.into_iter().enumerate() {
             self.send_copy_pool
-                .set_end_of_send(slot, chunks.peek().is_none());
-
+                .set_end_of_send(slot, chunk_index == last);
             let user_data = crate::completion::UserData::encode(
                 crate::completion::OpTag::Send,
                 conn.index,
@@ -273,18 +268,15 @@ impl<'a> DriverCtx<'a> {
                 .flags(crate::completion::STREAM_SEND_FLAGS)
                 .build()
                 .user_data(user_data.raw());
-
-            let built = BuiltSend {
+            sends.push(BuiltSend {
                 entry,
                 pool_slot: slot,
                 slab_idx: u16::MAX,
-                total_len: chunk.len() as u32,
-            };
-
-            self.submit_or_queue(conn.index, built)?;
+                total_len: len,
+            });
         }
 
-        Ok(())
+        self.queue_built_sends(conn.index, sends)
     }
 
     /// Allocate a unique 32-bit disk-I/O completion key: monotonic sequence

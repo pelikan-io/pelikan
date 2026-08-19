@@ -104,20 +104,51 @@ impl RinglineRuntime {
     }
 
     /// Starts a monitor that joins workers and shuts the listener on exit.
-    pub fn monitor(self) -> (RinglineShutdown, JoinHandle<io::Result<()>>) {
-        let Self { shutdown, workers } = self;
+    /// A monitor-thread creation failure shuts down and joins the live runtime
+    /// before returning the original creation error.
+    pub fn monitor(self) -> io::Result<(RinglineShutdown, JoinHandle<io::Result<()>>)> {
+        self.monitor_named("pelikan_ringline_monitor")
+    }
+
+    fn monitor_named(
+        self,
+        thread_name: &str,
+    ) -> io::Result<(RinglineShutdown, JoinHandle<io::Result<()>>)> {
+        if thread_name.as_bytes().contains(&0) {
+            let error = io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Ringline monitor thread name contains a NUL byte",
+            );
+            let _ = self.join();
+            return Err(error);
+        }
         let control = RinglineShutdown {
-            shutdown: Arc::clone(&shutdown),
+            shutdown: Arc::clone(&self.shutdown),
         };
-        let monitor = std::thread::Builder::new()
-            .name("pelikan_ringline_monitor".to_string())
+        let state = Arc::new(Mutex::new(Some(self)));
+        let monitor_state = Arc::clone(&state);
+        match std::thread::Builder::new()
+            .name(thread_name.to_string())
             .spawn(move || {
-                let result = join_workers(workers);
-                shutdown.shutdown();
-                result
-            })
-            .expect("failed to spawn Ringline monitor");
-        (control, monitor)
+                let runtime = monitor_state
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .take()
+                    .expect("monitor runtime handoff missing");
+                runtime.join()
+            }) {
+            Ok(monitor) => Ok((control, monitor)),
+            Err(error) => {
+                if let Some(runtime) = state
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .take()
+                {
+                    let _ = runtime.join();
+                }
+                Err(error)
+            }
+        }
     }
 
     /// Shuts down and joins every Ringline worker.
@@ -338,6 +369,97 @@ mod tests {
             );
             Self
         }
+    }
+
+    #[cfg(feature = "ringline-force-mio")]
+    struct GreetingHandler;
+
+    #[cfg(feature = "ringline-force-mio")]
+    impl ::ringline::AsyncEventHandler for GreetingHandler {
+        #[allow(clippy::manual_async_fn)]
+        fn on_accept(
+            &self,
+            conn: ::ringline::ConnCtx,
+        ) -> impl std::future::Future<Output = ()> + 'static {
+            async move {
+                let completion = conn.send(b"READY\r\n").unwrap();
+                assert_eq!(completion.await.unwrap(), 7);
+            }
+        }
+
+        fn create_for_worker(worker_id: usize) -> Self {
+            assert_eq!(take_worker_bootstrap::<u8>(worker_id), 7);
+            Self
+        }
+    }
+
+    #[cfg(feature = "ringline-force-mio")]
+    #[test]
+    fn facade_launch_accepts_a_connection_after_bootstrap() {
+        use std::io::Read;
+        use std::net::TcpStream;
+        use std::time::Duration;
+
+        let _test_guard = TEST_LOCK.lock().unwrap();
+        let runtime = launch_with_bootstraps::<GreetingHandler, u8>(
+            "127.0.0.1:0".parse().unwrap(),
+            runtime_config(1, 128),
+            vec![7],
+        )
+        .unwrap();
+        let mut stream = TcpStream::connect(runtime.bound_addr().unwrap()).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        let mut response = [0; 7];
+        stream.read_exact(&mut response).unwrap();
+        assert_eq!(&response, b"READY\r\n");
+        runtime.join().unwrap();
+    }
+
+    #[cfg(feature = "ringline-force-mio")]
+    #[test]
+    fn monitor_spawn_failure_shuts_down_joins_and_releases_listener() {
+        use std::net::TcpListener;
+
+        let _test_guard = TEST_LOCK.lock().unwrap();
+        let runtime = launch_with_bootstraps::<GreetingHandler, u8>(
+            "127.0.0.1:0".parse().unwrap(),
+            runtime_config(1, 128),
+            vec![7],
+        )
+        .unwrap();
+        let addr = runtime.bound_addr().unwrap();
+
+        let error = runtime
+            .monitor_named("invalid\0monitor")
+            .err()
+            .expect("NUL thread name must fail");
+
+        assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
+        let rebound = TcpListener::bind(addr).unwrap();
+        drop(rebound);
+    }
+
+    #[cfg(feature = "ringline-force-mio")]
+    #[test]
+    fn facade_launch_preserves_bootstrap_type_panic_payload() {
+        let _test_guard = TEST_LOCK.lock().unwrap();
+        let result = launch_with_bootstraps::<BootstrapHandler, u8>(
+            "127.0.0.1:0".parse().unwrap(),
+            runtime_config(1, 128),
+            vec![7],
+        );
+
+        let error = result.err().expect("type mismatch must fail launch");
+        assert!(
+            error
+                .to_string()
+                .contains("Ringline worker bootstrap type mismatch for worker 0"),
+            "unexpected launch error: {error}"
+        );
+        let guard = HandlerSlots::install(vec![9_u8]).unwrap();
+        drop(guard);
     }
 
     #[test]

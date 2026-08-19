@@ -33,9 +33,13 @@ Compared with the published archive, this vendor tree omits the package-local
   rollback closes launch-owned descriptors and joins started workers. The
   reviewed correction binds the io_uring event loop before submitting an SQE
   that references inline storage and uses `OwnedFd` for Mio read-end ownership.
+  Generic follow-ups reserve all copy-send slots before committing a logical
+  send and preserve exact worker panic payloads through startup rollback.
 
-The Ringline change is generic and contains no Pelikan-specific fallback or
-configuration behavior. It is open upstream as ringline-rs/ringline#309. See
+The Ringline changes are generic and contain no Pelikan-specific fallback or
+configuration behavior. The startup transaction merged as ringline-rs/ringline#309
+but is not released on crates.io; send reservation and panic-detail propagation
+are documented follow-ups for a separate upstream submission. See
 `ringline-0.5.3/UPSTREAM-PR.md` for the standalone patch artifact and
 verification commands.
 

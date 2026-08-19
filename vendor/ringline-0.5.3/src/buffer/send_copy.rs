@@ -36,6 +36,26 @@ impl SendCopyPool {
         }
     }
 
+    /// Transactionally reserve and fill every slot needed for `data`.
+    ///
+    /// Returns `None` without reserving any slot when the whole logical send
+    /// does not fit. Callers may therefore report pressure without having
+    /// committed a prefix of the buffer.
+    pub fn copy_in_chunks(&mut self, data: &[u8]) -> Option<Vec<(u16, *const u8, u32)>> {
+        let slot_size = self.slot_size as usize;
+        let required = data.len().div_ceil(slot_size);
+        if required > self.free_list.len() {
+            crate::metrics::POOL.increment(crate::metrics::pool::SEND_EXHAUSTED);
+            return None;
+        }
+
+        Some(
+            data.chunks(slot_size)
+                .map(|chunk| self.copy_in(chunk).expect("capacity was reserved"))
+                .collect(),
+        )
+    }
+
     /// Allocate a slot, copy `data` into it, and return (slot_index, ptr, len).
     /// Returns `None` if no slots are free or data exceeds slot size.
     pub fn copy_in(&mut self, data: &[u8]) -> Option<(u16, *const u8, u32)> {
@@ -243,6 +263,14 @@ mod tests {
         let _ = pool.copy_in(b"first").unwrap();
         assert_eq!(pool.free_count(), 0);
         assert!(pool.copy_in(b"second").is_none());
+    }
+
+    #[test]
+    fn chunk_reservation_is_transactional_under_pool_pressure() {
+        let mut pool = SendCopyPool::new(1, 4);
+
+        assert!(pool.copy_in_chunks(b"abcdefgh").is_none());
+        assert_eq!(pool.free_count(), 1);
     }
 
     #[test]

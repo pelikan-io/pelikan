@@ -1,8 +1,10 @@
+use std::any::Any;
 use std::io;
 use std::net::SocketAddr;
 use std::os::fd::RawFd;
 #[cfg(not(has_io_uring))]
 use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,6 +24,18 @@ type LaunchResult = Result<
     crate::error::Error,
 >;
 type WorkerHandle = thread::JoinHandle<Result<(), crate::error::Error>>;
+type StartupResult = Result<(), String>;
+
+fn panic_payload(payload: Box<dyn Any + Send>) -> String {
+    let payload = match payload.downcast::<String>() {
+        Ok(message) => return *message,
+        Err(payload) => payload,
+    };
+    payload
+        .downcast::<&'static str>()
+        .map(|message| (*message).to_string())
+        .unwrap_or_else(|_| "non-string panic payload".to_string())
+}
 
 fn rollback_workers(
     shutdown_flag: &Arc<AtomicBool>,
@@ -566,7 +580,7 @@ impl RinglineBuilder {
                 let mut event_loop = match event_loop_result {
                     Ok(event_loop) => event_loop,
                     Err(e) => {
-                        let _ = startup_tx.send(Err(()));
+                        let _ = startup_tx.send(Err(e.to_string()));
                         return Err(e);
                     }
                 };
@@ -577,7 +591,7 @@ impl RinglineBuilder {
                 // after `prepare_run()` would invalidate that pointer.
                 eventfd.0.transfer_to_driver();
                 if let Err(e) = event_loop.prepare_run() {
-                    let _ = startup_tx.send(Err(()));
+                    let _ = startup_tx.send(Err(e.to_string()));
                     return Err(e);
                 }
 
@@ -613,7 +627,7 @@ impl RinglineBuilder {
                 Option<crossbeam_channel::Sender<crate::blocking::BlockingResponse>>,
                 Option<Arc<crate::blocking::BlockingPool>>,
                 crate::region_registry::RegionControlRx,
-                crossbeam_channel::Sender<Result<(), ()>>,
+                crossbeam_channel::Sender<StartupResult>,
             ) -> Result<(), crate::error::Error>
             + Send
             + Clone
@@ -734,7 +748,7 @@ impl RinglineBuilder {
         // errors to the caller of `launch()` instead of silently
         // swallowing them inside a thread that never gets joined.
         let mut handles: Vec<WorkerHandle> = Vec::with_capacity(num_threads);
-        let (startup_tx, startup_rx) = crossbeam_channel::bounded::<Result<(), ()>>(num_threads);
+        let (startup_tx, startup_rx) = crossbeam_channel::bounded::<StartupResult>(num_threads);
 
         // SMT-aware pinning: when the requested worker range fits within
         // the machine's physical cores, treat `core_offset + worker_id`
@@ -813,7 +827,7 @@ impl RinglineBuilder {
                                  against the machine's CPU count",
                                 config.worker.core_offset
                             );
-                            let _ = startup_tx.send(Err(()));
+                            let _ = startup_tx.send(Err(e.to_string()));
                             return Err(e);
                         }
                     }
@@ -821,24 +835,37 @@ impl RinglineBuilder {
                     metriken::set_thread_shard(worker_id);
 
                     let accept_rx = if has_acceptor { Some(rx) } else { None };
-                    worker_fn(
-                        worker_id,
-                        config,
-                        accept_rx,
-                        eventfd,
-                        worker_shutdown_flag,
-                        worker_resolve_rx,
-                        worker_resolve_tx,
-                        worker_resolver,
-                        worker_spawn_rx,
-                        worker_spawn_tx,
-                        worker_spawner,
-                        worker_blocking_rx,
-                        worker_blocking_tx,
-                        worker_blocking_pool,
-                        worker_region_rx,
-                        startup_tx,
-                    )
+                    let panic_tx = startup_tx.clone();
+                    match catch_unwind(AssertUnwindSafe(|| {
+                        worker_fn(
+                            worker_id,
+                            config,
+                            accept_rx,
+                            eventfd,
+                            worker_shutdown_flag,
+                            worker_resolve_rx,
+                            worker_resolve_tx,
+                            worker_resolver,
+                            worker_spawn_rx,
+                            worker_spawn_tx,
+                            worker_spawner,
+                            worker_blocking_rx,
+                            worker_blocking_tx,
+                            worker_blocking_pool,
+                            worker_region_rx,
+                            startup_tx,
+                        )
+                    })) {
+                        Ok(result) => result,
+                        Err(payload) => {
+                            let message = format!(
+                                "Ringline worker {worker_id} panicked: {}",
+                                panic_payload(payload)
+                            );
+                            let _ = panic_tx.send(Err(message.clone()));
+                            Err(crate::error::Error::Io(io::Error::other(message)))
+                        }
+                    }
                 });
 
             let handle = match spawn_result {
@@ -859,22 +886,26 @@ impl RinglineBuilder {
         // Collect setup outcomes. If any worker failed setup, signal
         // shutdown to the rest, join everyone, and surface the first
         // setup error back to the caller of `launch()`.
-        let mut setup_failed = false;
+        let mut setup_error = None;
         for _ in 0..num_threads {
             match startup_rx.recv() {
                 Ok(Ok(())) => {}
-                Ok(Err(())) | Err(_) => {
-                    setup_failed = true;
+                Ok(Err(error)) => {
+                    setup_error = Some(error);
+                    break;
+                }
+                Err(error) => {
+                    setup_error = Some(format!("worker startup channel disconnected: {error}"));
                     break;
                 }
             }
         }
 
-        if setup_failed {
+        if let Some(setup_error) = setup_error {
             let first_err = rollback_workers(&shutdown_flag, &worker_wake_fds, handles);
-            return Err(first_err.unwrap_or_else(|| {
-                crate::error::Error::Io(io::Error::other("worker setup failed"))
-            }));
+            return Err(
+                first_err.unwrap_or_else(|| crate::error::Error::Io(io::Error::other(setup_error)))
+            );
         }
 
         // Commit the listener only after every worker has completed fallible
@@ -1197,7 +1228,7 @@ mod startup_gate_tests {
                         if let Some((fd, _)) = accepted {
                             unsafe { libc::close(fd) };
                         }
-                        let _ = startup_tx.send(Err(()));
+                        let _ = startup_tx.send(Err("injected worker startup failure".to_string()));
                         Err(crate::error::Error::Io(io::Error::other(
                             "injected worker startup failure",
                         )))
@@ -1215,6 +1246,24 @@ mod startup_gate_tests {
         let _ = std::fs::remove_file(path);
         assert!(absent_before_worker_ready);
         assert!(absent_after_rollback);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn worker_startup_panic_payload_is_preserved() {
+        let result = RinglineBuilder::new(one_worker_config()).launch_inner(
+            |_, _, _, _eventfd, _, _, _, _, _, _, _, _, _, _, _, _| {
+                panic!("injected bootstrap type-erasure panic")
+            },
+        );
+
+        assert!(
+            result
+                .err()
+                .expect("startup panic must fail launch")
+                .to_string()
+                .contains("injected bootstrap type-erasure panic")
+        );
     }
 
     #[cfg(target_os = "linux")]
@@ -1244,7 +1293,7 @@ mod startup_gate_tests {
         for _ in 0..4 {
             let result = RinglineBuilder::new(one_worker_config()).launch_inner(
                 |_, _, _, _eventfd, _, _, _, _, _, _, _, _, _, _, _, startup_tx| {
-                    let _ = startup_tx.send(Err(()));
+                    let _ = startup_tx.send(Err("injected worker startup failure".to_string()));
                     Err(crate::error::Error::Io(io::Error::other(
                         "injected worker startup failure",
                     )))

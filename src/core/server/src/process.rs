@@ -8,6 +8,7 @@ use protocol_common::Protocol;
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
 use std::any::Any;
+use std::io;
 use std::thread::JoinHandle;
 
 #[cfg(target_os = "linux")]
@@ -268,6 +269,9 @@ fn ringline_preflight<P, Request, Response, Storage>(
 }
 
 #[cfg(target_os = "linux")]
+const RINGLINE_MAX_CONNECTIONS: u32 = 16_000;
+
+#[cfg(target_os = "linux")]
 impl<P, Request, Response, Storage> RinglineProcessBuilder<P, Request, Response, Storage>
 where
     P: 'static + Protocol<Request, Response> + Clone + Send,
@@ -293,9 +297,7 @@ where
             .server
             .socket_addr()
             .expect("Ringline listen address was validated at builder creation");
-        let max_connections = u32::try_from(config.server.nevent())
-            .unwrap_or(u32::MAX)
-            .max(1);
+        let max_connections = RINGLINE_MAX_CONNECTIONS;
         let runtime_config = RinglineRuntimeConfig {
             workers: 1,
             max_connections,
@@ -314,7 +316,12 @@ where
             Ok(runtime) => {
                 recovery.commit();
                 info!("cache server I/O backend requested=ringline active=ringline");
-                Process::Ringline(spawn_ringline(admin, log_drain, runtime))
+                Process::Ringline(spawn_ringline(admin, log_drain, runtime).unwrap_or_else(
+                    |error| {
+                        error!("Ringline control-plane initialization failed: {error}");
+                        panic!("Ringline control-plane initialization failed: {error}")
+                    },
+                ))
             }
             Err(ringline_error) => {
                 error!(
@@ -359,7 +366,6 @@ pub struct MioProcess {
 pub struct RinglineProcess {
     admin: JoinHandle<()>,
     bridge: JoinHandle<()>,
-    supervisor: JoinHandle<()>,
     signal_tx: Sender<Signal>,
 }
 
@@ -368,39 +374,76 @@ fn spawn_ringline(
     admin: AdminBuilder,
     log_drain: LogDrain,
     runtime: pelikan_net::ringline::RinglineRuntime,
-) -> RinglineProcess {
-    let (control, worker_monitor) = runtime.monitor();
-    let worker_wake = control.worker_wake_handle(0);
-
-    let mut bridge_poll = Poll::new().expect("failed to create Ringline admin bridge poll");
-    let bridge_waker = Arc::new(Waker::from(
-        pelikan_net::Waker::new(bridge_poll.registry(), WAKER_TOKEN)
-            .expect("failed to create Ringline admin bridge waker"),
-    ));
+) -> io::Result<RinglineProcess> {
+    let mut bridge_poll = match Poll::new() {
+        Ok(poll) => poll,
+        Err(error) => return rollback_live_runtime(runtime, error),
+    };
+    let bridge_waker = match pelikan_net::Waker::new(bridge_poll.registry(), WAKER_TOKEN) {
+        Ok(waker) => Arc::new(Waker::from(waker)),
+        Err(error) => return rollback_live_runtime(runtime, error),
+    };
 
     let (signal_tx, signal_rx) = bounded(QUEUE_CAPACITY);
-    let (mut admin_signal_queues, mut bridge_signal_queues) = Queues::new(
+    let (mut admin_signal_queues, mut bridge_signal_queues) = match Queues::new(
         vec![admin.waker()],
         vec![Arc::clone(&bridge_waker)],
         QUEUE_CAPACITY,
-    )
-    .unwrap();
+    ) {
+        Ok(queues) => queues,
+        Err(error) => return rollback_live_runtime(runtime, io::Error::other(error)),
+    };
     let mut admin = admin.build(log_drain, signal_rx, admin_signal_queues.remove(0));
 
-    let admin = std::thread::Builder::new()
+    let admin = match std::thread::Builder::new()
         .name(format!("{THREAD_PREFIX}_admin"))
         .spawn(move || admin.run())
-        .unwrap();
+    {
+        Ok(admin) => admin,
+        Err(error) => return rollback_live_runtime(runtime, error),
+    };
 
     let bridge_signals = bridge_signal_queues.remove(0);
-    let bridge = std::thread::Builder::new()
+    let (runtime_tx, runtime_rx) = std::sync::mpsc::sync_channel::<(
+        pelikan_net::ringline::RinglineShutdown,
+        JoinHandle<io::Result<()>>,
+    )>(1);
+    let bridge_signal_tx = signal_tx.clone();
+    let bridge = match std::thread::Builder::new()
         .name(format!("{THREAD_PREFIX}_ringline_control"))
         .spawn(move || {
-            let mut events = Events::with_capacity(1);
+            let Ok((control, worker_monitor)) = runtime_rx.recv() else {
+                return;
+            };
+            let worker_wake = control.worker_wake_handle(0);
+            let mut worker_monitor = Some(worker_monitor);
             loop {
-                if let Err(error) = bridge_poll.poll(&mut events, Some(Duration::from_millis(100)))
-                {
+                if worker_monitor.as_ref().is_some_and(JoinHandle::is_finished) {
+                    if let Some(monitor) = worker_monitor.take() {
+                        log_ringline_monitor(monitor);
+                    } else {
+                        error!("Ringline worker monitor missing during termination");
+                    }
+                    if let Err(error) = bridge_signal_tx.try_send(Signal::Shutdown) {
+                        error!("failed to report Ringline termination to admin: {error}");
+                    }
+                    return;
+                }
+                if let Err(error) = bridge_poll.poll(
+                    &mut Events::with_capacity(1),
+                    Some(Duration::from_millis(100)),
+                ) {
                     error!("Ringline admin bridge poll failed: {error}");
+                    control.shutdown();
+                    if let Some(monitor) = worker_monitor.take() {
+                        log_ringline_monitor(monitor);
+                    } else {
+                        error!("Ringline worker monitor missing during shutdown");
+                    }
+                    if let Err(report_error) = bridge_signal_tx.try_send(Signal::Shutdown) {
+                        error!("failed to report Ringline bridge failure to admin: {report_error}");
+                    }
+                    return;
                 }
                 bridge_waker.reset();
 
@@ -416,37 +459,102 @@ fn spawn_ringline(
                         }
                         Signal::Shutdown => {
                             control.shutdown();
+                            if let Some(monitor) = worker_monitor.take() {
+                                log_ringline_monitor(monitor);
+                            } else {
+                                error!("Ringline worker monitor missing during shutdown");
+                            }
                             return;
                         }
                     }
                 }
             }
-        })
-        .unwrap();
+        }) {
+        Ok(bridge) => bridge,
+        Err(error) => {
+            shutdown_signal(&signal_tx);
+            let _ = admin.join();
+            return rollback_live_runtime(runtime, error);
+        }
+    };
 
-    let supervisor_signal_tx = signal_tx.clone();
-    let supervisor = std::thread::Builder::new()
-        .name(format!("{THREAD_PREFIX}_ringline_supervisor"))
-        .spawn(move || {
-            match worker_monitor.join() {
-                Ok(Ok(())) => {}
-                Ok(Err(error)) => error!("Ringline runtime terminated: {error}"),
-                Err(payload) => error!("Ringline monitor panicked: {}", panic_payload(payload)),
-            }
-            if let Err(error) = supervisor_signal_tx.try_send(Signal::Shutdown) {
-                error!("failed to report Ringline termination to admin: {error}");
-            }
-        })
-        .unwrap();
+    let monitored = match runtime.monitor() {
+        Ok(monitored) => monitored,
+        Err(error) => {
+            drop(runtime_tx);
+            shutdown_signal(&signal_tx);
+            let _ = bridge.join();
+            let _ = admin.join();
+            return Err(error);
+        }
+    };
+    if let Err(error) = runtime_tx.send(monitored) {
+        let (control, monitor) = error.0;
+        control.shutdown();
+        log_ringline_monitor(monitor);
+        shutdown_signal(&signal_tx);
+        let bridge_error = match bridge.join() {
+            Ok(()) => io::Error::other("Ringline control bridge exited during startup"),
+            Err(payload) => io::Error::other(format!(
+                "Ringline control bridge panicked during startup: {}",
+                panic_payload(payload)
+            )),
+        };
+        if let Err(payload) = admin.join() {
+            error!(
+                "Ringline admin panicked during rollback: {}",
+                panic_payload(payload)
+            );
+        }
+        return Err(bridge_error);
+    }
 
-    spawn_signal_handler(signal_tx.clone());
+    if let Err(error) = try_spawn_signal_handler(signal_tx.clone()) {
+        shutdown_signal(&signal_tx);
+        let _ = bridge.join();
+        let _ = admin.join();
+        return Err(error);
+    }
 
-    RinglineProcess {
+    Ok(RinglineProcess {
         admin,
         bridge,
-        supervisor,
         signal_tx,
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn fail_after_live<T>(error: io::Error, rollback: impl FnOnce()) -> io::Result<T> {
+    rollback();
+    Err(error)
+}
+
+#[cfg(target_os = "linux")]
+fn rollback_live_runtime(
+    runtime: pelikan_net::ringline::RinglineRuntime,
+    error: io::Error,
+) -> io::Result<RinglineProcess> {
+    fail_after_live(error, || {
+        if let Err(cleanup_error) = runtime.join() {
+            error!("Ringline rollback after control-plane failure also failed: {cleanup_error}");
+        }
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn log_ringline_monitor(worker_monitor: JoinHandle<io::Result<()>>) {
+    match worker_monitor.join() {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => error!("Ringline runtime terminated: {error}"),
+        Err(payload) => error!("Ringline monitor panicked: {}", panic_payload(payload)),
     }
+}
+
+fn try_spawn_signal_handler(signal_tx: Sender<Signal>) -> io::Result<()> {
+    std::thread::Builder::new()
+        .name(format!("{THREAD_PREFIX}_signal"))
+        .spawn(move || signal_handler(&signal_tx))
+        .map(drop)
 }
 
 fn spawn_signal_handler(signal_tx: Sender<Signal>) {
@@ -528,9 +636,6 @@ impl MioProcess {
 #[cfg(target_os = "linux")]
 impl RinglineProcess {
     fn wait(self) {
-        if let Err(payload) = self.supervisor.join() {
-            error!("Ringline supervisor panicked: {}", panic_payload(payload));
-        }
         if let Err(payload) = self.bridge.join() {
             error!("Ringline admin bridge panicked: {}", panic_payload(payload));
         }
@@ -542,8 +647,14 @@ impl RinglineProcess {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "linux")]
+    use super::RINGLINE_MAX_CONNECTIONS;
     use super::{process_kind, ProcessKind};
     use pelikan_net::{resolve_backend, IoBackend};
+    #[cfg(target_os = "linux")]
+    use std::cell::Cell;
+    #[cfg(target_os = "linux")]
+    use std::io;
 
     #[test]
     fn resolved_mio_builds_existing_process() {
@@ -560,6 +671,26 @@ mod tests {
             process_kind(resolve_backend(IoBackend::Ringline, true)),
             ProcessKind::Ringline
         );
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn post_live_construction_failure_runs_rollback_and_preserves_cause() {
+        let rolled_back = Cell::new(false);
+        let error =
+            super::fail_after_live::<()>(io::Error::other("injected bridge spawn failure"), || {
+                rolled_back.set(true)
+            })
+            .unwrap_err();
+
+        assert!(rolled_back.get());
+        assert_eq!(error.to_string(), "injected bridge spawn failure");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn ringline_connection_limit_uses_ringline_default_not_mio_event_batch() {
+        assert_eq!(RINGLINE_MAX_CONNECTIONS, 16_000);
     }
 
     #[test]
