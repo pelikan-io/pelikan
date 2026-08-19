@@ -1116,7 +1116,7 @@ Invoke the `pr-adversarial-review` skill on the branch diff (repo's standard pre
 
 - [ ] **Step 3: Open the PR**
 
-Invoke the `pr` skill to push `concurrent-segcache` and open a PR against pelikan-io/pelikan, referencing the spec and this plan.
+Invoke the `pr` skill to push `concurrent-segcache` and open a PR against pelikan-io/pelikan, referencing the spec and this plan. The PR description must call out the operational changes (Phase D quality review, M3): the `storage_event_loop`/`storage_queue_depth` metrics are gone (external dashboards may chart them); `flush_all` now logs one `warn!` line per worker instead of one; the single-worker thread name changed from `pelikan_work` to `pelikan_work_0` (ops tooling matching on thread names); and the accepted semantic changes from the spec (add/replace races, flush smear, no periodic expire — memory for expired segments is reclaimed under write pressure).
 
 ---
 
