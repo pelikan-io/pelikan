@@ -48,6 +48,9 @@ follow-ups for a separate upstream submission. See
 `ringline-0.5.3/UPSTREAM-PR.md` for the standalone patch artifact and
 verification commands.
 
+- Standalone patch SHA-256:
+  `3755ff1bd37608c8b6b482f516186c8ccdfd3d96f951e56a5f8e87b45e42f706`
+
 Compared with the published archive, this vendor tree omits `Cargo.lock`,
 `Cargo.toml.orig`, and `ROADMAP.md`; it adds `UPSTREAM-PR.md` and the standalone
 `ringline-v0.5.3-startup-transaction.patch`. Cargo's `.cargo-ok` unpack-cache

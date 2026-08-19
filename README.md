@@ -213,6 +213,36 @@ Pelikan is file-first when it comes to configurations, and currently is
 config-file only. You can create a new config file following the examples
 included under the `config` directory.
 
+### Cache-server I/O backend
+
+The Segcache and RDS plain-TCP data listeners can opt in to Ringline on Linux:
+
+```toml
+[server]
+io_backend = "ringline" # Linux only; defaults and falls back to "mio"
+```
+
+`mio` remains the default on every platform. The Ringline option uses version
+`0.5.3`, vendored from the published crates.io archive and patched locally.
+Ringline reports Linux 6.0 or newer on x86_64 or ARM64 as its platform
+requirement; the host must also permit the io_uring capabilities that Ringline
+uses. The startup log records the requested and active backends and any
+fallback cause.
+
+Fallback is a startup transaction: on non-Linux systems, with TLS enabled, or
+when Ringline cannot initialize before serving traffic, Pelikan starts the data
+listener on Mio. After Ringline begins serving, a Ringline worker or driver
+failure shuts down the process; live connections are never migrated to Mio.
+TLS data listeners and admin listeners continue to use Mio. Proxy frontends and
+backends are not covered by this option and remain on Mio.
+
+The vendored startup transaction has merged upstream as
+`ringline-rs/ringline#309` (commit
+`a04751f0041c0ffc485a706bb124ec40b27823e1`), but no crates.io release contains
+it yet. The vendor patch also carries generic, unreleased backpressure,
+send-identity, receive-error, and panic-detail follow-ups; see
+[`vendor/README.md`](vendor/README.md) for checksums and exact provenance.
+
 # Community
 
 ## Stay in touch
