@@ -1,10 +1,12 @@
 //! The threading architecture chart: the runtime thread model per binary in
-//! three stacked panels (single worker / multiple workers / proxy). Literal
-//! thread names in monospace matching `top -H`; build-module chips inside
-//! each thread bridge this chart to the architecture chart; heavier edges
-//! carry bytes across the process boundary (wire) vs internal queues
-//! (object). The thread and queue inventory is asserted against the sources
-//! at generation time.
+//! two stacked panels (server / proxy). Literal thread names in monospace
+//! matching `top -H`; build-module chips inside each thread bridge this
+//! chart to the architecture chart; heavier edges carry bytes across the
+//! process boundary (wire) vs internal queues (object). Every server worker
+//! carries the storage chips because the workers share one internally
+//! synchronized cache through an `Arc` and execute requests in place — there
+//! is no storage thread. The thread and queue inventory is asserted against
+//! the sources at generation time.
 
 use crate::claims::{verify, Claim};
 use crate::svg::*;
@@ -25,18 +27,13 @@ const CLAIMS: &[Claim] = &[
     },
     Claim {
         path: "src/core/server/src/workers/mod.rs",
-        pattern: r#"name\(format!\("\{THREAD_PREFIX\}_work"\)\)"#,
-        what: "single worker thread spawn",
-    },
-    Claim {
-        path: "src/core/server/src/workers/mod.rs",
         pattern: r#"name\(format!\("\{THREAD_PREFIX\}_work_\{id\}"\)\)"#,
-        what: "multi worker thread spawn",
+        what: "worker thread spawn",
     },
     Claim {
         path: "src/core/server/src/workers/mod.rs",
-        pattern: r#"name\(format!\("\{THREAD_PREFIX\}_storage"\)\)"#,
-        what: "storage thread spawn",
+        pattern: r"let storage = Arc::new\(storage\);",
+        what: "workers share one Arc'd storage",
     },
     Claim {
         path: "src/core/server/src/process.rs",
@@ -54,14 +51,9 @@ const CLAIMS: &[Claim] = &[
         what: "listener->worker session queues",
     },
     Claim {
-        path: "src/core/server/src/workers/mod.rs",
-        pattern: r"Queues::new\(worker_wakers, storage_wakers",
-        what: "worker<->storage data queues",
-    },
-    Claim {
         path: "src/core/server/src/process.rs",
         pattern: r"thread_wakers\.extend_from_slice\(&self\.workers\.wakers\(\)\)",
-        what: "signal queues include all worker-side wakers (incl. storage)",
+        what: "signal queues include every worker's waker",
     },
     Claim {
         path: "src/core/server/src/process.rs",
@@ -111,7 +103,23 @@ const CLAIMS: &[Claim] = &[
 ];
 
 /// Claims of absence: the diagram relies on these NOT existing.
-const NEG_CLAIMS: &[Claim] = &[];
+const NEG_CLAIMS: &[Claim] = &[
+    Claim {
+        path: "src/core/server/src/workers/mod.rs",
+        pattern: r"\}_storage",
+        what: "no storage thread spawn",
+    },
+    Claim {
+        path: "src/core/server/src/workers/mod.rs",
+        pattern: r"storage_wakers",
+        what: "no worker<->storage data queues",
+    },
+    Claim {
+        path: "src/core/server/src/workers/worker.rs",
+        pattern: r"\.expire\(",
+        what: "no periodic expiration in the worker event loop",
+    },
+];
 
 type Chip = (&'static str, &'static str);
 const CHIP_PROTOCOL: Chip = ("protocol-*", FILL_PROTOCOL);
@@ -268,9 +276,9 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
     }
 }
 
-fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Vec<String>, f64) {
+fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = if multi { 792.0 } else { 560.0 };
+    let h = 792.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -316,95 +324,36 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
     let top_y = y0 + 40.0;
     let row_b = y0 + h - 212.0;
 
-    let (wk_bottom, st): (f64, Option<(f64, f64)>) = if !multi {
-        thread_box(
-            &mut parts,
-            wk_x,
-            row_a,
-            "pelikan_work",
-            None,
-            &[CHIP_PROTOCOL, CHIP_ENTRYSTORE, CHIP_SEGCACHE],
-            false,
-        );
-        parts.push(ortho(&[(q_x + q_w, mid_a), (wk_x, mid_a)]).build());
-        (row_a + TB_H, None)
-    } else {
-        let wk0_y = row_a;
-        let wk1_y = worker_column(
-            &mut parts,
-            wk_x,
-            wk0_y,
-            ("pelikan_work_0", "pelikan_work_n-1"),
-            &[CHIP_PROTOCOL],
-        );
-        parts.push(
-            ortho(&[
-                (q_x + q_w, mid_a),
-                (wk_x - 22.0, mid_a),
-                (wk_x - 22.0, wk0_y + TB_H / 2.0),
-                (wk_x, wk0_y + TB_H / 2.0),
-            ])
-            .build(),
-        );
-        parts.push(
-            ortho(&[
-                (q_x + q_w, mid_a),
-                (wk_x - 22.0, mid_a),
-                (wk_x - 22.0, wk1_y + TB_H / 2.0),
-                (wk_x, wk1_y + TB_H / 2.0),
-            ])
-            .build(),
-        );
-        let dq_w = 50.0;
-        let dqg = queue_gap("requests / responses (object)");
-        let dq_x = wk_x + TB_W + dqg;
-        let dq_mid = (wk0_y + wk1_y + TB_H) / 2.0;
-        queue_glyph(
-            &mut parts,
-            dq_x,
-            dq_mid - 9.0,
-            dq_w,
-            18.0,
-            "requests / responses (object)",
-        );
-        parts.push(
-            ortho(&[
-                (wk_x + TB_W, wk0_y + TB_H / 2.0),
-                (dq_x - ELBOW, wk0_y + TB_H / 2.0),
-                (dq_x - ELBOW, dq_mid),
-                (dq_x, dq_mid),
-            ])
-            .both()
-            .build(),
-        );
-        parts.push(
-            ortho(&[
-                (wk_x + TB_W, wk1_y + TB_H / 2.0),
-                (dq_x - ELBOW, wk1_y + TB_H / 2.0),
-                (dq_x - ELBOW, dq_mid),
-                (dq_x, dq_mid),
-            ])
-            .both()
-            .build(),
-        );
-        let st_x = dq_x + dq_w + dqg;
-        let st_y = dq_mid - TB_H / 2.0;
-        thread_box(
-            &mut parts,
-            st_x,
-            st_y,
-            "pelikan_storage",
-            None,
-            &[CHIP_ENTRYSTORE, CHIP_SEGCACHE],
-            false,
-        );
-        parts.push(
-            ortho(&[(dq_x + dq_w, dq_mid), (st_x, dq_mid)])
-                .both()
-                .build(),
-        );
-        (wk1_y + TB_H, Some((st_x, st_y)))
-    };
+    // one worker column: every worker carries the protocol and storage chips
+    // because each executes requests in place against the one Arc-shared,
+    // internally synchronized cache — there is no storage thread
+    let wk0_y = row_a;
+    let wk1_y = worker_column(
+        &mut parts,
+        wk_x,
+        wk0_y,
+        ("pelikan_work_0", "pelikan_work_n-1"),
+        &[CHIP_PROTOCOL, CHIP_ENTRYSTORE, CHIP_SEGCACHE],
+    );
+    parts.push(
+        ortho(&[
+            (q_x + q_w, mid_a),
+            (wk_x - 22.0, mid_a),
+            (wk_x - 22.0, wk0_y + TB_H / 2.0),
+            (wk_x, wk0_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (q_x + q_w, mid_a),
+            (wk_x - 22.0, mid_a),
+            (wk_x - 22.0, wk1_y + TB_H / 2.0),
+            (wk_x, wk1_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    let wk_bottom = wk1_y + TB_H;
 
     // requests/responses between clients and workers, over the top
     parts.push(
@@ -473,17 +422,6 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
         .signal()
         .build(),
     );
-    if let Some((st_x, st_y)) = st {
-        parts.push(
-            ortho(&[
-                (li_x + TB_W, mid_b),
-                (st_x + TB_W / 2.0, mid_b),
-                (st_x + TB_W / 2.0, st_y + TB_H),
-            ])
-            .signal()
-            .build(),
-        );
-    }
     (parts, h)
 }
 
@@ -726,16 +664,13 @@ pub fn generate() {
 
     let mut parts = vec![ARROW_DEFS.to_string()];
     let mut y = 24.0;
-    let (p1, h1) = server_panel(y, "single worker", &server_rows, false);
+    let (p1, h1) = server_panel(y, "server", &server_rows);
     parts.extend(p1);
     y += h1 + 20.0;
-    let (p2, h2) = server_panel(y, "multiple workers", &server_rows, true);
+    let (p2, h2) = proxy_panel(y, "proxy", &proxy_rows);
     parts.extend(p2);
-    y += h2 + 20.0;
-    let (p3, h3) = proxy_panel(y, "proxy", &proxy_rows);
-    parts.extend(p3);
 
-    let (w, h) = (24.0 + PANEL_W + 260.0 + 24.0, y + h3 + 24.0);
+    let (w, h) = (24.0 + PANEL_W + 260.0 + 24.0, y + h2 + 24.0);
     fs::write(OUT, svg_document(w, h, "cargo xtask diagrams", &parts)).unwrap();
     println!("generated: {OUT}");
 }

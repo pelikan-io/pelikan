@@ -53,22 +53,20 @@ and a core, and write the thin crate that wires them together.
 
 [![Pelikan threading architecture](diagrams/threading.svg)](diagrams/threading.svg?raw=1)
 
-Three panels, one per thread model. Thread names are the literal names the
+Two panels, one per runtime core. Thread names are the literal names the
 code registers — what you see in `top -H` is what the chart says:
 
-- **Single worker**: `pelikan_listener` accepts connections and hands
-  sessions over a queue to one `pelikan_work` thread that parses, executes
-  against thread-local storage, and responds.
-- **Multiple workers**: parsing moves to `pelikan_work_0..n-1`; storage
-  execution is centralized in a dedicated `pelikan_storage` thread. The
-  difference from the single-worker model reads as the storage modules
-  migrating out of the worker box.
+- **Server**: `pelikan_listener` accepts connections and hands sessions
+  over a queue to the `pelikan_work_0..n-1` workers; each worker parses,
+  executes, and responds. The storage chips appear in every worker box
+  because the workers share one internally synchronized Segcache engine
+  through an `Arc` and execute requests in place — there is no storage
+  thread. The `[worker] threads` config option is a scaling knob, not a
+  mode switch: `1` (the default) is simply n = 1 of the same model. There
+  is no maintenance thread either — the engine treats expired items as
+  missing on access and reclaims expired segments under write pressure.
 - **Proxy**: frontend threads (`pelikan_fe_i`) face clients, backend threads
   (`pelikan_be_i`) face upstream servers, connected by object queues.
-
-Servers pick between the first two models at runtime: the `[worker] threads`
-config option spawns the single-worker model at `1` (the default) and the
-multi-worker model — workers plus the dedicated storage thread — above it.
 
 Two conventions carry the meaning: heavier edges are bytes crossing the
 process boundary (the wire); thin edges are internal queues — accepted
@@ -87,9 +85,9 @@ code's own verbs: `receive` (read + parse), `execute`, `send` (compose),
 `flush`. The stage pitch is uniform across panels, so the panels compare
 column by column and the differences that remain are the real ones:
 
-- In the **single worker** model all four stages run on one thread.
-- In the **multiple workers** model stage ② dips into `pelikan_storage` —
-  two queue crossings buy centralized storage.
+- On a **server**, all four stages run on whichever worker owns the
+  session; stage ② executes directly against the `Arc`-shared engine, so
+  the request crosses no queue after the listener's session hand-off.
 - In the **proxy**, the request leaves through a backend thread to the
   upstream *servers* and the response retraces the path — six stages, with
   one queue crossing outbound (frontend → backend) and one on the return.
@@ -127,7 +125,7 @@ carries it.
 
 **Server cores** (`src/core/`)
 - `admin/` — the admin thread every binary runs
-- `server/` — listener/worker/storage event loops, thread management, signal
+- `server/` — listener/worker event loops, thread management, signal
   handling
 - `proxy/` — frontend/backend event loops for proxies
 
@@ -137,8 +135,9 @@ carries it.
 
 ## Design Principles
 
-- **Workers never block.** Threads communicate over lockless queues; the data
-  plane holds no locks that a slow peer can convert into tail latency.
+- **Workers never block.** Threads communicate over lockless queues, and the
+  workers share a lock-free storage engine; the data plane holds no locks
+  that a slow peer can convert into tail latency.
 - **Control and data plane separation.** Management traffic (stats, version,
   shutdown) rides its own thread and port (9999 by default), so an operator
   inspecting a saturated server is not competing with cache traffic.
