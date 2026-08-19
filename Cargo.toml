@@ -97,3 +97,10 @@ codegen-units = 1
 [profile.dev]
 debug = true
 opt-level = 0
+
+# TEMPORARY: tracking cache-rs main during the engine-hardening phase
+# (concurrent-segcache work). Advance the rev as fixes land; remove before
+# merging, swapping to the published release (see Task F5 of
+# docs/superpowers/plans/2026-08-18-concurrent-segcache-conversion.md).
+[patch.crates-io]
+segcache = { git = "https://github.com/pelikan-io/cache-rs", rev = "241b07d" }

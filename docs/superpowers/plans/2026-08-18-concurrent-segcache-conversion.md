@@ -1114,9 +1114,15 @@ git add docs/journal && git commit -m "docs: journal the concurrent segcache con
   false STORED, destroying acked increments): re-verify the full token
   (including the numeric seqlock version) under the pin immediately before
   the location slot-CAS publish; fail `Exists` on mismatch.
-- [ ] **F4 — release**: keyvalue 0.3.1 + segcache 0.4.2 bump PRs, publish
-  from refreshed clean clone, adversarial re-review of the engine deltas.
-- [ ] **F5 — pelikan**: bump `segcache = "0.4.2"`, full gate, then Task E3.
+- [ ] **F4 — git-pin iteration** (user decision 2026-08-18: work on git
+  dependencies while hardening, defer releases): re-add the
+  `[patch.crates-io]` pin in pelikan pointing at cache-rs main, advancing
+  the rev as each engine fix merges; run the full pelikan gate against each
+  rev. Adversarial re-review of the engine deltas once F1–F3 are all in.
+  Iterate further as needed — releases wait until everything is fleshed out.
+- [ ] **F5 — release + ship**: when hardening settles: keyvalue 0.3.1 +
+  segcache 0.4.2 bump PRs, publish from refreshed clean clone, drop the
+  pelikan git pin (swap to published 0.4.2), full gate, then Task E3.
 
 Non-critical findings recorded for follow-up (cache-rs issues, not this PR):
 cas-vs-delete returns EXISTS where serialized execution gave NOT_FOUND;

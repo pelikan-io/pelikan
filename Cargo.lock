@@ -845,8 +845,7 @@ dependencies = [
 [[package]]
 name = "keyvalue"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bc8cf0a40eaa76888d6d374cbeddbacbad11e135648dce3973097a63ae6d28f"
+source = "git+https://github.com/pelikan-io/cache-rs?rev=241b07d#241b07debf74cfeea83fb903c587e31f46b24ebb"
 dependencies = [
  "crc32fast",
 ]
@@ -1659,8 +1658,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 [[package]]
 name = "segcache"
 version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c95c43d37f7385efc65f161a377f026591c210bdd6c1b2ab8c51e528b4094f2"
+source = "git+https://github.com/pelikan-io/cache-rs?rev=241b07d#241b07debf74cfeea83fb903c587e31f46b24ebb"
 dependencies = [
  "ahash",
  "clocksource",
