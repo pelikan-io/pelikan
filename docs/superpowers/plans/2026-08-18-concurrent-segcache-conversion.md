@@ -1089,6 +1089,42 @@ git commit -m "docs: thread model reflects Arc-shared workers"
 git add docs/journal && git commit -m "docs: journal the concurrent segcache conversion"
 ```
 
+## Phase F: engine hardening (added 2026-08-18, blocks the PR)
+
+> The pre-PR adversarial review found five critical engine-level bugs, all
+> newly reachable now that pelikan shares the cache concurrently (default
+> Merge eviction policy, plain numeric ops). User decision: fix all five in
+> cache-rs before shipping. Three work areas, each TDD'd with reproducing
+> tests; a finding that cannot be reproduced is reported back as a possible
+> false positive, not "fixed".
+
+- [ ] **F1 — pin-failure protocol** (findings: false absence during merge
+  drains; acked delete resurrected by merge relocation; replace-vs-drain
+  deadlock): `get_pinned` retries the lookup on pin failure (bounded, like
+  `numeric_update`); `delete` on remover-pin failure still unlinks via
+  `hashtable.remove` (merge drains relocate rather than sweep); `insert`'s
+  replace arm and `replace_at` break the deadlock by rolling back the
+  reservation when the old item's segment == the reserved segment and the
+  remover pin fails (the drain is provably waiting on our WriterPin).
+- [ ] **F2 — numeric atomicity** (finding: concurrent incr/decr lose
+  updates): `keyvalue::seqlocked_update`'s non-atomic RMW becomes atomic
+  (`fetch_add` for wrapping add; CAS loop for saturating sub; version
+  `fetch_add(2)` after). keyvalue patch release.
+- [ ] **F3 — cas publish integrity** (finding: cas racing incr/decr returns
+  false STORED, destroying acked increments): re-verify the full token
+  (including the numeric seqlock version) under the pin immediately before
+  the location slot-CAS publish; fail `Exists` on mismatch.
+- [ ] **F4 — release**: keyvalue 0.3.1 + segcache 0.4.2 bump PRs, publish
+  from refreshed clean clone, adversarial re-review of the engine deltas.
+- [ ] **F5 — pelikan**: bump `segcache = "0.4.2"`, full gate, then Task E3.
+
+Non-critical findings recorded for follow-up (cache-rs issues, not this PR):
+cas-vs-delete returns EXISTS where serialized execution gave NOT_FOUND;
+16-bit generation ABA (theoretical); eviction overshoot (up to 3 segments per
+insert); numeric canonicalization breaks byte-transparency for "007"/"+42"
+(pre-existing on main); `ERROR` vs memcached's `CLIENT_ERROR` for
+non-numeric incr (pre-existing).
+
 ### Task E3: Final verification and PR
 
 - [ ] **Step 0: Remove the temporary git pin (blocks merge until publishes land)**
