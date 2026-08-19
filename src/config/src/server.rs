@@ -61,6 +61,14 @@ impl Server {
         self.port.clone()
     }
 
+    pub fn set_host(&mut self, host: impl Into<String>) {
+        self.host = host.into();
+    }
+
+    pub fn set_port(&mut self, port: impl Into<String>) {
+        self.port = port.into();
+    }
+
     /// Return the result of parsing the host and port
     pub fn socket_addr(&self) -> Result<SocketAddr, AddrParseError> {
         format!("{}:{}", self.host(), self.port()).parse()
@@ -134,5 +142,16 @@ mod tests {
         let mut server = Server::default();
         server.set_io_backend("ringline");
         assert_eq!(server.io_backend(), "ringline");
+    }
+
+    #[test]
+    fn listener_address_can_be_reserved_programmatically() {
+        let mut server = Server::default();
+        server.set_host("127.0.0.1");
+        server.set_port("43210");
+        assert_eq!(
+            server.socket_addr().unwrap(),
+            "127.0.0.1:43210".parse().unwrap()
+        );
     }
 }

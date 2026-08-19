@@ -300,8 +300,8 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
         &mut parts,
         li_x,
         row_a,
-        "pelikan_listener / ringline-acceptor",
-        Some(":12321 · selected once at launch"),
+        "pelikan_listener",
+        Some(":12321"),
         &[],
         false,
     );
@@ -331,7 +331,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
             &mut parts,
             wk_x,
             row_a,
-            "pelikan_work / ringline-worker-0",
+            "pelikan_work",
             None,
             &[CHIP_PROTOCOL, CHIP_ENTRYSTORE, CHIP_SEGCACHE],
             false,
@@ -344,10 +344,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
             &mut parts,
             wk_x,
             wk0_y,
-            (
-                "pelikan_work_0 / ringline-worker-0",
-                "pelikan_work_n-1 / ringline-worker-n-1",
-            ),
+            ("pelikan_work_0", "pelikan_work_n-1"),
             &[CHIP_PROTOCOL],
         );
         parts.push(
@@ -497,6 +494,160 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)], multi: bool) -> (Ve
             .build(),
         );
     }
+    (parts, h)
+}
+
+fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
+    let mut parts = Vec::new();
+    let h = 520.0;
+    parts.push(
+        rect(X0, y0, PANEL_W, h, PANEL_FILL)
+            .stroke(PANEL_BORDER)
+            .sw(2.0)
+            .build(),
+    );
+    margin_block(
+        &mut parts,
+        X0 + PANEL_W + 130.0,
+        y0 + h / 2.0,
+        "launch-time backend fork",
+        &[("cache servers", "plain TCP")],
+    );
+
+    let cfg_x = X0 + 40.0;
+    let mio_x = cfg_x + 430.0;
+    let dispatch_x = mio_x + 430.0;
+    let worker_x = dispatch_x + 430.0;
+    let mio_y = y0 + 55.0;
+    let ring_y = y0 + 280.0;
+    thread_box(
+        &mut parts,
+        cfg_x,
+        y0 + 164.0,
+        "server.io_backend",
+        Some("resolved once"),
+        &[],
+        true,
+    );
+    thread_box(
+        &mut parts,
+        mio_x,
+        mio_y,
+        "pelikan_listener",
+        Some("Mio accept/readiness"),
+        &[],
+        false,
+    );
+    queue_glyph(
+        &mut parts,
+        dispatch_x,
+        mio_y + TB_H / 2.0 - 11.0,
+        50.0,
+        22.0,
+        "session queue",
+    );
+    thread_box(
+        &mut parts,
+        worker_x,
+        mio_y,
+        "pelikan_work_i",
+        Some("callback state machine"),
+        &[CHIP_PROTOCOL],
+        false,
+    );
+    thread_box(
+        &mut parts,
+        mio_x,
+        ring_y,
+        "ringline-acceptor",
+        Some("Ringline accept"),
+        &[],
+        false,
+    );
+    thread_box(
+        &mut parts,
+        dispatch_x,
+        ring_y,
+        "runtime task dispatch",
+        Some("same-thread wake"),
+        &[],
+        false,
+    );
+    thread_box(
+        &mut parts,
+        worker_x,
+        ring_y,
+        "ringline-worker-i",
+        Some("async connection tasks"),
+        &[CHIP_PROTOCOL],
+        false,
+    );
+
+    let cfg_mid = y0 + 164.0 + TB_H / 2.0;
+    parts.push(
+        ortho(&[
+            (cfg_x + TB_W, cfg_mid),
+            (mio_x - 40.0, cfg_mid),
+            (mio_x - 40.0, mio_y + TB_H / 2.0),
+            (mio_x, mio_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        text(
+            (cfg_x + TB_W + mio_x) / 2.0,
+            mio_y + TB_H / 2.0 - 18.0,
+            "mio (default)",
+        )
+        .fill("#555")
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (cfg_x + TB_W, cfg_mid),
+            (mio_x - 40.0, cfg_mid),
+            (mio_x - 40.0, ring_y + TB_H / 2.0),
+            (mio_x, ring_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        text(
+            (cfg_x + TB_W + mio_x) / 2.0,
+            ring_y + TB_H / 2.0 + 18.0,
+            "ringline (Linux)",
+        )
+        .fill("#555")
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (mio_x + TB_W, mio_y + TB_H / 2.0),
+            (dispatch_x, mio_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (dispatch_x + 50.0, mio_y + TB_H / 2.0),
+            (worker_x, mio_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (mio_x + TB_W, ring_y + TB_H / 2.0),
+            (dispatch_x, ring_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (dispatch_x + TB_W, ring_y + TB_H / 2.0),
+            (worker_x, ring_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
     (parts, h)
 }
 
@@ -739,10 +890,13 @@ pub fn generate() {
 
     let mut parts = vec![ARROW_DEFS.to_string()];
     let mut y = 24.0;
-    let (p1, h1) = server_panel(y, "single worker · mio or Ringline", &server_rows, false);
+    let (fork, fork_h) = backend_choice_panel(y);
+    parts.extend(fork);
+    y += fork_h + 20.0;
+    let (p1, h1) = server_panel(y, "storage topology · single worker", &server_rows, false);
     parts.extend(p1);
     y += h1 + 20.0;
-    let (p2, h2) = server_panel(y, "multiple workers · mio or Ringline", &server_rows, true);
+    let (p2, h2) = server_panel(y, "storage topology · multiple workers", &server_rows, true);
     parts.extend(p2);
     y += h2 + 20.0;
     let (p3, h3) = proxy_panel(y, "proxy", &proxy_rows);

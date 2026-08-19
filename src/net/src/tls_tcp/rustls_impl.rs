@@ -282,6 +282,7 @@ impl TlsTcpAcceptor {
     }
 
     fn build(builder: TlsTcpAcceptorBuilder) -> Result<TlsTcpAcceptor> {
+        let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
         let certs = load_certs(&builder.certificate_chain_file, &builder.certificate_file)?;
         let key = load_private_key(&builder.private_key_file)?;
 

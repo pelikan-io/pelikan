@@ -103,6 +103,7 @@ use logger::{Klog, LogDrain};
 use metriken::*;
 use pelikan_net::event::{Event, Source};
 use pelikan_net::*;
+pub use pelikan_net::{BackendResolution, FallbackReason, IoBackend};
 use protocol_common::{Compose, Execute};
 use queues::{Queues, Waker};
 use session::{Buf, ServerSession, Session};
@@ -121,7 +122,7 @@ use workers::WorkersBuilder;
 
 #[cfg(target_os = "linux")]
 pub use process::RinglineProcessBuilder;
-pub use process::{MioProcessBuilder, Process, ProcessBuilder};
+pub use process::{backend_resolution, MioProcessBuilder, Process, ProcessBuilder};
 
 // TODO(bmartin): this *should* be plenty safe, the queue should rarely ever be
 // full, and a single wakeup should drain at least one message and make room for

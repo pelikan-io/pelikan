@@ -146,7 +146,25 @@ where
     }
 }
 
+static BACKEND_RESOLUTION: std::sync::Mutex<pelikan_net::BackendResolution> =
+    std::sync::Mutex::new(pelikan_net::BackendResolution {
+        requested: pelikan_net::IoBackend::Mio,
+        active: pelikan_net::IoBackend::Mio,
+        fallback: None,
+    });
+
+/// Returns the last terminal cache-server backend resolution, including cause.
+pub fn backend_resolution() -> pelikan_net::BackendResolution {
+    BACKEND_RESOLUTION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+}
+
 fn record_resolution(resolution: &pelikan_net::BackendResolution) {
+    *BACKEND_RESOLUTION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = resolution.clone();
     SERVER_IO_BACKEND_ACTIVE.set(match resolution.active {
         pelikan_net::IoBackend::Mio => 0,
         pelikan_net::IoBackend::Ringline => 1,
@@ -161,6 +179,33 @@ fn log_ringline_active() {
         requested: pelikan_net::IoBackend::Ringline,
         active: pelikan_net::IoBackend::Ringline,
         fallback: None,
+    });
+}
+
+#[cfg(target_os = "linux")]
+fn ringline_fallback_reason(error: &pelikan_net::ringline::Error) -> pelikan_net::FallbackReason {
+    match error {
+        pelikan_net::ringline::Error::RingSetup(_) => {
+            pelikan_net::FallbackReason::UnsupportedCapability(error.to_string())
+        }
+        pelikan_net::ringline::Error::Io(io_error)
+            if matches!(
+                io_error.raw_os_error(),
+                Some(libc::EINVAL | libc::EPERM | libc::ENOSYS | libc::EOPNOTSUPP)
+            ) =>
+        {
+            pelikan_net::FallbackReason::UnsupportedCapability(error.to_string())
+        }
+        _ => pelikan_net::FallbackReason::Initialization(error.to_string()),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn log_ringline_runtime_fallback(error: &pelikan_net::ringline::Error) {
+    log_resolution(&pelikan_net::BackendResolution {
+        requested: pelikan_net::IoBackend::Ringline,
+        active: pelikan_net::IoBackend::Mio,
+        fallback: Some(ringline_fallback_reason(error)),
     });
 }
 
@@ -445,7 +490,7 @@ where
                 Process::Ringline(process)
             }
             Err(ringline_error) => {
-                log_ringline_fallback(&ringline_error);
+                log_ringline_runtime_fallback(&ringline_error);
                 Process::Mio(
                     MioProcessBuilder {
                         admin,
@@ -497,7 +542,7 @@ where
             )
         }
         Err(ringline_error) => {
-            log_ringline_fallback(&ringline_error);
+            log_ringline_runtime_fallback(&ringline_error);
             let (protocol, storage) = recovery.recover().unwrap_or_else(|recovery_error| {
                 panic!("Ringline initialization failed ({ringline_error}); mio fallback state recovery failed: {recovery_error}")
             });
@@ -888,7 +933,9 @@ impl RinglineProcess {
 mod tests {
     #[cfg(target_os = "linux")]
     use super::RINGLINE_MAX_CONNECTIONS;
-    use super::{process_kind, record_resolution, ProcessKind};
+    use super::{
+        backend_resolution, process_kind, record_resolution, ringline_fallback_reason, ProcessKind,
+    };
     use crate::{SERVER_IO_BACKEND_ACTIVE, SERVER_IO_BACKEND_FALLBACK};
     use pelikan_net::{resolve_backend, BackendResolution, FallbackReason, IoBackend};
     #[cfg(target_os = "linux")]
@@ -934,6 +981,44 @@ mod tests {
     }
 
     #[test]
+    fn ring_setup_is_classified_as_unsupported_with_exact_cause() {
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::Error::RingSetup(
+            "Operation not permitted (os error 1)".to_string(),
+        ));
+        assert_eq!(
+            reason,
+            FallbackReason::UnsupportedCapability(
+                "ring setup: Operation not permitted (os error 1)".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn kernel_einval_is_classified_as_unsupported_with_exact_cause() {
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::Error::Io(
+            io::Error::from_raw_os_error(libc::EINVAL),
+        ));
+        assert_eq!(
+            reason,
+            FallbackReason::UnsupportedCapability(
+                "I/O error: Invalid argument (os error 22)".to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn unrelated_initialization_error_is_not_an_unsupported_capability() {
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::Error::Io(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "broken bootstrap",
+        )));
+        assert_eq!(
+            reason,
+            FallbackReason::Initialization("I/O error: broken bootstrap".to_string())
+        );
+    }
+
+    #[test]
     fn fallback_records_mio_active_and_increments_counter() {
         let before = SERVER_IO_BACKEND_FALLBACK.value();
         record_resolution(&BackendResolution {
@@ -943,6 +1028,14 @@ mod tests {
         });
         assert_eq!(SERVER_IO_BACKEND_ACTIVE.value(), 0);
         assert_eq!(SERVER_IO_BACKEND_FALLBACK.value(), before + 1);
+        assert_eq!(
+            backend_resolution(),
+            BackendResolution {
+                requested: IoBackend::Ringline,
+                active: IoBackend::Mio,
+                fallback: Some(FallbackReason::Unavailable),
+            }
+        );
     }
 
     #[test]

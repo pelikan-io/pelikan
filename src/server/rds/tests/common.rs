@@ -9,7 +9,30 @@
 use logger::*;
 
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
+use std::sync::Mutex;
+
+static TEST_ADDRESSES: Mutex<Option<(SocketAddr, SocketAddr)>> = Mutex::new(None);
+
+pub fn set_test_addresses(data: SocketAddr, admin: SocketAddr) {
+    *TEST_ADDRESSES.lock().unwrap() = Some((data, admin));
+}
+
+fn data_addr() -> SocketAddr {
+    TEST_ADDRESSES
+        .lock()
+        .unwrap()
+        .expect("test addresses not set")
+        .0
+}
+
+fn admin_addr() -> SocketAddr {
+    TEST_ADDRESSES
+        .lock()
+        .unwrap()
+        .expect("test addresses not set")
+        .1
+}
 use std::time::Duration;
 
 pub fn tests() {
@@ -38,7 +61,7 @@ pub fn tests() {
 fn test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("testing: {name}");
     debug!("connecting to server");
-    let mut stream = TcpStream::connect("127.0.0.1:12321").expect("failed to connect");
+    let mut stream = TcpStream::connect(data_addr()).expect("failed to connect");
     stream
         .set_read_timeout(Some(Duration::from_millis(250)))
         .expect("failed to set read timeout");
@@ -114,12 +137,16 @@ pub fn smoke_exchange() {
 pub fn conformance_tests() {
     partial_request_is_completed_after_second_write();
     pipelined_requests_preserve_response_order();
-    client_disconnect_does_not_poison_runtime();
+    partial_request_disconnect_cancels_mutation();
     connection_burst_does_not_block_existing_clients();
+    deep_pipeline_preserves_every_response();
+    large_request_and_response_round_trip();
+    flush_all_clears_storage();
+    invalid_input_closes_only_that_connection();
 }
 
 fn connected_client() -> TcpStream {
-    let stream = TcpStream::connect("127.0.0.1:12321").expect("failed to connect");
+    let stream = TcpStream::connect(data_addr()).expect("failed to connect");
     stream
         .set_read_timeout(Some(Duration::from_secs(2)))
         .unwrap();
@@ -154,19 +181,80 @@ fn pipelined_requests_preserve_response_order() {
     );
 }
 
-fn client_disconnect_does_not_poison_runtime() {
+fn partial_request_disconnect_cancels_mutation() {
     let mut abandoned = connected_client();
     abandoned.write_all(b"set abandoned").unwrap();
     drop(abandoned);
     let mut existing = connected_client();
-    exchange(&mut existing, b"get missing\r\n", b"$-1\r\n");
+    exchange(&mut existing, b"get abandoned\r\n", b"$-1\r\n");
 }
 
 fn connection_burst_does_not_block_existing_clients() {
     let mut existing = connected_client();
     let burst: Vec<_> = (0..128).map(|_| connected_client()).collect();
-    exchange(&mut existing, b"get missing\r\n", b"$-1\r\n");
+    exchange(&mut existing, b"get abandoned\r\n", b"$-1\r\n");
     drop(burst);
+}
+
+fn deep_pipeline_preserves_every_response() {
+    let mut request = Vec::new();
+    let mut expected = Vec::new();
+    for _ in 0..256 {
+        request.extend_from_slice(b"get task7-pressure\r\n");
+        expected.extend_from_slice(b"$-1\r\n");
+    }
+    let mut stream = connected_client();
+    exchange(&mut stream, &request, &expected);
+}
+
+fn large_request_and_response_round_trip() {
+    let value = "x".repeat(64 * 1024);
+    let request = format!("set task7-large {value}\r\nget task7-large\r\n");
+    let expected = format!("+OK\r\n${}\r\n{value}\r\n", value.len());
+    let mut stream = connected_client();
+    exchange(&mut stream, request.as_bytes(), expected.as_bytes());
+}
+
+fn flush_all_clears_storage() {
+    let mut data = connected_client();
+    exchange(&mut data, b"set task7-flush value\r\n", b"+OK\r\n");
+    let mut admin = TcpStream::connect(admin_addr()).unwrap();
+    admin
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    exchange(&mut admin, b"flush_all\r\n", b"OK\r\n");
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    loop {
+        let mut data = connected_client();
+        data.write_all(b"get task7-flush\r\n").unwrap();
+        let mut response = [0_u8; 64];
+        let count = data.read(&mut response).unwrap();
+        if response[..count].starts_with(b"$-1\r\n") {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "FlushAll did not clear RDS storage"
+        );
+        std::thread::yield_now();
+    }
+}
+
+fn invalid_input_closes_only_that_connection() {
+    let mut invalid = connected_client();
+    invalid.write_all(b"!not-resp\r\n").unwrap();
+    let mut byte = [0_u8; 1];
+    match invalid.read(&mut byte) {
+        Ok(0) => {}
+        Err(error)
+            if matches!(
+                error.kind(),
+                std::io::ErrorKind::ConnectionReset | std::io::ErrorKind::BrokenPipe
+            ) => {}
+        outcome => panic!("invalid RESP input did not close its connection: {outcome:?}"),
+    }
+    let mut valid = connected_client();
+    exchange(&mut valid, b"get task7-after-invalid\r\n", b"$-1\r\n");
 }
 
 pub fn admin_tests() {
@@ -186,7 +274,7 @@ pub fn admin_tests() {
 fn admin_test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("testing: {name}");
     debug!("connecting to server");
-    let mut stream = TcpStream::connect("127.0.0.1:9999").expect("failed to connect");
+    let mut stream = TcpStream::connect(admin_addr()).expect("failed to connect");
     stream
         .set_read_timeout(Some(Duration::from_millis(250)))
         .expect("failed to set read timeout");

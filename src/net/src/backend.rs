@@ -43,6 +43,7 @@ impl std::error::Error for InvalidIoBackend {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FallbackReason {
     Unavailable,
+    UnsupportedCapability(String),
     Initialization(String),
 }
 
@@ -50,6 +51,9 @@ impl fmt::Display for FallbackReason {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Unavailable => write!(formatter, "backend unavailable"),
+            Self::UnsupportedCapability(reason) => {
+                write!(formatter, "unsupported capability: {reason}")
+            }
             Self::Initialization(reason) => {
                 write!(formatter, "backend initialization failed: {reason}")
             }
