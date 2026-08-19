@@ -186,6 +186,17 @@ With that in place:
   fresh-key insert de-duplication spec — after which entrystore switches to
   them. Note: add-based distributed-locking patterns can double-win until
   then.
+
+  **This accepted race requires genuinely concurrent `add`s on the same
+  key.** It should not be confused with the *spontaneous* clobber that
+  segcache 0.4.0–0.4.2 also exhibited, where `add` could overwrite a live
+  key with no competing writer at all, because two engine bugs made a live
+  key read as absent: the stale-location ABA in hashtable key verification
+  (fixed in #60) and `get_pinned`'s bounded revalidation giving up under
+  churn (fixed in #68). Both are fixed in segcache 0.4.3, so on 0.4.3 the
+  remaining exposure is only the check-then-act window between the
+  presence probe and the insert. Pelikan must be on 0.4.3 for that to
+  hold; the two are separate defects and only the first is accepted.
 - **cas with past-timestamp TTL has a non-atomic delete-after tail:** the
   engine `cas` is atomic, but the follow-up delete used to emulate
   immediate expiry can remove a value a concurrent `set` stored in between.
