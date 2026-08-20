@@ -188,6 +188,18 @@ and executing requests in place. Spec and plan:
     effects that both clear the floor while contradicting each other. A
     reviewer can dispute whether ±3.72% is "too wide"; nobody can
     dispute that a fixed cost cannot dilute upward.
+
+    The control has **three** consistent outcomes, not two: the diluted
+    effect appears at roughly the predicted smaller size; it appears
+    *larger*, which disqualifies the sweep; or it is **correctly
+    invisible** — the predicted dilution falls below that group's own
+    resolution, so it could not have been distinguished from zero either
+    way. The third is a pass, but only if you check that group's
+    resolution rather than reading "no effect" as a contradiction. A
+    later measurement landed exactly there: +1.2 ns on a 40 ns baseline
+    predicts ~1.45% on an 82 ns one, against a 2.15% control on that
+    group — invisible by construction, and so evidence *for* the fixed
+    cost rather than against it.
   - **Attach the cheap check to the claim.** Every miss this week was a
     plausible statement nobody spent thirty seconds testing: "loom can't
     model this" (it could — the seam was already in production code),
