@@ -20,7 +20,12 @@ use std::time::Duration;
 fn main() {
     debug!("launching multi-worker server");
     let mut config = SegcacheConfig::default();
-    config.worker_mut().set_threads(2);
+    // eight workers rather than two: with only a couple of workers a single
+    // connection is almost always served by the same one, so nothing about
+    // sharing the storage is exercised. eight also makes `flush_all_tests`
+    // meaningful — a worker that becomes free while others are still busy is
+    // exactly the interleaving that test needs to observe.
+    config.worker_mut().set_threads(8);
     let server = Segcache::new(config).expect("failed to launch segcache");
 
     // wait for server to startup. duration is chosen to be longer than we'd
@@ -30,6 +35,8 @@ fn main() {
     tests();
 
     admin_tests();
+
+    flush_all_tests();
 
     // shutdown server and join
     info!("shutdown...");

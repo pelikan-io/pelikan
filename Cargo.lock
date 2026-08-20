@@ -844,9 +844,9 @@ dependencies = [
 
 [[package]]
 name = "keyvalue"
-version = "0.2.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fdb19de59cbd7afebf7e393cc689d63f572b2df45a95b5ffba005abe7ee9638"
+checksum = "0603f65d986d7c324ddb3dc533fa980d8114468dd20b65050ead503d6b0fb2a6"
 dependencies = [
  "crc32fast",
 ]
@@ -1658,12 +1658,14 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "segcache"
-version = "0.3.0"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "511afdec590e313aa76a32e095840c623a9f10a5a33c67bd846901c2a8853ea5"
+checksum = "eabb50ba80f77b4c710a11b7eaa7452a862c888ee397c5699829e48b357d98c7"
 dependencies = [
  "ahash",
  "clocksource",
+ "crossbeam-deque",
+ "crossbeam-utils",
  "keyvalue",
  "log",
  "memmap2",

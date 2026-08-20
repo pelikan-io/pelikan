@@ -138,9 +138,20 @@ fn map_err(e: std::io::Error) -> Result<()> {
     }
 }
 
+/// A type-erased handle which clears the process's storage.
+///
+/// The admin thread owns `flush_all`: it calls this and only then acks. The
+/// handle is type-erased so that `Admin` does not have to become generic over
+/// the storage type, which would push a `Storage` parameter through every
+/// admin-side type for the sake of one call.
+pub type FlushHandle = Arc<dyn Fn() + Send + Sync>;
+
 pub struct Admin {
     /// A backlog of tokens that need to be handled
     backlog: VecDeque<Token>,
+    /// Clears the storage on `flush_all`. `None` for processes which have no
+    /// storage of their own, such as the proxy.
+    flush_handle: Option<FlushHandle>,
     http_server: Option<tiny_http::Server>,
     /// The actual network listener for the ASCII Admin Endpoint
     listener: pelikan_net::Listener,
@@ -166,6 +177,7 @@ pub struct Admin {
 
 pub struct AdminBuilder {
     backlog: VecDeque<Token>,
+    flush_handle: Option<FlushHandle>,
     http_server: Option<tiny_http::Server>,
     listener: pelikan_net::Listener,
     nevent: usize,
@@ -222,6 +234,7 @@ impl AdminBuilder {
 
         Ok(Self {
             backlog,
+            flush_handle: None,
             http_server,
             listener,
             nevent,
@@ -231,6 +244,13 @@ impl AdminBuilder {
             version,
             waker,
         })
+    }
+
+    /// Give the admin thread the ability to clear the storage itself, so that
+    /// `flush_all` can be applied exactly once and acked only afterwards.
+    /// Callers with no storage — the proxy — simply never set one.
+    pub fn flush_handle(&mut self, flush_handle: FlushHandle) {
+        self.flush_handle = Some(flush_handle);
     }
 
     pub fn version(&mut self, version: &str) {
@@ -249,6 +269,7 @@ impl AdminBuilder {
     ) -> Admin {
         Admin {
             backlog: self.backlog,
+            flush_handle: self.flush_handle,
             http_server: self.http_server,
             listener: self.listener,
             _log_drain,
@@ -368,7 +389,39 @@ impl Admin {
                 // do some request handling
                 match request {
                     AdminRequest::FlushAll => {
-                        let _ = self.signal_queue_tx.try_send_all(Signal::FlushAll);
+                        if let Some(flush) = self.flush_handle.as_ref() {
+                            // The storage is shared by all the workers, so one
+                            // sweep clears it for all of them. Doing it here,
+                            // synchronously, buys the client-visible ordering
+                            // that matters: once `OK` has been written the
+                            // sweep is already complete, so anything the client
+                            // writes next cannot be destroyed by it.
+                            //
+                            // The cost is that the admin thread is blocked for
+                            // the duration of the sweep (~6-8 ms in release for
+                            // segcache, irrespective of heap size) and serves
+                            // no other admin request meanwhile. That is a
+                            // deliberate trade: `flush_all` is rare and
+                            // inherently heavy, and the control plane is the
+                            // right place to absorb it — no data-plane thread
+                            // stalls at all.
+                            //
+                            // Writes still in flight *during* the sweep can
+                            // still be destroyed. Avoiding that would require
+                            // quiescing the workers; memcached leaves writes
+                            // concurrent with a flush undefined too.
+                            flush();
+                        } else {
+                            // No storage of our own (the proxy). Keep the
+                            // historical broadcast so any sibling thread that
+                            // cares can react.
+                            if self.signal_queue_tx.try_send_all(Signal::FlushAll).is_err() {
+                                warn!("failed to broadcast flush_all signal");
+                            }
+                            if self.signal_queue_tx.wake().is_err() {
+                                warn!("error waking threads for flush_all");
+                            }
+                        }
                         session.send(AdminResponse::Ok)?;
                     }
                     AdminRequest::Quit => {

@@ -29,6 +29,8 @@ fn main() {
 
     admin_tests();
 
+    flush_all_tests();
+
     // shutdown server and join
     info!("shutdown...");
     server.shutdown();
