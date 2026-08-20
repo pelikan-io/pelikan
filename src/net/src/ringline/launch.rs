@@ -476,6 +476,7 @@ mod tests {
         monitor.join().unwrap().unwrap();
     }
 
+    #[cfg(feature = "ringline-force-mio")]
     #[test]
     fn monitor_spawn_failure_shuts_down_joins_and_releases_listener() {
         use std::net::TcpListener;

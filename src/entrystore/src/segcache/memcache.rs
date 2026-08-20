@@ -269,10 +269,7 @@ impl Storage for Seg {
 
     fn incr(&mut self, incr: &Incr) -> Response {
         match self.data.wrapping_add(incr.key(), incr.value()) {
-            Ok(item) => match item.value() {
-                segcache::Value::U64(v) => Response::numeric(v, incr.noreply()),
-                _ => Response::server_error(""),
-            },
+            Ok(value) => Response::numeric(value, incr.noreply()),
             Err(SegcacheError::NotFound) => Response::not_found(incr.noreply()),
             Err(SegcacheError::NotNumeric) => Response::error(),
             Err(_) => Response::server_error(""),
@@ -281,10 +278,7 @@ impl Storage for Seg {
 
     fn decr(&mut self, decr: &Decr) -> Response {
         match self.data.saturating_sub(decr.key(), decr.value()) {
-            Ok(item) => match item.value() {
-                segcache::Value::U64(v) => Response::numeric(v, decr.noreply()),
-                _ => Response::server_error(""),
-            },
+            Ok(value) => Response::numeric(value, decr.noreply()),
             Err(SegcacheError::NotFound) => Response::not_found(decr.noreply()),
             Err(SegcacheError::NotNumeric) => Response::error(),
             Err(_) => Response::server_error(""),

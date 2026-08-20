@@ -4,23 +4,6 @@ These crates are copied from their published crates.io archives and selected
 with the workspace's `[patch.crates-io]` table. Keep each patch minimal so it
 can be rebased onto a future upstream release or submitted independently.
 
-## `segcache` 0.3.0
-
-- Upstream repository: <https://github.com/pelikan-io/cache-rs>
-- Published version: `0.3.0`
-- crates.io archive checksum: `511afdec590e313aa76a32e095840c623a9f10a5a33c67bd846901c2a8853ea5`
-- Archive VCS revision: `4ce3405708e6831afa3c0abe3056090889e05aa5`
-- Archive path: `crates/segcache`
-- Local change: require `metriken` 0.9 instead of 0.7. No metric definitions,
-  names, labels, values, features, or runtime code are changed.
-
-This keeps Segcache's default `metrics` feature enabled while the Pelikan
-workspace uses a single `metriken-core` 0.2 registration domain.
-
-Compared with the published archive, this vendor tree omits the package-local
-`Cargo.lock` and publication-source `Cargo.toml.orig`; it adds no files. Cargo's
-`.cargo-ok` unpack-cache marker is not part of the archive and is not vendored.
-
 ## `ringline` 0.5.3
 
 - Upstream repository: <https://github.com/brayniac/ringline>
