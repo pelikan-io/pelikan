@@ -1658,9 +1658,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "segcache"
-version = "0.4.2"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7267742f824513da6d28f884c4389cf2f70d4f4b920151429f2f123abd506869"
+checksum = "eabb50ba80f77b4c710a11b7eaa7452a862c888ee397c5699829e48b357d98c7"
 dependencies = [
  "ahash",
  "clocksource",
