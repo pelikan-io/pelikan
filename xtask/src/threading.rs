@@ -31,9 +31,14 @@ const CLAIMS: &[Claim] = &[
         what: "worker thread spawn",
     },
     Claim {
-        path: "src/core/server/src/workers/mod.rs",
+        path: "src/core/server/src/process.rs",
         pattern: r"let storage = Arc::new\(storage\);",
         what: "workers share one Arc'd storage",
+    },
+    Claim {
+        path: "src/core/admin/src/lib.rs",
+        pattern: r"pub type FlushHandle = Arc<dyn Fn\(\) \+ Send \+ Sync>;",
+        what: "admin holds the clear handle for flush_all",
     },
     Claim {
         path: "src/core/server/src/process.rs",
@@ -118,6 +123,11 @@ const NEG_CLAIMS: &[Claim] = &[
         path: "src/core/server/src/workers/worker.rs",
         pattern: r"\.expire\(",
         what: "no periodic expiration in the worker event loop",
+    },
+    Claim {
+        path: "src/core/server/src/workers/worker.rs",
+        pattern: r"storage\.clear\(",
+        what: "workers do not clear; the admin thread owns flush_all",
     },
 ];
 
