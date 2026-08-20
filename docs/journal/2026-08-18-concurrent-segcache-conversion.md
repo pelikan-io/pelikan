@@ -176,6 +176,18 @@ and executing requests in place. Spec and plan:
     is bounded work that must finish, the other because a bound says so —
     and unifying them would have hidden the asymmetry that makes each
     correct. There, the *distinct* code is what carries the invariant.
+  - **A dilution control beats arguing about confidence intervals.** Two
+    benchmarks with a known working-set ratio give an *internal
+    consistency* test, not just a floor: a genuine fixed cost of ~1.6 ns
+    must show roughly half the relative effect on a 255-byte hit path
+    that it shows on a 1-byte one. When a measurement showed *more*
+    (+2.76% vs +1.82%), that was physically impossible for a real fixed
+    cost, so the sweep was measuring the machine — settled without
+    adjudicating a single overlapping interval. Strictly stronger than
+    the A/A control, which tells you the floor but cannot catch two
+    effects that both clear the floor while contradicting each other. A
+    reviewer can dispute whether ±3.72% is "too wide"; nobody can
+    dispute that a fixed cost cannot dilute upward.
   - **Attach the cheap check to the claim.** Every miss this week was a
     plausible statement nobody spent thirty seconds testing: "loom can't
     model this" (it could — the seam was already in production code),
