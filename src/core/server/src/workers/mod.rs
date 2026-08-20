@@ -97,9 +97,12 @@ where
     Response: Compose,
     Storage: Execute<Request, Response> + EntryStore,
 {
-    pub fn new<T: WorkerConfig>(config: &T, protocol: Proto, storage: Storage) -> Result<Self> {
+    pub fn new<T: WorkerConfig>(
+        config: &T,
+        protocol: Proto,
+        storage: Arc<Storage>,
+    ) -> Result<Self> {
         let threads = config.worker().threads();
-        let storage = Arc::new(storage);
 
         let mut workers = vec![];
         for _ in 0..threads {

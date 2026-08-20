@@ -29,7 +29,18 @@ where
         protocol: P,
         storage: Storage,
     ) -> Result<Self> {
-        let admin = AdminBuilder::new(config)?;
+        // the workers share one storage instance; the admin thread gets a
+        // type-erased handle to it so that it can apply `flush_all` itself,
+        // exactly once, before acking
+        let storage = Arc::new(storage);
+        let flush_handle = {
+            let storage = storage.clone();
+            Arc::new(move || storage.clear()) as admin::FlushHandle
+        };
+
+        let mut admin = AdminBuilder::new(config)?;
+        admin.flush_handle(flush_handle);
+
         let listener = ListenerBuilder::new(config)?;
         let workers = WorkersBuilder::new(config, protocol, storage)?;
 

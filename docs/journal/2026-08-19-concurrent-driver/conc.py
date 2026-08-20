@@ -481,12 +481,21 @@ def phase_ryw(args):
 
 
 def phase_flush(args):
-    """Characterise the flush_all smear window with writes in flight.
+    """Assert the flush_all contract, and characterise the smear window.
 
-    Documented accepted race: the admin thread broadcasts flush_all and each
-    worker calls clear(); a write acked between the FIRST and LAST worker's
-    clear can be destroyed by the later duplicate clear. This measures how wide
-    that window actually is, in time and in acked writes.
+    INVARIANT: once the admin connection has received `OK`, no write the server
+    subsequently acks may be destroyed by that flush. The admin thread holds a
+    clear handle, performs the single sweep itself, and only then acks -- so
+    there is no clear left to run once `OK` is on the wire.
+
+    Writes still in flight DURING the sweep can still be destroyed. That is
+    unavoidable without quiescing the workers and matches memcached, where
+    writes concurrent with a flush are undefined; those show up in the smear
+    window this phase also prints, and are not a failure.
+
+    --broken injects the pre-fix defect: ack on enqueue rather than after the
+    sweep, i.e. treat the ack as having arrived when the request was sent. The
+    phase must then FAIL, because writes acked during the sweep are destroyed.
     """
     port = args.port
     stop = threading.Event()
@@ -522,6 +531,10 @@ def phase_flush(args):
     resp = a.line()
     t_ok = time.monotonic()
     a.close()
+    if args.broken:
+        # SELFTEST: pretend the admin acked on enqueue, before sweeping. This
+        # is exactly the pre-fix behaviour, and it must make the phase fail.
+        t_ok = t_sent
 
     time.sleep(args.after)
     stop.set()
@@ -568,8 +581,8 @@ def phase_flush(args):
     print(f"[flush] pre-flush sample destroyed {pre_destroyed}/{len(sample)} (EXPECTED: all)")
     print(f"[flush] acked_after_flush_sent={len(window)} destroyed={len(destroyed)} "
           f"survived={len(survived)}")
-    print(f"[flush] acked AFTER admin OK but destroyed = {len(post_destroyed)}"
-          f"   <-- the smear beyond the ack")
+    print(f"[flush] BUG acked AFTER admin OK but destroyed = {len(post_destroyed)}"
+          f"   (MUST be 0)")
     # Ack timeline around the flush: if writers STALL for the duration of
     # clear(), no write can be acked-then-destroyed during the sweep, and the
     # smear collapses to the pre-clear window regardless of how long clear()
@@ -591,7 +604,13 @@ def phase_flush(args):
         print(f"[flush] SMEAR WINDOW: last destroyed ack at t_sent+"
               f"{(last_destroyed-t_sent)*1000:.2f}ms "
               f"(admin OK at t_sent+{(t_ok-t_sent)*1000:.2f}ms)")
-    return 0
+    # the flush must actually have cleared, otherwise "nothing was destroyed"
+    # is vacuously true
+    if pre_destroyed != len(sample):
+        print(f"[flush] BUG flush_all did not clear: {len(sample)-pre_destroyed}"
+              f"/{len(sample)} pre-flush keys survived")
+        return 1
+    return 1 if post_destroyed else 0
 
 
 def phase_resp(args):

@@ -8,9 +8,11 @@
 
 use logger::*;
 
-use std::io::{Read, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::TcpStream;
-use std::time::Duration;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 pub fn tests() {
     debug!("beginning tests");
@@ -342,6 +344,232 @@ fn test(name: &str, data: &[(&str, Option<&str>)]) {
         }
     }
     info!("status: passed\n");
+}
+
+/// Line-oriented client used by the concurrent `flush_all` test.
+struct Client {
+    reader: BufReader<TcpStream>,
+    writer: TcpStream,
+}
+
+impl Client {
+    fn connect(addr: &str) -> Self {
+        let stream = TcpStream::connect(addr).expect("failed to connect");
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .expect("failed to set read timeout");
+        stream.set_nodelay(true).expect("failed to set nodelay");
+        Self {
+            reader: BufReader::new(stream.try_clone().expect("failed to clone stream")),
+            writer: stream,
+        }
+    }
+
+    fn send(&mut self, request: &[u8]) {
+        self.writer.write_all(request).expect("failed to write");
+        self.writer.flush().expect("failed to flush");
+    }
+
+    fn line(&mut self) -> String {
+        let mut line = String::new();
+        let n = self.reader.read_line(&mut line).expect("failed to read");
+        assert!(n > 0, "server closed the connection");
+        line
+    }
+
+    /// `set <key> 0 0 1\r\nx\r\n`, returns true if the server acked `STORED`.
+    fn set(&mut self, key: &str) -> bool {
+        self.send(format!("set {key} 0 0 1\r\nx\r\n").as_bytes());
+        self.line() == "STORED\r\n"
+    }
+
+    /// `get <key>`, returns true if the key is present.
+    fn exists(&mut self, key: &str) -> bool {
+        self.send(format!("get {key}\r\n").as_bytes());
+        let line = self.line();
+        if line == "END\r\n" {
+            return false;
+        }
+        assert!(
+            line.starts_with("VALUE "),
+            "unexpected get response: {line:?}"
+        );
+        // one-byte value, then the trailing END
+        let _value = self.line();
+        assert_eq!(self.line(), "END\r\n", "missing END after VALUE");
+        true
+    }
+}
+
+/// Asserts the client-visible `flush_all` contract:
+///
+/// **Once the admin connection has received `OK`, every subsequent write that
+/// the server acks must survive.**
+///
+/// This is deliberately narrower than "nothing written near a flush is lost".
+/// Writes still in flight *during* the sweep can still be destroyed — that is
+/// unavoidable without quiescing the workers, and matches memcached, where
+/// concurrent writes during a flush are undefined. What must hold is the
+/// ordering a client can actually observe and depend on.
+///
+/// The test drives concurrent writers against the data port while a separate
+/// connection issues `flush_all` on the admin port. A writer only records a
+/// key as "post-OK" when it observes the `OK` flag *before* sending that write,
+/// so every recorded key was issued strictly after the client saw `OK`.
+///
+/// Against the pre-fix code — where the admin replied `OK` as soon as the
+/// `Signal::FlushAll` broadcast was queued and the workers swept afterwards —
+/// this fails: writes issued after `OK` land in buckets the sweep has not
+/// reached yet and are destroyed by it.
+pub fn flush_all_tests() {
+    info!("testing: flush_all acks after effect");
+
+    // more writer connections than workers, so that a worker which becomes
+    // free again has traffic waiting for it
+    const WRITERS: usize = 16;
+    // how long writers keep writing before the flush is issued, so that there
+    // is genuine write traffic in flight when it lands
+    const PRE_FLUSH: Duration = Duration::from_millis(150);
+    // how long writers keep writing after the client has seen `OK`. every
+    // destroyed write observed pre-fix landed within ~10 ms of the ack (the
+    // sweep is ~6-8 ms in release, ~40 ms in debug), so this covers the
+    // vulnerable window with room to spare while keeping verification cheap.
+    const POST_OK_WINDOW: Duration = Duration::from_millis(75);
+    // keys captured at the very start of a round, used to prove the flush
+    // actually cleared, so a no-op flush cannot pass this test
+    const EARLY_SAMPLE: usize = 25;
+    // the defect this catches is a race, and one round does not always hit it;
+    // several cheap rounds do. post-fix every round is deterministically clean.
+    const ROUNDS: usize = 5;
+
+    let mut total_post_ok = 0usize;
+    let mut total_destroyed = 0usize;
+    let mut first_failure: Option<String> = None;
+
+    for round in 0..ROUNDS {
+        let ok_received = Arc::new(AtomicBool::new(false));
+        let stop = Arc::new(AtomicBool::new(false));
+        // (keys written well before the flush, keys written after `OK`)
+        let collected: Arc<Mutex<(Vec<String>, Vec<String>)>> =
+            Arc::new(Mutex::new((Vec::new(), Vec::new())));
+
+        let mut handles = Vec::new();
+        for tid in 0..WRITERS {
+            let ok_received = ok_received.clone();
+            let stop = stop.clone();
+            let collected = collected.clone();
+            handles.push(std::thread::spawn(move || {
+                let mut client = Client::connect("127.0.0.1:12321");
+                let mut early = Vec::new();
+                let mut post_ok = Vec::new();
+                let mut post_ok_start = None;
+                let mut i = 0usize;
+
+                while !stop.load(Ordering::Relaxed) {
+                    // read the flag BEFORE sending, so that observing `true`
+                    // means the admin `OK` had already been read by the main
+                    // thread when this write was issued. this is the sound
+                    // direction: sampling the flag after the ack would not
+                    // order the two.
+                    let post = ok_received.load(Ordering::Acquire);
+                    if post {
+                        let start = *post_ok_start.get_or_insert_with(Instant::now);
+                        if start.elapsed() > POST_OK_WINDOW {
+                            break;
+                        }
+                    }
+
+                    let key = format!("fa:{round}:{tid}:{i:08}");
+                    i += 1;
+                    if !client.set(&key) {
+                        continue;
+                    }
+
+                    if post {
+                        post_ok.push(key);
+                    } else if early.len() < EARLY_SAMPLE {
+                        early.push(key);
+                    }
+                }
+
+                let mut collected = collected.lock().expect("poisoned");
+                collected.0.extend(early);
+                collected.1.extend(post_ok);
+            }));
+        }
+
+        std::thread::sleep(PRE_FLUSH);
+
+        let mut admin = Client::connect("127.0.0.1:9999");
+        admin.send(b"flush_all\r\n");
+        let response = admin.line();
+        // publish only once `OK` has been fully read
+        ok_received.store(true, Ordering::Release);
+        assert_eq!(response, "OK\r\n", "unexpected flush_all response");
+        drop(admin);
+
+        // writers terminate themselves once their post-`OK` window elapses;
+        // `stop` is only a backstop in case one cannot make progress
+        std::thread::sleep(POST_OK_WINDOW + Duration::from_millis(250));
+        stop.store(true, Ordering::Relaxed);
+        for handle in handles {
+            handle.join().expect("writer thread panicked");
+        }
+
+        let (early, post_ok) = {
+            let collected = collected.lock().expect("poisoned");
+            (collected.0.clone(), collected.1.clone())
+        };
+
+        assert!(
+            !post_ok.is_empty(),
+            "round {round}: no writes were issued after the flush_all OK; \
+             the test would prove nothing"
+        );
+        assert!(
+            !early.is_empty(),
+            "round {round}: no writes were issued before the flush_all; \
+             the test would prove nothing"
+        );
+
+        let mut client = Client::connect("127.0.0.1:12321");
+
+        // the flush must actually have cleared something: these keys were
+        // written ~150 ms before `flush_all` was even sent, so they are
+        // unambiguously before the sweep
+        let survived_early: Vec<&String> = early.iter().filter(|k| client.exists(k)).collect();
+        assert!(
+            survived_early.is_empty(),
+            "round {round}: flush_all did not clear — {}/{} keys written before the \
+             flush survived (e.g. {:?})",
+            survived_early.len(),
+            early.len(),
+            survived_early.first()
+        );
+
+        // the contract: nothing issued after the client saw `OK` may be destroyed
+        let destroyed: Vec<&String> = post_ok.iter().filter(|k| !client.exists(k)).collect();
+        total_post_ok += post_ok.len();
+        total_destroyed += destroyed.len();
+        if let Some(key) = destroyed.first() {
+            first_failure.get_or_insert_with(|| {
+                format!(
+                    "round {round}, e.g. {key:?} ({} destroyed)",
+                    destroyed.len()
+                )
+            });
+        }
+    }
+
+    assert_eq!(
+        total_destroyed,
+        0,
+        "flush_all acked before it took effect: {total_destroyed} of {total_post_ok} writes \
+         issued AFTER the admin returned OK were destroyed by the sweep [{}]",
+        first_failure.as_deref().unwrap_or("-")
+    );
+
+    info!("status: passed ({total_post_ok} writes after OK across {ROUNDS} rounds all survived)\n");
 }
 
 pub fn admin_tests() {

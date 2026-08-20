@@ -278,15 +278,17 @@ where
             while let Some(signal) = self.signal_queue.try_recv() {
                 match signal.into_inner() {
                     Signal::FlushAll => {
-                        // the admin thread broadcasts flush_all to every
-                        // worker and each calls `clear()`. duplicate clears
-                        // are cheap, but not semantically inert: a write
-                        // acked between the first and last worker's clear()
-                        // can be destroyed by a later duplicate clear — see
-                        // "Accepted semantic changes" in the concurrent
-                        // segcache conversion design spec
-                        warn!("received flush_all");
-                        self.storage.clear();
+                        // Nothing to do. The storage is a shared `Arc`, so one
+                        // sweep clears it for every worker, and the admin
+                        // thread performs that sweep itself before acking the
+                        // client — see the `flush_all` handler in
+                        // `core/admin`. Clearing here as well would repeat a
+                        // ~6-8 ms sweep N times and, worse, let a worker that
+                        // finished early ack writes which a still-sweeping
+                        // sibling then destroys.
+                        //
+                        // The server never sends this signal any more; the arm
+                        // remains because `Signal` is shared with the proxy.
                     }
                     Signal::Shutdown => {
                         // if we received a shutdown, we can return

@@ -113,9 +113,9 @@ and never outlive `execute()`.
 - Deleted along with the storage thread: the worker↔storage data queues, the
   `QUEUE_RETRIES` response shuttle, and the `storage_event_loop` /
   `storage_queue_depth` metrics. Worker metrics are unchanged.
-- Workers no longer call `expire()` in their event loop. Each worker handles
-  `Signal::FlushAll` by calling `storage.clear()` (the admin signal is a
-  broadcast), and still acts on `Signal::Shutdown`.
+- Workers no longer call `expire()` in their event loop. They act on
+  `Signal::Shutdown`; `Signal::FlushAll` is a no-op for them, because the
+  admin thread owns the clear (see "flush_all" below).
 
 ### 4. Expiration model (revised: no maintenance thread)
 
@@ -137,9 +137,9 @@ With that in place:
 - Pelikan calls `expire()` nowhere. `EntryStore::expire` is removed from the
   trait (and its implementors) as dead API; the engine keeps its public
   `expire()` for callers that want eager reclamation.
-- `FlushAll` is handled by each worker: the admin signal fan-out is a
-  broadcast, every worker receives it, and each calls `storage.clear()` —
-  the second..Nth calls find already-drained buckets and are cheap no-ops.
+- `FlushAll` is handled by the admin thread, which holds a type-erased clear
+  handle over the shared `Arc<Storage>`, sweeps synchronously, and only then
+  acks. Workers ignore the signal, and the server no longer sends it.
 - Net thread count: one fewer than the original multi-worker model (the
   storage thread is not replaced by anything).
 
@@ -207,64 +207,43 @@ With that in place:
   write pressure. Under low load expired segments linger in memory (metrics
   show them as used) — accepted, since that memory has no competing demand
   until write pressure exists.
-- **flush_all is applied by each worker independently (broadcast).**
-  *Measured 2026-08-19 with a concurrent multi-connection driver; the
-  earlier description here was written from reasoning and understated it
-  in two separate ways.*
+- **flush_all: writes concurrent with the sweep are still undefined.**
+  Once the client has received `OK` the sweep is already complete, so any
+  write it issues afterwards survives. Writes still *in flight* when the
+  sweep runs can still be destroyed — unavoidable without quiescing the
+  workers, and the same latitude memcached takes. The admin thread is also
+  blocked for the duration of the sweep (~6-8 ms in release for segcache,
+  fixed regardless of heap size or contents) and serves no other admin
+  request meanwhile; accepted, since `flush_all` is rare and inherently
+  heavy, and the control plane is the right place to absorb it.
 
-  **(a) Ack precedes effect, at every worker count including one.** The
-  admin thread replies `OK` once the broadcast is *queued*, before any
-  worker has cleared. At `threads = 1` — where there is no first/last
-  worker interval at all — writes acked *after* the client received `OK`
-  were still destroyed. So the client-visible contract "flush returned
-  OK, therefore my later writes survive" does not hold at any worker
-  count. **Verified inherited, not introduced:** at the branch point
-  (`6dc2e98`) the admin handler was
-  `let _ = self.signal_queue_tx.try_send_all(Signal::FlushAll); session.send(Ok)?;`
-  — the same ack-on-enqueue, and with no `wake()` at all, so the storage
-  thread saw the signal only on its next poll. `b4c50a7` made this
-  strictly better, not worse.
+  *History, kept because it was measured and because the two defects had
+  different origins.* Until 2026-08-19 this section described `flush_all` as
+  a broadcast applied by each worker independently, with two defects:
 
-  **(b) The window is the duration of `clear()`, not inter-worker skew.**
-  *Corrects an earlier revision of this section, which attributed the
-  window to workers waiting on the 100 ms poll timeout and questioned
-  whether the wake was effective. Both claims were wrong; they came from
-  a debug-build measurement reported without its profile.* Instrumenting
-  the admin broadcast and every worker's `clear()` with lock-free atomic
-  timestamps gives:
+  **(a) Ack preceded effect, at every worker count including one** — the
+  admin replied `OK` once the broadcast was *queued*. Measured with a
+  concurrent multi-connection driver: writes acked after the client received
+  `OK` were destroyed at 1, 2, 4 and 8 workers (0-13 writes per flush,
+  release). **Inherited, not introduced:** at the branch point (`6dc2e98`)
+  the handler was the same ack-on-enqueue, with no `wake()` at all.
 
-  | build | workers | wake latency | inter-worker skew | `clear()` | window |
-  |---|---|---|---|---|---|
-  | release | 1 | 51 µs | – | 5.65 ms | 0.64 ms |
-  | release | 2 | 35 µs | 5 µs | 8.44 ms | 0.37 ms |
-  | release | 4 | 40 µs | 9 µs | 8.59 ms | 8.64 ms |
-  | release | 8 | 35–82 µs | 29 µs | 6.2–7.4 ms | 6.7–8.2 ms |
-  | debug | 8 | 75–152 µs | 57–69 µs | 41–46 ms | 41–47 ms |
+  **(b) N redundant sweeps.** `TtlBuckets::clear` walks all
+  `TOTAL_BUCKETS = 256 x 4 = 1024` buckets taking each bucket's chain lock,
+  and costs a fixed ~6-8 ms in release at 64MB, 256MB and 1GB heaps alike —
+  the cost is the bucket sweep, not the data discarded. N workers therefore
+  paid N-1 wasted sweeps, and a worker that finished early resumed serving
+  while others still swept, widening the destruction window to a full sweep
+  (0.2-0.4 ms at 1-2 workers, 6.4-8.4 ms at 4-8). **This one was new to the
+  conversion:** pre-conversion `workers/multi.rs` ignored the signal and only
+  the storage thread cleared, so exactly one `clear()` ever ran.
 
-  - **The wake works.** Every worker receives the broadcast within
-    **35–152 µs**, skew ≤ ~70 µs, at every worker count. No worker ever
-    waits on the poll timeout. `b4c50a7` is doing its job.
-  - **`clear()` is a fixed ~6–8 ms (release).** `TtlBuckets::clear` walks
-    all `TOTAL_BUCKETS = 256 × 4 = 1024` buckets, taking each bucket's
-    `std::sync::Mutex` chain lock. Measured identical at 64MB, 256MB and
-    1GB heaps: the cost is the bucket sweep, not the data discarded, so
-    even an empty cache pays it.
-  - **The window equals the sweep.** A write landing in a bucket the
-    sweep has not yet reached is acked and then destroyed by that sweep.
-    At 1–2 workers each connection stalls behind its own worker's sweep,
-    so little is acked mid-sweep and the window stays sub-millisecond; at
-    4–8 workers a worker that finishes early resumes serving while others
-    still sweep, widening the window to a full sweep. "Between the first
-    and last worker's clear" names a real multi-worker effect but
-    attributes it to a skew of ~70 µs — three orders of magnitude too
-    small to explain the observed window.
-
-  **The duplicate clear is new to this conversion.** At the branch point
-  `workers/multi.rs` explicitly ignored the signal (`Signal::FlushAll =>
-  {}`) and only the dedicated storage thread cleared; `workers/single.rs`
-  cleared once because it owned the storage. Exactly one `clear()` ever
-  ran. Exactly-once flush via an admin-held clear handle remains the
-  structural fix, and would also remove N-1 redundant 6–8 ms sweeps.
+  Both are fixed by giving the admin thread the clear handle: exactly one
+  sweep, on the control plane, before the ack. Measured after the fix
+  (release, 3 reps each at 1/2/4/8 workers): zero writes acked after `OK`
+  destroyed at every worker count, destruction ending 0.14-0.38 ms after the
+  broadcast at every worker count, and an admin round trip of 6.5-9.6 ms —
+  one sweep, not N.
 - **add/replace race magnitude, measured:** the accepted check-then-act
   race scales with worker count — concurrent `add`s on one hot key
   double-win 10–13% of the time at 2 workers and **32.7%** at 8, with 24
