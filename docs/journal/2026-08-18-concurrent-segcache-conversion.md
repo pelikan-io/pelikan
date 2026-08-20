@@ -176,6 +176,23 @@ and executing requests in place. Spec and plan:
     is bounded work that must finish, the other because a bound says so —
     and unifying them would have hidden the asymmetry that makes each
     correct. There, the *distinct* code is what carries the invariant.
+  - **The A/A control has a blind spot: it cannot see code-layout
+    noise**, because both arms share a layout. Measured afterwards: six
+    padding-only variants of one binary — semantically identical, hot-path
+    instructions identical, differing only by `global_asm!(".space N")` —
+    span **0.6–1.3 ns (1.6–3.4%)** on the same benchmark where the A/A
+    control read **0.097 ns (0.25%)**. The control was advertising a
+    resolution roughly **10× better than achievable**, and both of us
+    trusted it. Consequence: every "effect is below our ±X% control"
+    conclusion this week was measured against a floor that was too
+    optimistic — the conclusions survive (a wider floor makes "below
+    resolution" *more* true) but the stated precision did not. For
+    effects near ~1 ns the protocol is to build each variant as several
+    padding-only layouts and compare per-layout minima; better still,
+    attribute from **disassembly rather than timing** where the question
+    permits it, which settles instruction-form questions exactly and with
+    no benchmark at all. Same family as the rest: a real measurement
+    that could not observe the thing it was cited for.
   - **A dilution control beats arguing about confidence intervals.** Two
     benchmarks with a known working-set ratio give an *internal
     consistency* test, not just a floor: a genuine fixed cost of ~1.6 ns
