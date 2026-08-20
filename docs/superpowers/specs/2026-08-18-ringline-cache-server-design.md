@@ -239,6 +239,16 @@ Because this changes the runtime thread model, the generated threading and
 request-dataflow diagrams and their source assertions must be updated with
 `cargo xtask diagrams`; generated SVGs are never edited by hand.
 
+## 2026-08-20 Amendment: Shared Concurrent Storage
+
+This amendment supersedes the earlier single-worker/multi-worker storage topology, async storage-response bridge, dedicated storage-thread shutdown, queue-pressure, and sole-storage-owner requirements in this document. Current Pelikan storage is internally synchronized and shared across workers. Both Mio and Ringline therefore construct exactly one `Arc<Storage>` per process, and every data-plane worker executes requests directly against that instance. Worker count changes execution parallelism only; it does not select a different storage ownership model.
+
+The Ringline cache-server implementation must remove `RinglineStorageWorker`, `MultiHandler`, the request/response storage queues, storage notification routing, and bridge-only metrics and completion state. Ringline connection tasks may perform synchronous storage operations because the concurrent engine provides its own synchronization; they must not add a Pelikan-owned lock or blocking channel receive around storage execution. Per-connection parsing, bounded network-send backpressure, request logging, expiration cadence, error metrics, and hangup behavior remain equivalent to Mio.
+
+`ProcessBuilder` wraps storage in one `Arc` before selecting a backend. Mio workers, Ringline workers, and the admin flush handle clone that same `Arc`. `FlushAll` clears the shared engine synchronously before acknowledging success, exactly once per command. Startup fallback recovers the same `Arc`; it never reconstructs or duplicates storage. Shutdown joins only the selected data-plane runtime and admin/signal threads; there is no Pelikan storage thread to stop or join.
+
+Conformance must exercise single- and multi-worker Mio and forced-Ringline modes against the same protocol cases, including concurrent writes, queue-independent request pressure, `FlushAll` ordering, cancellation, large values, restart/listener release, and backend observability. Generated diagrams must show the Mio/Ringline launch fork and their different I/O scheduling models, but one common Arc-shared storage topology with no dedicated storage queue or thread.
+
 ## Follow-up: TLS
 
 After plain TCP conformance is established, a separate increment extends the
