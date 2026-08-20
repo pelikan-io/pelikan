@@ -204,6 +204,25 @@ and executing requests in place. Spec and plan:
 - Numeric values are stored typed when they parse as `u64`, so `set`ting
   `007` reads back `7` — a memcached byte-transparency violation that
   predates this work and survives it.
+- **Three engine timing metrics report garbage, and pelikan exposes them**
+  (cache-rs #75, found while trying to build an assertion on one).
+  `EVICT_TIME`, `EXPIRE_TIME` and `CLEAR_TIME` measure sub-millisecond
+  operations against a clocksource `Instant` with **1-second
+  resolution**, so `elapsed()` yields either `0` — when the operation
+  fits inside one coarse second — or exactly `1_000_000_000` ns when it
+  straddles a tick. Pelikan's admin enumerates metriken's global
+  registry, so all three appear in `/metrics` verbatim.
+  `evict_time` is the damaging one: eviction runs constantly under
+  pressure, so a fraction of evictions each contribute a spurious full
+  second and the total becomes a random walk. `evict_time /
+  segment_evict` looks like an average eviction latency and is
+  meaningless. That is worse than a metric that visibly reads zero — a
+  zero prompts an investigation, a plausible number does not.
+  `clear_time` is the benign instance only because flushes are rare
+  enough that it mostly reads 0. Fix is upstream (`std::time::Instant`
+  at the three sites); the coarse clock is correct for TTL and expiry
+  *deadlines*, which is what it exists for, and the two concerns sharing
+  the type name `Instant` is what made this invisible at the call site.
 
 ## Skill Feedback
 
