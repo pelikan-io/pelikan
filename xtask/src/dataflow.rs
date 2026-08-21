@@ -1,10 +1,10 @@
-//! The "life of a request" chart: one request traced through the threads of
-//! each binary as numbered stages on thread swimlanes, using the code's own
-//! verbs (receive/execute/send/flush). One uniform gap between stage columns
-//! whether or not the path switches lanes (same-lane labels float above the
-//! stage line; the gap is sized for the elbow-and-queue run of a crossing).
-//! Stage claims are asserted against the event-loop sources, and panel
-//! content is bounds-checked, at generation time. Control plane is
+//! The "life of a request" chart: one request traced through the execution
+//! contexts of each binary as numbered stages on swimlanes, using the code's
+//! own verbs (receive/execute/send/flush). One uniform gap between stage
+//! columns whether or not the path switches lanes (same-lane labels float
+//! above the stage line; the gap is sized for the elbow-and-queue run of a
+//! crossing). Stage claims are asserted against the event-loop sources, and
+//! panel content is bounds-checked, at generation time. Control plane is
 //! intentionally out of scope.
 
 use crate::claims::{verify, Claim};
@@ -206,7 +206,7 @@ enum Kind {
 fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String>, f64) {
     let mut parts: Vec<String> = Vec::new();
     let lanes: Vec<&str> = match kind {
-        Kind::Server => vec!["clients", "pelikan_work_i"],
+        Kind::Server => vec!["clients", "request context"],
         Kind::Proxy => vec!["clients", "pelikan_fe_i", "pelikan_be_i", "servers"],
     };
     let h = 44.0 + LANE_H * lanes.len() as f64 + 28.0;
@@ -315,8 +315,8 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
         Kind::Server => {
             // all four stages run on whichever worker owns the session; the
             // execute stage calls into the Arc-shared cache in place, so the
-            // path crosses no queue after the listener hand-off
-            let wl = "pelikan_work_i";
+            // path crosses no queue after the backend's connection hand-off
+            let wl = "request context";
             let xs = columns(4);
             stage(
                 &mut parts,
@@ -479,4 +479,20 @@ pub fn generate() {
     let (w, h) = (X0 + PANEL_W + 260.0 + 24.0, y + h2 + 24.0);
     fs::write(OUT, svg_document(w, h, "cargo xtask diagrams", &parts)).unwrap();
     println!("generated: {OUT}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn server_lane_names_a_backend_neutral_execution_context() {
+        let rows = [("segcache", "memcache")];
+        let (parts, _) = panel(0.0, "server", &rows, Kind::Server);
+        let svg = parts.concat();
+
+        assert!(svg.contains("request context"));
+        assert!(!svg.contains("pelikan_work_i"));
+        assert!(!svg.contains("ringline-worker-i"));
+    }
 }

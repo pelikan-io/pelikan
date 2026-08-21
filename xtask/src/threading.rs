@@ -1,12 +1,10 @@
 //! The threading architecture chart: the runtime thread model per binary in
-//! a launch-time backend fork followed by server and proxy panels. Literal
-//! thread names in monospace
-//! matching `top -H`; build-module chips inside each thread bridge this
-//! chart to the architecture chart; heavier edges carry bytes across the
-//! process boundary (wire) vs internal queues (object). Every server worker
-//! carries the storage chips because the workers share one internally
-//! synchronized cache through an `Arc` and execute requests in place — there
-//! is no storage thread. The thread and queue inventory is asserted against
+//! a launch-time backend fork, a backend-neutral shared-storage topology, and
+//! a proxy panel. Named runtime threads are literal names matching `top -H`;
+//! the storage panel deliberately uses neutral execution contexts because Mio
+//! callbacks and Ringline tasks share one ownership model. Heavier edges carry
+//! bytes across the process boundary (wire) vs internal queues (object). The
+//! thread, queue, control, and shared-storage inventory is asserted against
 //! the sources at generation time.
 
 use crate::claims::{verify, Claim};
@@ -25,6 +23,26 @@ const CLAIMS: &[Claim] = &[
         path: "vendor/ringline-0.5.3/src/worker.rs",
         pattern: r#"name\("ringline-acceptor"\.to_string\(\)\)"#,
         what: "Ringline acceptor thread spawn",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.3/src/worker.rs",
+        pattern: r"crossbeam_channel::bounded::<\(RawFd, SocketAddr\)>",
+        what: "Ringline accepted-fd queues are bounded per worker",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.3/src/acceptor.rs",
+        pattern: r"worker_channels\[worker_idx\]\.try_send\(\(fd, peer_addr\)\)",
+        what: "Ringline acceptor queues accepted fds to workers",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.3/src/acceptor.rs",
+        pattern: r"worker_wake_handles\[worker_idx\]\.wake\(\)",
+        what: "Ringline acceptor wakes the selected worker",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.3/src/backend/uring/event_loop.rs",
+        pattern: r"self\.executor\.task_slab\.spawn\(conn_index, future\);",
+        what: "Ringline worker event loop schedules the accepted connection task",
     },
     Claim {
         path: "src/core/server/src/process.rs",
@@ -55,6 +73,21 @@ const CLAIMS: &[Claim] = &[
         path: "src/core/server/src/process.rs",
         pattern: r#"name\(format!\("\{THREAD_PREFIX\}_signal"\)\)"#,
         what: "signal handler thread spawn",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
+        pattern: r#"name\(format!\("\{THREAD_PREFIX\}_ringline_control"\)\)"#,
+        what: "Pelikan Ringline control thread spawn",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
+        pattern: r"let \(mut admin_signal_queues, mut bridge_signal_queues\)",
+        what: "admin-to-Ringline-control signal queue",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
+        pattern: r"bridge_signal_tx\.try_send\(Signal::Shutdown\)",
+        what: "Ringline control reports runtime termination to admin",
     },
     Claim {
         path: "src/core/server/src/process.rs",
@@ -192,7 +225,21 @@ fn thread_box(
     chips: &[Chip],
     external: bool,
 ) {
-    parts.push(rect(x, y, TB_W, TB_H, "#FFFFFF").rx(10.0).build());
+    thread_box_w(parts, x, y, TB_W, name, sub, chips, external);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn thread_box_w(
+    parts: &mut Vec<String>,
+    x: f64,
+    y: f64,
+    width: f64,
+    name: &str,
+    sub: Option<&str>,
+    chips: &[Chip],
+    external: bool,
+) {
+    parts.push(rect(x, y, width, TB_H, "#FFFFFF").rx(10.0).build());
     // name row, optional sub row, and the one-column bar stack (the
     // architecture chart's composition-bar idiom) vertically centered as
     // one block
@@ -206,25 +253,25 @@ fn thread_box(
     };
     let top = y + (TB_H - name_h - sub_h - bars_h) / 2.0;
     parts.push(
-        text(x + TB_W / 2.0, top + name_h / 2.0, name)
+        text(x + width / 2.0, top + name_h / 2.0, name)
             .size(TS.h2)
             .bold()
             .mono()
             .build(),
     );
     if let Some(sub) = sub {
-        let mut t = text(x + TB_W / 2.0, top + name_h + sub_h / 2.0, sub).fill("#333");
+        let mut t = text(x + width / 2.0, top + name_h + sub_h / 2.0, sub).fill("#333");
         if external {
             t = t.italic();
         }
         parts.push(t.build());
     }
     if !chips.is_empty() {
-        let bw = TB_W - 40.0;
+        let bw = width - 40.0;
         let mut cy = top + name_h + sub_h + 18.0;
         for (label, cfill) in chips {
             parts.push(rect(x + 20.0, cy, bw, bh, cfill).sw(1.0).build());
-            parts.push(text(x + TB_W / 2.0, cy + bh / 2.0, label).build());
+            parts.push(text(x + width / 2.0, cy + bh / 2.0, label).build());
             cy += bh + 6.0;
         }
     }
@@ -304,7 +351,7 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
 
 fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = 792.0;
+    let h = 560.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -313,139 +360,101 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f6
     );
     margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
 
-    let row_a = y0 + 80.0;
-    let mid_a = row_a + TB_H / 2.0;
-
-    let cl_x = X0 + 26.0;
-    ext_box(&mut parts, cl_x, row_a, "clients");
-
-    let li_x = cl_x + EXT_W + gap_for("accept").max(TB_W + GAP - EXT_W);
-    thread_box(
+    let context_x = X0 + 120.0;
+    let context_w = 390.0;
+    let context_0_y = y0 + 45.0;
+    let context_n_y = y0 + h - TB_H - 45.0;
+    thread_box_w(
         &mut parts,
-        li_x,
-        row_a,
-        "pelikan_listener",
-        Some(":12321"),
-        &[],
+        context_x,
+        context_0_y,
+        context_w,
+        "execution context 0",
+        Some("Mio callback / Ringline task"),
+        &[CHIP_PROTOCOL],
         false,
     );
-    parts.push(
-        ortho(&[(cl_x + EXT_W, mid_a), (li_x, mid_a)])
-            .network()
-            .build(),
-    );
-    parts.push(
-        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 15.0, "accept")
-            .fill("#555")
-            .build(),
-    );
-
-    let q_w = 50.0;
-    let qg = queue_gap("sessions");
-    let q_x = li_x + TB_W + qg;
-    queue_glyph(&mut parts, q_x, mid_a - 11.0, q_w, 22.0, "sessions");
-    parts.push(ortho(&[(li_x + TB_W, mid_a), (q_x, mid_a)]).build());
-
-    let wk_x = q_x + q_w + qg;
-    let top_y = y0 + 40.0;
-    let row_b = y0 + h - 212.0;
-
-    // one worker column: every worker carries the protocol and storage chips
-    // because each executes requests in place against the one Arc-shared,
-    // internally synchronized cache — there is no storage thread
-    let wk0_y = row_a;
-    let wk1_y = worker_column(
+    thread_box_w(
         &mut parts,
-        wk_x,
-        wk0_y,
-        ("pelikan_work_0", "pelikan_work_n-1"),
-        &[CHIP_PROTOCOL, CHIP_ENTRYSTORE, CHIP_SEGCACHE],
+        context_x,
+        context_n_y,
+        context_w,
+        "execution context n-1",
+        Some("Mio callback / Ringline task"),
+        &[CHIP_PROTOCOL],
+        false,
     );
-    parts.push(
-        ortho(&[
-            (q_x + q_w, mid_a),
-            (wk_x - 22.0, mid_a),
-            (wk_x - 22.0, wk0_y + TB_H / 2.0),
-            (wk_x, wk0_y + TB_H / 2.0),
-        ])
-        .build(),
-    );
-    parts.push(
-        ortho(&[
-            (q_x + q_w, mid_a),
-            (wk_x - 22.0, mid_a),
-            (wk_x - 22.0, wk1_y + TB_H / 2.0),
-            (wk_x, wk1_y + TB_H / 2.0),
-        ])
-        .build(),
-    );
-    let wk_bottom = wk1_y + TB_H;
+    let dots_cy = y0 + h / 2.0;
+    for dy in [-8.0, 0.0, 8.0] {
+        parts.push(format!(
+            "<circle cx=\"{:.0}\" cy=\"{:.0}\" r=\"2\" fill=\"#777\"/>",
+            context_x + context_w / 2.0,
+            dots_cy + dy
+        ));
+    }
 
-    // requests/responses between clients and workers, over the top
-    parts.push(
-        ortho(&[
-            (cl_x + EXT_W / 2.0, row_a + (TB_H - EXT_H) / 2.0),
-            (cl_x + EXT_W / 2.0, top_y),
-            (wk_x + TB_W / 2.0, top_y),
-            (wk_x + TB_W / 2.0, row_a),
-        ])
-        .both()
-        .network()
-        .build(),
+    let storage_x = context_x + 720.0;
+    let storage_w = 390.0;
+    let storage_y = y0 + (h - TB_H) / 2.0;
+    thread_box_w(
+        &mut parts,
+        storage_x,
+        storage_y,
+        storage_w,
+        "one Arc-shared engine",
+        Some("process-owned; not a thread"),
+        &[CHIP_ENTRYSTORE, CHIP_SEGCACHE],
+        false,
     );
+
+    let storage_mid = storage_y + TB_H / 2.0;
+    let elbow_x = storage_x - 180.0;
+    for (context_y, storage_offset) in [(context_0_y, -42.0), (context_n_y, 42.0)] {
+        parts.push(
+            ortho(&[
+                (context_x + context_w, context_y + TB_H / 2.0),
+                (elbow_x, context_y + TB_H / 2.0),
+                (elbow_x, storage_mid + storage_offset),
+                (storage_x, storage_mid + storage_offset),
+            ])
+            .both()
+            .build(),
+        );
+    }
     parts.push(
         text(
-            (cl_x + wk_x + TB_W) / 2.0,
-            top_y - 15.0,
-            "requests / responses (wire)",
+            (context_x + context_w + storage_x) / 2.0,
+            y0 + h / 2.0,
+            "direct execute / response",
         )
         .fill("#555")
         .build(),
     );
 
-    // control plane: signal left of admin, admin aligned under listener
-    let sg_x = X0 + 26.0;
-    thread_box(
+    let admin_x = storage_x + 720.0;
+    let admin_w = 390.0;
+    thread_box_w(
         &mut parts,
-        sg_x,
-        row_b,
-        "pelikan_signal",
-        Some("SIGINT/TERM/QUIT"),
-        &[],
-        true,
-    );
-    thread_box(
-        &mut parts,
-        li_x,
-        row_b,
+        admin_x,
+        storage_y,
+        admin_w,
         "pelikan_admin",
-        Some(":9999"),
+        Some("FlushHandle clones same Arc"),
         &[CHIP_PROTOCOL_ADMIN],
         false,
     );
-    let mid_b = row_b + TB_H / 2.0;
     parts.push(
-        ortho(&[(sg_x + TB_W, mid_b), (li_x, mid_b)])
+        ortho(&[(admin_x, storage_mid), (storage_x + storage_w, storage_mid)])
             .signal()
             .build(),
     );
     parts.push(
-        ortho(&[(li_x + 48.0, row_b), (li_x + 48.0, row_a + TB_H)])
-            .signal()
-            .build(),
-    );
-    parts.push(
-        text(li_x + 16.0, (row_b + row_a + TB_H) / 2.0, "signals")
-            .fill("#777")
-            .build(),
-    );
-    parts.push(
-        ortho(&[
-            (li_x + TB_W, mid_b),
-            (wk_x + TB_W / 2.0, mid_b),
-            (wk_x + TB_W / 2.0, wk_bottom),
-        ])
-        .signal()
+        text(
+            (storage_x + storage_w + admin_x) / 2.0,
+            storage_mid - 18.0,
+            "synchronous clear",
+        )
+        .fill("#777")
         .build(),
     );
     (parts, h)
@@ -453,7 +462,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f6
 
 fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = 520.0;
+    let h = 850.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -518,22 +527,52 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
         &[],
         false,
     );
-    thread_box(
+    queue_glyph(
         &mut parts,
         dispatch_x,
-        ring_y,
-        "runtime task dispatch",
-        Some("same-thread wake"),
-        &[],
-        false,
+        ring_y + TB_H / 2.0 - 11.0,
+        50.0,
+        22.0,
+        "accepted fd queue / wake",
     );
     thread_box(
         &mut parts,
         worker_x,
         ring_y,
         "ringline-worker-i",
-        Some("async connection tasks"),
+        Some("schedules async tasks"),
         &[CHIP_PROTOCOL],
+        false,
+    );
+
+    let control_y = y0 + 575.0;
+    let control_mid = control_y + TB_H / 2.0;
+    thread_box(
+        &mut parts,
+        mio_x,
+        control_y,
+        "pelikan_admin",
+        Some(":9999 (Mio)"),
+        &[CHIP_PROTOCOL_ADMIN],
+        false,
+    );
+    queue_glyph(
+        &mut parts,
+        dispatch_x,
+        control_mid - 11.0,
+        50.0,
+        22.0,
+        "signal queue / wake",
+    );
+    let control_w = 430.0;
+    thread_box_w(
+        &mut parts,
+        worker_x,
+        control_y,
+        control_w,
+        "pelikan_ringline_control",
+        Some("shutdown + monitor"),
+        &[],
         false,
     );
 
@@ -597,9 +636,39 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
     );
     parts.push(
         ortho(&[
-            (dispatch_x + TB_W, ring_y + TB_H / 2.0),
+            (dispatch_x + 50.0, ring_y + TB_H / 2.0),
             (worker_x, ring_y + TB_H / 2.0),
         ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[(mio_x + TB_W, control_mid), (dispatch_x, control_mid)])
+            .signal()
+            .build(),
+    );
+    parts.push(
+        ortho(&[(dispatch_x + 50.0, control_mid), (worker_x, control_mid)])
+            .signal()
+            .build(),
+    );
+    let report_y = control_y + TB_H + 28.0;
+    parts.push(
+        ortho(&[
+            (worker_x + control_w / 2.0, control_y + TB_H),
+            (worker_x + control_w / 2.0, report_y),
+            (mio_x + TB_W / 2.0, report_y),
+            (mio_x + TB_W / 2.0, control_y + TB_H),
+        ])
+        .signal()
+        .build(),
+    );
+    parts.push(
+        text(
+            (mio_x + TB_W / 2.0 + worker_x + control_w / 2.0) / 2.0,
+            report_y + 18.0,
+            "runtime termination report",
+        )
+        .fill("#777")
         .build(),
     );
     (parts, h)
@@ -856,4 +925,38 @@ pub fn generate() {
     let (w, h) = (24.0 + PANEL_W + 260.0 + 24.0, y + h2 + 24.0);
     fs::write(OUT, svg_document(w, h, "cargo xtask diagrams", &parts)).unwrap();
     println!("generated: {OUT}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn backend_panel_shows_real_ringline_queue_workers_and_control_thread() {
+        let (parts, _) = backend_choice_panel(0.0);
+        let svg = parts.concat();
+
+        assert!(svg.contains("accepted fd queue / wake"));
+        assert!(svg.contains("pelikan_ringline_control"));
+        assert!(svg.contains("schedules async tasks"));
+        assert!(!svg.contains("runtime task dispatch"));
+    }
+
+    #[test]
+    fn shared_storage_panel_is_backend_neutral() {
+        let rows = [("segcache", "memcache")];
+        let (parts, _) = server_panel(0.0, "common Arc-shared storage", &rows);
+        let svg = parts.concat();
+
+        assert!(svg.contains("execution context 0"));
+        assert!(svg.contains("one Arc-shared engine"));
+        for backend_specific in [
+            "pelikan_listener",
+            "pelikan_work",
+            "ringline-acceptor",
+            "ringline-worker",
+        ] {
+            assert!(!svg.contains(backend_specific));
+        }
+    }
 }
