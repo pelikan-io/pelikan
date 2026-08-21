@@ -54,23 +54,27 @@ and a core, and write the thin crate that wires them together.
 [![Pelikan threading architecture](diagrams/threading.svg)](diagrams/threading.svg?raw=1)
 
 The chart starts with the cache-server I/O scheduling fork, then shows the
-common server storage topology and the proxy runtime. Thread names are the
-literal names the code registers — what you see in `top -H` is what the chart
-says:
+backend-neutral shared-storage topology and the proxy runtime. Where the chart
+names a runtime thread, it uses the literal registered name — what you see in
+`top -H` is what the chart says. The storage-only panel instead names neutral
+execution contexts so it does not imply Mio or Ringline owns storage
+differently:
 
 - **Cache-server I/O**: Mio accepts on `pelikan_listener` and drives
   `pelikan_work_i` callback state machines after a session-queue handoff.
-  Ringline accepts on `ringline-acceptor` and schedules async connection tasks
-  on `ringline-worker-*` threads. This fork changes I/O scheduling, not storage
-  ownership.
-- **Server storage**: whichever backend is active, every data-plane worker
-  parses, executes, and responds directly against one internally synchronized
-  engine shared through an `Arc`. The storage chips therefore appear in every
-  worker box, with no storage thread or request/response storage queues. The
-  `[worker] threads` config option is a scaling knob, not a mode switch: `1`
-  (the default) is simply n = 1 of the same model. There is no maintenance
-  thread either — the engine treats expired items as missing on access and
-  reclaims expired segments under write pressure.
+  `ringline-acceptor` sends each accepted file descriptor through a bounded
+  per-worker queue and wakes the selected `ringline-worker-*`; that worker's
+  event loop then schedules the async connection task internally. This fork
+  changes I/O scheduling, not storage ownership.
+- **Server storage**: whichever backend is active, each neutral request
+  execution context parses and responds while executing directly against one
+  process-owned, internally synchronized engine shared through an `Arc`. The
+  panel draws those direct calls into one engine node, with no backend listener,
+  storage thread, or request/response storage queues. The `[worker] threads`
+  config option is a scaling knob, not a mode switch: `1` (the default) is
+  simply n = 1 of the same model. There is no maintenance thread either — the
+  engine treats expired items as missing on access and reclaims expired
+  segments under write pressure.
 - **Proxy**: frontend threads (`pelikan_fe_i`) face clients, backend threads
   (`pelikan_be_i`) face upstream servers, connected by object queues.
 
@@ -83,21 +87,22 @@ and proxy sockets remain on Mio, and a live Ringline process never migrates
 established connections. The admin `FlushHandle` also clones the shared `Arc`;
 `flush_all` clears that one engine synchronously before acknowledging success.
 Two conventions carry the meaning: heavier edges are bytes crossing the
-process boundary (the wire); thin edges are internal queues — accepted
-sessions from the listener, parsed request/response objects everywhere
-else. The control plane is the same everywhere — `pelikan_signal` relays
-SIGINT/SIGTERM/SIGQUIT to `pelikan_admin` (port 9999), which broadcasts
-shutdown to every sibling thread; a per-panel margin table expands which
-binaries and protocols each panel covers.
+process boundary (the wire); queue glyphs mark real internal queues, while thin
+edges without a queue are direct calls or control signals. `pelikan_signal`
+relays SIGINT/SIGTERM/SIGQUIT to `pelikan_admin` (port 9999). Under Ringline,
+the admin thread sends shutdown through a signal queue/wake to the real
+`pelikan_ringline_control` thread, which shuts down and monitors the runtime
+and reports unexpected termination back to admin. A per-panel margin table
+expands which binaries and protocols each panel covers.
 
 ## Life of a Request
 
 [![Life of a request](diagrams/dataflow.svg)](diagrams/dataflow.svg?raw=1)
 
-One request, traced as numbered stages on thread swimlanes, named by the
-code's own verbs: `receive` (read + parse), `execute`, `send` (compose),
-`flush`. The stage pitch is uniform across panels, so the panels compare
-column by column and the differences that remain are the real ones:
+One request, traced as numbered stages on execution-context swimlanes, named
+by the code's own verbs: `receive` (read + parse), `execute`, `send` (compose),
+`flush`. The stage pitch is uniform across panels, so the panels compare column
+by column and the differences that remain are the real ones:
 
 - On a **server**, all four stages run in whichever Mio callback or Ringline
   connection task owns the session; stage ② executes directly against the
