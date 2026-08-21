@@ -5,17 +5,17 @@
 use crate::*;
 
 pub trait Storage {
-    fn add(&mut self, request: &Add) -> Response;
-    fn append(&mut self, request: &Append) -> Response;
-    fn cas(&mut self, request: &Cas) -> Response;
-    fn decr(&mut self, request: &Decr) -> Response;
-    fn delete(&mut self, request: &Delete) -> Response;
-    fn flush_all(&mut self, request: &FlushAll) -> Response;
-    fn get(&mut self, request: &Get) -> Response;
-    fn gets(&mut self, request: &Get) -> Response;
-    fn incr(&mut self, request: &Incr) -> Response;
-    fn prepend(&mut self, request: &Prepend) -> Response;
-    fn quit(&mut self, request: &Quit) -> Response;
-    fn replace(&mut self, request: &Replace) -> Response;
-    fn set(&mut self, request: &Set) -> Response;
+    fn add(&self, request: &Add) -> Response;
+    fn append(&self, request: &Append) -> Response;
+    fn cas(&self, request: &Cas) -> Response;
+    fn decr(&self, request: &Decr) -> Response;
+    fn delete(&self, request: &Delete) -> Response;
+    fn flush_all(&self, request: &FlushAll) -> Response;
+    fn get(&self, request: &Get) -> Response;
+    fn gets(&self, request: &Get) -> Response;
+    fn incr(&self, request: &Incr) -> Response;
+    fn prepend(&self, request: &Prepend) -> Response;
+    fn quit(&self, request: &Quit) -> Response;
+    fn replace(&self, request: &Replace) -> Response;
+    fn set(&self, request: &Set) -> Response;
 }

@@ -1,8 +1,6 @@
-mod completion;
 mod launch;
 
 pub use ::ringline::{AsyncEventHandler, ConnCtx, DriverCtx, Error, ParseResult, WakeHandle};
-pub use completion::{Completion, CompletionCanceled, CompletionId, CompletionTable};
 pub use launch::{
     launch, launch_with_bootstraps, take_worker_bootstrap, RinglineRuntime, RinglineShutdown,
     StartupError,

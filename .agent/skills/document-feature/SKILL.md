@@ -111,6 +111,21 @@ facts across audiences. Satisfy a higher-priority need without making a
 lower-priority contract false; document the tradeoff and any unmet criterion.
 Ask the human owner when audience priorities conflict materially.
 
+## One Document, One Question
+
+A document that answers two questions well for its author answers neither for
+its reader. The clearest case is a guide to when a platform or technology is
+the right choice merged with a guide to how this implementation works: the
+general argument then reads as a property of this implementation, and a reader
+evaluating the technology cannot tell which claims would survive a different
+one.
+
+Split on the question, not on length. State the question each document answers
+in its own opening, and let the implementation guide point at the technology
+argument rather than restate it. The same split separates a reference from a
+tutorial and an operator guide from a contributor guide. Shared authoritative
+facts stay shared; the reader's question decides where a paragraph lives.
+
 ## Surface Checklists
 
 ### README

@@ -13,7 +13,7 @@ use protocol_resp::*;
 use std::time::Duration;
 
 impl Execute<Request, Response> for Seg {
-    fn execute(&mut self, request: &Request) -> Response {
+    fn execute(&self, request: &Request) -> Response {
         match request {
             Request::Get(get) => self.get(get),
             Request::Set(set) => self.set(set),
@@ -23,7 +23,7 @@ impl Execute<Request, Response> for Seg {
 }
 
 impl Storage for Seg {
-    fn get(&mut self, get: &Get) -> Response {
+    fn get(&self, get: &Get) -> Response {
         if let Some(item) = self.data.get(get.key()) {
             match item.value() {
                 segcache::Value::Bytes(b) => Response::bulk_string(b),
@@ -34,7 +34,7 @@ impl Storage for Seg {
         }
     }
 
-    fn set(&mut self, set: &Set) -> Response {
+    fn set(&self, set: &Set) -> Response {
         let ttl = match set.expire_time().unwrap_or_default() {
             ExpireTime::Seconds(n) => n,
             _ => 0,

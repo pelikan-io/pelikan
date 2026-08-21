@@ -53,25 +53,35 @@ and a core, and write the thin crate that wires them together.
 
 [![Pelikan threading architecture](diagrams/threading.svg)](diagrams/threading.svg?raw=1)
 
-Three panels, one per thread model. Thread names are the literal names the
-code registers — what you see in `top -H` is what the chart says:
+The chart starts with the cache-server I/O scheduling fork, then shows the
+common server storage topology and the proxy runtime. Thread names are the
+literal names the code registers — what you see in `top -H` is what the chart
+says:
 
-- **Single worker**: `pelikan_listener` accepts connections and hands
-  sessions over a queue to one `pelikan_work` thread that parses, executes
-  against thread-local storage, and responds.
-- **Multiple workers**: parsing moves to `pelikan_work_0..n-1`; storage
-  execution is centralized in a dedicated `pelikan_storage` thread. The
-  difference from the single-worker model reads as the storage modules
-  migrating out of the worker box.
+- **Cache-server I/O**: Mio accepts on `pelikan_listener` and drives
+  `pelikan_work_i` callback state machines after a session-queue handoff.
+  Ringline accepts on `ringline-acceptor` and schedules async connection tasks
+  on `ringline-worker-*` threads. This fork changes I/O scheduling, not storage
+  ownership.
+- **Server storage**: whichever backend is active, every data-plane worker
+  parses, executes, and responds directly against one internally synchronized
+  engine shared through an `Arc`. The storage chips therefore appear in every
+  worker box, with no storage thread or request/response storage queues. The
+  `[worker] threads` config option is a scaling knob, not a mode switch: `1`
+  (the default) is simply n = 1 of the same model. There is no maintenance
+  thread either — the engine treats expired items as missing on access and
+  reclaims expired segments under write pressure.
 - **Proxy**: frontend threads (`pelikan_fe_i`) face clients, backend threads
   (`pelikan_be_i`) face upstream servers, connected by object queues.
 
-Cache servers select the data-plane I/O backend once during startup. `mio` is the portable default; on Linux, `server.io_backend = "ringline"` attempts a Ringline acceptor and `ringline-worker-*` task runtime before traffic is accepted. Unsupported kernel setup falls back to Mio and records both the requested and active backend. TLS, admin, and proxy sockets remain on Mio, and a live Ringline process never migrates established connections.
-
-Within either backend, the worker count picks between the first two storage models: the `[worker] threads`
-config option spawns the single-worker model at `1` (the default) and the
-multi-worker model — workers plus the dedicated storage thread — above it.
-
+Cache servers select the data-plane I/O backend once during startup. `mio` is
+the portable default; on Linux, `server.io_backend = "ringline"` attempts a
+Ringline acceptor and `ringline-worker-*` task runtime before traffic is
+accepted. Unsupported kernel setup falls back to Mio, reusing the same shared
+storage `Arc`, and records both the requested and active backend. TLS, admin,
+and proxy sockets remain on Mio, and a live Ringline process never migrates
+established connections. The admin `FlushHandle` also clones the shared `Arc`;
+`flush_all` clears that one engine synchronously before acknowledging success.
 Two conventions carry the meaning: heavier edges are bytes crossing the
 process boundary (the wire); thin edges are internal queues — accepted
 sessions from the listener, parsed request/response objects everywhere
@@ -89,9 +99,9 @@ code's own verbs: `receive` (read + parse), `execute`, `send` (compose),
 `flush`. The stage pitch is uniform across panels, so the panels compare
 column by column and the differences that remain are the real ones:
 
-- In the **single worker** model all four stages run on one thread.
-- In the **multiple workers** model stage ② dips into `pelikan_storage` —
-  two queue crossings buy centralized storage.
+- On a **server**, all four stages run in whichever Mio callback or Ringline
+  connection task owns the session; stage ② executes directly against the
+  `Arc`-shared engine, so the request crosses no storage queue.
 - In the **proxy**, the request leaves through a backend thread to the
   upstream *servers* and the response retraces the path — six stages, with
   one queue crossing outbound (frontend → backend) and one on the return.
@@ -129,7 +139,7 @@ carries it.
 
 **Server cores** (`src/core/`)
 - `admin/` — the admin thread every binary runs
-- `server/` — listener/worker/storage event loops, thread management, signal
+- `server/` — listener/worker event loops, thread management, signal
   handling
 - `proxy/` — frontend/backend event loops for proxies
 
@@ -139,8 +149,9 @@ carries it.
 
 ## Design Principles
 
-- **Workers never block.** Threads communicate over lockless queues; the data
-  plane holds no locks that a slow peer can convert into tail latency.
+- **Workers never block.** Threads communicate over lockless queues, and the
+  workers share a lock-free storage engine; the data plane holds no locks
+  that a slow peer can convert into tail latency.
 - **Control and data plane separation.** Management traffic (stats, version,
   shutdown) rides its own thread and port (9999 by default), so an operator
   inspecting a saturated server is not competing with cache traffic.

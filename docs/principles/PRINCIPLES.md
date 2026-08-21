@@ -312,6 +312,141 @@ Eight ideas recur across the parts above and are arguably the deepest layer of t
 
 ---
 
+## Part X — Build, Borrow, and the Price of Experimentation
+
+*Parts X–XVII were added in a follow-up session (August 2026), conducted per the method in the companion README; Part IX's synthesis predates them. Part X's territory the expert marks as explicitly unsettled — coding agents have disrupted the conventional wisdom on reuse and the dust has not settled — so its principles are dated positions, not settled physics.*
+
+### P42. Build-versus-wrap is no longer decided on priors: generate the challenger and run a quantified comparison.
+
+**Rationale.** Historically the decision ran on priors because trying both was unaffordable. The prevailing default — use existing code and wrap the gap — accretes layer and dependency proliferation and unnecessary complexity; the contrarian default, NIH, yields undermaintained in-house code that loses long-term to the third-party ecosystem's investment and focus. Coding agents collapse the cost of authoring a challenger, so the decision can run on measurement instead: generate your own candidate, compare quantitatively against the existing alternative, decide with numbers in hand. Throwaway code stops being waste — it is the purchase price of doubt-removal or opportunistic optimization. "What if" is now affordable to ask literally.
+
+**Continuity.** This is P23's measure-the-incumbent extended to dependencies — the library is an incumbent, and now its challenger is affordable — with P32's ablation discipline applied at authorship time.
+
+### P43. A dependency decision with a live contender is a control loop, not a verdict: register a recurring reassessment, and give it friction.
+
+**Rationale.** The real NIH hazard was never authoring cost but the maintenance tail — in-house code silently rotting while the ecosystem compounds. The answer is not a maintenance estimate at decision time but a loop: wherever a contender exists or could plausibly emerge, put up a recurring reassessment task, captured in the repository in a form agents can schedule and carry out. Undermaintenance stops being a silent hazard and becomes a measured regression detected at the next reassessment, upon which the decision can flip. This joins P41's nested-loop family as a new slowest band (code provenance, cadence of months), and the registered task joins P18's formal artifacts: inspectable, diffable, reversible.
+
+**Friction.** The loop must not thrash — migration is never free — so incumbency earns a deliberate stability preference, whichever side holds it. No universal flip margin exists; the benchmark's number is weighed against terms the benchmark cannot see: control over code and change cadence, solution complexity, customizability, familiarity. Judgment within structure, again.
+
+### P44. The rule of two: explore an abstraction when two implementations can be summarized as the same thing. Review scans for the pairs; the adoption bar stays judgment.
+
+**Rationale.** Agents are prolific at recreating similar code, so near-duplicates now arrive fast and correlated. Two was always the informational floor — one implementation cannot exhibit a pattern — and the traditional threshold of three was two plus a cost markup for expensive exploration; with the markup gone, the exploration threshold settles onto the floor. The similarity test is semantic, not textual: two implementations whose summaries collapse into one sentence, which catches twins that share no tokens. The consolidation is then explored by building it — cheap, per P42 — and "helpful versus overly eager" is judged on the artifact, not in the abstract.
+
+**Example, from this repository.** The four product entry points (`pingserver`, `segcache`, `rds`, `pingproxy`) carried 477 lines across four `main.rs` files with one summary: "launch a Pelikan product with its config." Consolidating them into a `pelikan_main!` macro (net −235 lines, behavior verified byte-identical by golden-file comparison) also *surfaced an accidental asymmetry*: one product had drifted — config errors to stdout without the standard prefix, panic hook logging through a different channel. The copies could not hold the symmetry; the abstraction enforces it. Duplication does not just cost lines; it lets siblings diverge silently.
+
+### P45. Decision rules silently encode a price of experimentation; when that price collapses, re-derive them from their information content.
+
+Defaults become experiments (build-vs-wrap → build the challenger and measure, P42); thresholds fall to their informational floors (rule of three → rule of two, P44); one-shot bets become control loops (dependency choice → registered reassessment, P43). The judgment bars — what is worth keeping, what is overly eager — do not move; only the cost markup around them does. (Interviewer synthesis, confirmed on review.)
+
+**Boundary.** Two limits, from the confirming ruling. First, the price collapsed but did not reach zero: some experiments remain prohibitively expensive — boil-the-ocean optimization studies among them — so the re-derivation is gated per decision by what the experiment actually costs now, not by a blanket assumption of cheapness; P35's ocean-boiling discipline survives the era shift intact. Second, an identity boundary: when the winning change would revamp the project past recognition — the majority of the code becoming new — the honest move is no longer "making changes" but starting from scratch: a new skeleton designed with the old system as its measured incumbent (P23), rather than a rewrite wearing an increment's clothing.
+
+---
+
+## Part XI — Faithful Workload Capture
+
+### P46. Aggregation is lossy compression designed around known attributes — so capture the workload itself, because unknown attributes are not guaranteed to survive.
+
+**Rationale.** Compression quality is measured against declared desiderata; an aggregation schema therefore guarantees survival only of the attributes someone named at design time. But the questions that produce breakthroughs are, by definition, about attributes nobody had named yet. The canonical casualty is reuse distance: it lives in the ordering and identity structure of the full interleaved request stream, is almost never preserved by any population-level aggregation, and is the foundational quantity of cache analysis — working sets, miss-ratio curves, and the TTL behavior that motivated Segcache all stand on it.
+
+**Example.** klog — the full-rate command logger whose affordability P30 measured — produced the public cache-trace dataset, which fed analyses and eviction-algorithm work years later, answering questions whose denominators did not exist when any reasonable metrics schema would have been declared. The trace outlives the questions its collectors knew to ask.
+
+**Relation to Part VI.** This is P25's logic run in reverse: the KPI contract closes an open-ended denominator by declaration because operations needs verifiable coverage now; workload capture refuses to close the denominator because learning needs questions that do not exist yet. Same problem — what to keep from an infinite signal — opposite resolutions, selected by whether the consumer is the present operator or the future researcher. P28's payload rule, applied to the service's entire workload.
+
+**Boundary: every reduction is itself a lossy codec — name what it forecloses, then judge the loss.** There is no clean fidelity line below which nothing is lost, but the losses are not equal. Anonymization preserves identity-*equality* (hashed keys keep reuse distance, working sets, miss-ratio curves alive) while destroying identity-*semantics*: any analysis joining keys to entity classes — which type of users see consistent cache behavior — is foreclosed, because the meaning of the key is masked. The expert's verdict on that trade: for access-pattern analysis the keys themselves carry little value and the values none at all, so hash the keys and drop the values with little loss — the high-value payload is identity, ordering, timing, size, TTL, and operation type. The discipline stands regardless of the verdict: treat each capture reduction (anonymize, sample, truncate, drop values) as a compressor with a named survival set, and choose reductions by naming the question classes being given up — the degrade-loudly ethic applied to data collection. Retention economics (how long traces are kept) was left open in the interview.
+
+---
+
+## Part XII — Symmetry
+
+### P47. Symmetry is the default; asymmetry needs an explanation — that's mostly it.
+
+**Rationale.** Symmetry names a family of pairings at every altitude — interface (getter/setter, read/write, encode/decode), structural (sibling products sharing a shape), vocabulary (naming, config, metric taxonomies) — and each pairing is a promise to the reader: what you learned about one side transfers to the other. Two mechanisms make the default load-bearing rather than aesthetic. First, amortized comprehension: cognitive load scales with the number of patterns, not the number of components — learn one product's launch path, know all four. Second, and sharper: **unjustified asymmetry is a defect indicator.** Divergence that encodes no intentional difference is presumed drift or bug, which makes symmetry a reviewable, lintable prior — kin to P27's "swallowing is the sin": symmetrize, or explain.
+
+**Example.** The consolidation in P44's case study did not just remove duplication; it *detected a defect through the asymmetry rule*. One of four sibling entry points had drifted — config errors to stdout without the standard prefix, panic output through a different channel. Each file read fine locally; the divergence encoded no intent and nobody could explain it, and under this principle that presumption — unexplained asymmetry, presumed defect — was correct. (A follow-on, from the same experiment, offered as near-synthesis the expert has seen demonstrated rather than stated: hand-maintained symmetry decays — the four copies were symmetric the day each was written — so durable symmetry is enforced by structure: a shared macro, a lint, a generator. Discipline drifts; structure holds.)
+
+**Boundary.** Asymmetry is earned by a real difference in role or environment, and the explanation should trace to it: a server decodes requests and encodes responses, never the reverse — justified, the role selects which half of the codec exists; a metrics library interfacing with a slow scraper chooses pull over push — justified by the consumer's properties. The rule is deliberately one-directional: the interviewer proposed the mirror sin — that interface symmetry over large behavioral asymmetry (get/set as visual peers at 100× cost difference; read/write as twins when P5 and P16 treat them as different decisions) should force visible interface asymmetry — and the expert declined the escalation. Symmetric interfaces over asymmetric physics remain a legitimate design choice; the behavioral gap is carried by the document's other instruments (cost models, seam maps, workload characterization), not by uglifying the interface. Asymmetry needs an explanation; symmetry doesn't.
+
+---
+
+## Part XIII — Storage
+
+*Numbers in this part are measurements from the Segcache paper (Yang, Yue, Vinayak, NSDI '21) and its Twitter production-trace analysis, cited during the interview rather than recalled.*
+
+### P48. Design insights come from data, not doctrine: hunt for the salient workload property the canon has overlooked.
+
+**Rationale.** Conventional wisdom encodes the salient properties of the workloads it was formed on; your production workload may have a different one, and the way to find it is measurement — neither deferring to convention nor being contrarian for its own sake, since contrarianism is just convention with the sign flipped and both substitute posture for data. The claim is deliberately weaker than "the overlooked property wins": TTL-centric design was not a doctrine that all caches ride expiration to victory, but the recognition — in trace data — that a universal production property had no research answer.
+
+**The exemplar.** TTLs were mandated on every Twitter in-memory cache workload (one minute to one month) and pervasive industry-wide, yet at the time there was no academic research on proactive expiration — while eviction ranking accumulated decades of refinement. Production had grown four folk remedies (LRU-tail checking, transient object pools, full scans, random sampling), each flawed; practitioners already knew the stakes (Memcached's maintainer: pulling expired items out actively beats "almost any other algorithmic improvement" on eviction). The ablation later quantified it: proactive expiration alone cut miss ratio by up to 35%.
+
+**Where overlooked properties hide — the blind-spot mechanism.** Two hiding places, both structural. In the evaluation corpus: research systems "do not consider TTLs in their design" because the shared benchmarks and traces didn't carry the dimension — the canon cannot rank what its data lacks (P46: attributes survive only in faithful capture). And behind lazy mechanisms: lazy expiration leaves dead objects invisible to every watched metric — the memory is wasted only until reaccess, which for dead objects never comes — so the cost never appears in the dashboards the field optimizes against.
+
+### P49. Storage is a system, not an algorithm: effectiveness is algorithm quality times implementation efficiency, and unpriced sophistication loses.
+
+**Rationale.** Implementing an algorithm inside a system consumes the very resources the algorithm is optimizing — metadata bytes displace cacheable payload, compute per operation caps throughput, synchronization surfaces at the tail — so the quality of the algorithm and the efficiency of its resource utilization jointly determine the effectiveness of the implemented solution. Many sophisticated algorithms never priced their own implementation, which is why they never got adoption or could not live up to their theoretical promise.
+
+**The arithmetic.** Memcached spends 56 bytes of metadata per object (two LRU pointers, a hash pointer, access and expiry times, size, cas) against mean object sizes of 230, 55, 294, and 72 bytes in Twitter's top four clusters — bookkeeping rivaling cargo — and "research aimed at reducing miss ratio typically ends up expanding object metadata even further." The evaluated exemplars: r-LHD and r-Hyperbolic sometimes beat LRU on miss ratio yet ran 3–4× slower than Segcache, their sampling-based eviction defeating CPU cache locality — and LHD's proposed remedy, segregating metadata for locality, requires *more* metadata: the fix for the compute tax is paid in memory tax. (r-LHD also underperformed on miss ratio itself, having been fitted to scan-heavy block workloads that in-memory cache traffic rarely exhibits — P16's workload-decides rule at the algorithm level.) Segcache's positive case ran the other direction: 5 bytes of per-object metadata (91% reduction), 22–60% less memory than state-of-the-art designs (up to 88% versus slab-based PCache), near-linear thread scaling — won not by a smarter ranking function but by making expiration, metadata, and locality the design itself.
+
+**The denominator rule.** Evaluate algorithms at the system level: miss ratio per byte of *total* memory including metadata, throughput per core at production line rate, scalability under the real synchronization structure. This is P14's cost model — where data lives and moves, not operation counts — applied to algorithm selection, and P32's ablation pricing applied to sophistication.
+
+**Boundary.** Sophistication earns its overhead in parameter regimes that flip the sign of the trade: objects large enough that per-object metadata amortizes to noise; misses expensive enough that hit-ratio gains dominate any implementation tax; offline or simulation settings where the implementation cost is not paid at line rate. But the list is illustrative, not exhaustive, because the deeper rule is that in systems everything is connected and every decision is a tradeoff — change the parameters and their values, and the overall outcome can be entirely different. There is no universal boundary; the system-level comparison under *your* parameters is the boundary-finder. Same architecture, opposite verdicts, the workload decides (P16) — here applied to the algorithm itself.
+
+### P51. Storage design is open-ended, so it must be workload-driven: no structure serves opposing access patterns near-optimally.
+
+**Rationale.** Every storage layout is a bet on an access pattern, and the bets conflict in pairs: it is almost impossible to design something near-optimal for both read-heavy and write-heavy workloads, or that handles append-mostly lists as well as insert-anywhere lists. Read-optimization wants dense, indexed, locality-friendly placement; write-optimization wants append paths and amortized reorganization; the two pull the core structure in opposite directions, and the same holds pairwise across the design space. Because the space is extremely open-ended — there are always more structures, hybrids, and parameterizations — no amount of cleverness converges on a universal optimum. The workload is what closes the open-endedness: characterize it first (P23), design to it (P16), bind the choice early (P17), and treat the opposing regime as a different design rather than a tuning target. P48 and P49 are instances; this is the reason the storage part cannot be a list of best structures, only a method.
+
+**The invariants that survive the open-endedness.** Workload decides the structure; hardware decides the idiom. A few leans hold across workloads because they come from the machine, not the access pattern: favor linear scan over random access, especially at cacheline scale — the prefetcher and the cache hierarchy pay sequential readers and tax random ones (P14); array over map whenever possible — contiguity and index arithmetic over pointer chases and per-entry overhead; and minimize locking (P2). The evaluation above is these invariants measured: Segcache's and PCache's throughput lead came from batched, sequential bookkeeping, while the research systems' random sampling defeated CPU cache locality. Choose the structure by workload; implement whatever is chosen in the hardware's preferred idiom.
+
+---
+
+## Part XIV — Clients and Middleware
+
+### P50. The client is a control surface of the fleet: put control-loop state on the managed side of the management boundary, and reach the rest through defaults.
+
+**Rationale.** The behaviors that decide whether an incident amplifies or damps — retry policy, backoff, connection lifecycle, timeout attribution — execute on clients: P5's cache-DDoS cascade is client-authored end to end, with the server fleet as victim. A fleet whose clients are uncontrolled has uncontrolled stability. The placement rule that follows: complexity and state belong where the operator can manage, version, and observe them. Fat clients (finagle-memcached) are viable only in a monoculture — one organization, one deploy pipeline, where the client fleet upgrades like a server fleet. In SaaS and polyglot settings the client population is unmanageable by construction (long-tail versions, every language's improvised retry logic, no upgrade lever), so complexity is contained in middleware — proxies, gateways, sidecars — and clients are kept too simple to misbehave. This is plane separation (Part IX) applied across the organizational trust boundary; twemproxy and finagle-memcached are the two answers for the two settings, from the same shop.
+
+**The irreducible contract.** The thin client cannot be empty: beyond basic correctness, timeout, retry behavior, and concurrency must still be gotten right client-side — only the caller can enforce its own deadline. For those, the lever over an unmanaged population is authorship of defaults: providers ship SDKs whose good defaults make client behavior statistically predictable, versus bring-your-own-client. You cannot upgrade their deployments, but you can write their starting point — P13's "what are good defaults?" promoted from module hygiene to fleet-stability control, and most users never change them.
+
+**Boundary.** The monoculture legitimizes the fat client. The middleware's own tax is real — an extra hop on every request, plus a new fleet with its own capacity loop (P41) to operate; where exactly that tax stops being worth paying, beyond the monoculture case, was left open in the interview.
+
+---
+
+## Part XV — Data Placement
+
+### P52. Movement-minimizing mapping is table stakes; skew is mitigated on top, and the mitigation must sit upstream of the bottleneck.
+
+**Rationale.** Placement has two layers. The base layer is an indirect, movement-minimizing key mapping — consistent hashing's primary property, shared by CRUSH and every other indirect mapping design — and it is table stakes, not cleverness: minimal movement on membership change is what makes live migration possible at all. (The interviewer proposed "consistent hashing is over-credited since its virtue is merely operational"; the expert inverted it — the operational property is the point.) Hot keys are then a problem this base layer does not solve and was never meant to: with Zipfian key popularity, skew is the norm, and mitigation is layered on top of the mapping.
+
+**The placement rule for mitigations: upstream of the choke point.** Which mitigations can work is dictated by which resource saturates. If network traffic is the bottleneck, client-side mitigation is the only choice — the bytes must never enter the network, so the fix is client-local caching or coalescing; server-side replication only rearranges traffic that is already the problem. If server resources bind, the server has levers: read-only replicas, shard resizing. This is P30's front-door rule generalized — a defense is effective only upstream of the saturated resource — and it names the legitimate exception to P50's thin-client lean: when the network is the bottleneck, mitigation *must* live client-side, which is exactly why it belongs in the provider's SDK defaults rather than in bring-your-own-client improvisation.
+
+---
+
+## Part XVI — Multi-Tenancy
+
+### P53. Multi-tenancy is a two-key decision — SLO decides compatibility, resource profiles decide merit — and the machinery is additive, never free.
+
+**Rationale.** The efficiency case is real: tenants with complementary resource profiles — one storage-bound, one throughput-bound — bind different resources and raise utilization when combined. The anti-case is equally real: some colocations introduce tension that cannot be easily mitigated, very small objects sharing a fleet with very large ones being the canonical pair. The decision therefore takes two keys in order: SLO decides the *compatibility* of tenants — whether they can coexist at all — and their resource profiles determine the *merit* of actually combining them — whether coexistence pays.
+
+**The machinery tax.** Even when multi-tenancy yields efficiency gains, the machinery is different from and additive to the single-tenant case: QoS, accounting by tenant, dynamically scoped metrics. Blindly mixing tenants without it is a hazard, not an efficiency — this is P49's rule (sophistication must be priced, including its implementation) applied to an operating model rather than an algorithm. And the accounting is not optional bookkeeping: without per-tenant attribution, P4's noisy-neighbor misattribution becomes permanently unresolvable, and the tenant dimension never enters the KPI contract (P25).
+
+---
+
+## Part XVII — Game Days
+
+### P54. A game day is an operator-run round trip over the cliff: push past, pull back, and let the observed asymmetry pick the standing posture.
+
+**Rationale.** The operator should push the service over the cliff and then pull it back, to see whether that is possible at all — P33's round-trip drill executed as human rehearsal rather than load-test instrumentation, so one act exercises both the system's physics and the operators' workflow. What the return leg shows selects among four standing responses, graded by the asymmetry between entry and return:
+
+- **Perfect symmetry** — the service comes back from overload exactly as it went in: do nothing; the seam is elastic and brief excursions are survivable.
+- **Mild asymmetry** — over-correction: a milder version of reset (kin to P36's overshoot-the-shed), nudging the system back rather than trusting it to settle.
+- **Scarring** — reset the state instead of assuming the system is now healthy: P6's scars are present, and P7's controlled-restart workflow is the honest recovery.
+- **No return** — set buffers so the cliff is never crossed in production: P35's do-not-operate band made binding, with alerts and shedding armed inside it.
+
+The diagnostic is P47 turned operational: the in/out asymmetry is the measured degree of metastability, and the response menu is sized to it. A game day that never crosses the cliff rehearses nothing — the whole point is to learn, at a chosen time with hands on the controls, which of the four postures the system's physics demands, instead of discovering it during an incident.
+
+---
+
 ## Noted gaps (candidates for future sessions)
 
 Two adjacent topics are deliberately left out: team and organizational dynamics beyond P21, and the security dimension of these services beyond P30's adversary-aware logging. The stated reason is that they are hard to generalize — both are dominated by context (organization, threat model, team composition) rather than by the service class, so principles claimed at this document's level of generality would either be platitudes or false. This is the scope discipline of the preamble applied to the document itself. Smaller residuals: human rehearsal of recovery workflows (game days for the operators rather than the system) was only gestured at alongside P40; and correctness/consistency is not a gap at all — with the scope refined to real-time data services, best-effort semantics are part of the archetype, and that deferral is by design.
+
+From the August 2026 follow-up session (Parts X–XVII), still open: trace retention economics (P46); the middleware-tax boundary beyond the monoculture case (P50). Migration principles were explicitly deferred by the expert to a later session, with one seed recorded: the central question of change is whether it can be undone, and undo has multiple implementations — rollback compatibility is one, redundancy (live-live clusters with dynamic load balancing, shadow traffic) is another.

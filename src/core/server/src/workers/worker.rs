@@ -5,19 +5,23 @@
 use super::*;
 use std::collections::VecDeque;
 
-pub struct SingleWorkerBuilder<Proto, Request, Response, Storage> {
+pub struct WorkerBuilder<Proto, Request, Response, Storage> {
     nevent: usize,
     protocol: Proto,
     pending: VecDeque<Token>,
     poll: Poll,
     sessions: Slab<ServerSession<Proto, Response, Request>>,
-    storage: Storage,
+    storage: Arc<Storage>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Proto, Request, Response, Storage> SingleWorkerBuilder<Proto, Request, Response, Storage> {
-    pub fn new<T: WorkerConfig>(config: &T, protocol: Proto, storage: Storage) -> Result<Self> {
+impl<Proto, Request, Response, Storage> WorkerBuilder<Proto, Request, Response, Storage> {
+    pub fn new<T: WorkerConfig>(
+        config: &T,
+        protocol: Proto,
+        storage: Arc<Storage>,
+    ) -> Result<Self> {
         let config = config.worker();
 
         let poll = Poll::new()?;
@@ -49,8 +53,8 @@ impl<Proto, Request, Response, Storage> SingleWorkerBuilder<Proto, Request, Resp
         self,
         session_queue: Queues<Session, Session>,
         signal_queue: Queues<(), Signal>,
-    ) -> SingleWorker<Proto, Request, Response, Storage> {
-        SingleWorker {
+    ) -> Worker<Proto, Request, Response, Storage> {
+        Worker {
             nevent: self.nevent,
             protocol: self.protocol,
             pending: self.pending,
@@ -65,7 +69,7 @@ impl<Proto, Request, Response, Storage> SingleWorkerBuilder<Proto, Request, Resp
     }
 }
 
-pub struct SingleWorker<Proto, Request, Response, Storage> {
+pub struct Worker<Proto, Request, Response, Storage> {
     nevent: usize,
     protocol: Proto,
     pending: VecDeque<Token>,
@@ -73,12 +77,12 @@ pub struct SingleWorker<Proto, Request, Response, Storage> {
     session_queue: Queues<Session, Session>,
     sessions: Slab<ServerSession<Proto, Response, Request>>,
     signal_queue: Queues<(), Signal>,
-    storage: Storage,
+    storage: Arc<Storage>,
     timeout: Duration,
     waker: Arc<Waker>,
 }
 
-impl<Proto, Request, Response, Storage> SingleWorker<Proto, Request, Response, Storage>
+impl<Proto, Request, Response, Storage> Worker<Proto, Request, Response, Storage>
 where
     Proto: Protocol<Request, Response> + Clone,
     Request: Klog + Klog<Response = Response>,
@@ -185,8 +189,6 @@ where
         loop {
             WORKER_EVENT_LOOP.increment();
 
-            self.storage.expire();
-
             // we need another wakeup if there are still pending reads
             if !self.pending.is_empty() {
                 let _ = self.waker.wake();
@@ -239,20 +241,6 @@ where
                             // trigger a wake-up in case there are more sessions
                             let _ = self.waker.wake();
                         }
-
-                        // check if we received any signals from the admin thread
-                        while let Some(signal) = self.signal_queue.try_recv() {
-                            match signal.into_inner() {
-                                Signal::FlushAll => {
-                                    self.storage.clear();
-                                }
-                                Signal::Shutdown => {
-                                    // if we received a shutdown, we can return
-                                    // and stop processing events
-                                    return;
-                                }
-                            }
-                        }
                     }
                     _ => {
                         if event.is_error() {
@@ -279,6 +267,33 @@ where
                                 continue;
                             }
                         }
+                    }
+                }
+            }
+
+            // check if we received any signals from the admin thread. this is
+            // drained once per event-loop iteration (try_recv on an empty
+            // queue is cheap) so signals are handled promptly even without a
+            // waker event
+            while let Some(signal) = self.signal_queue.try_recv() {
+                match signal.into_inner() {
+                    Signal::FlushAll => {
+                        // Nothing to do. The storage is a shared `Arc`, so one
+                        // sweep clears it for every worker, and the admin
+                        // thread performs that sweep itself before acking the
+                        // client — see the `flush_all` handler in
+                        // `core/admin`. Clearing here as well would repeat a
+                        // ~6-8 ms sweep N times and, worse, let a worker that
+                        // finished early ack writes which a still-sweeping
+                        // sibling then destroys.
+                        //
+                        // The server never sends this signal any more; the arm
+                        // remains because `Signal` is shared with the proxy.
+                    }
+                    Signal::Shutdown => {
+                        // if we received a shutdown, we can return
+                        // and stop processing events
+                        return;
                     }
                 }
             }

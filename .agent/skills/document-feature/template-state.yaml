@@ -5,12 +5,12 @@ template:
   version: 0.1.0
 source:
   repository: https://github.com/iopsystems/skills-mcp
-  commit: 106daa7819a333fa238c424478542a71d6228e62
+  commit: 0be4d46be9f641563f01b33aae0aa293a3c4a043
 base:
-  aggregate_sha256: d27f6594f7cbc7ed7a379bdec16d53031ca039a5e01e3b89f1feb9166f9389a7
+  aggregate_sha256: 0912f10292270d4e7c7fa56dbca3329425545de04fe019ac603e7ee0aa84a97a
   files:
     - path: SKILL.md
-      sha256: c1b1b6a2af47e7e214893291945d2f8767896a1c5308ed72706f54f085cb7cd7
+      sha256: 3e4bd3f1646571d58f6a73e51066718dd46005c4c5abd46adf423091d666f6cb
       merge_strategy: three-way
     - path: references/audience-charter.md
       sha256: 5113f77e70bffe7016e2e07c24a5bfc07fa9c9722f716b082e7167a0042b2579
@@ -19,7 +19,7 @@ base:
       sha256: e7362e80465d30345a1f0f23073eebb099ea97030bbddadc7a34676be5954dfb
       merge_strategy: preserve-local
 installed_at: 2026-08-09
-last_upgraded_at: null
+last_upgraded_at: 2026-09-01
 customizations:
   - path: references/audience-charter.md
     rationale: filled placeholder charter with pelikan project profile (audiences, sources of truth, verification commands, diagram tooling, review gates) for README documentation work

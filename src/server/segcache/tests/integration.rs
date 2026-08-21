@@ -75,6 +75,7 @@ fn run_backend(backend: &str) {
     tests();
     conformance_tests();
     admin_tests();
+    flush_all_tests();
     let started = Instant::now();
     server.shutdown();
     assert!(started.elapsed() < Duration::from_secs(2));
@@ -82,7 +83,11 @@ fn run_backend(backend: &str) {
     assert!(TcpStream::connect(admin).is_err(), "admin listener leaked");
 }
 
-#[cfg(all(feature = "ringline", target_os = "linux"))]
+#[cfg(all(
+    feature = "ringline",
+    not(feature = "ringline-force-mio"),
+    target_os = "linux"
+))]
 fn tls_requested_ringline_uses_mio() {
     let mut config = configure("ringline");
     config.tls_mut().set_private_key(concat!(
@@ -149,6 +154,7 @@ fn main() {
     #[cfg(all(feature = "ringline", target_os = "linux"))]
     {
         run_backend("ringline");
+        #[cfg(not(feature = "ringline-force-mio"))]
         tls_requested_ringline_uses_mio();
         repeated_ringline_startup_releases_resources();
     }

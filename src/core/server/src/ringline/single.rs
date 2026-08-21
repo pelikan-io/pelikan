@@ -9,9 +9,7 @@ use std::any::Any;
 use std::cell::RefCell;
 use std::io;
 use std::marker::PhantomData;
-use std::sync::atomic::{AtomicBool, Ordering};
-
-static FLUSH_REQUESTED: AtomicBool = AtomicBool::new(false);
+use std::sync::Arc;
 
 pub(super) fn record_receive(observed: usize, buffered: &mut usize) {
     SESSION_RECV.increment();
@@ -34,56 +32,17 @@ pub(super) fn record_send_bytes(bytes: usize) {
     SESSION_SEND_BYTE.add(bytes as u64);
 }
 
-pub(crate) fn request_flush() {
-    FLUSH_REQUESTED.store(true, Ordering::Release);
-}
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::Arc;
-
 thread_local! {
     static WORKER_STATE: RefCell<Option<Box<dyn Any>>> = RefCell::new(None);
 }
 
 pub(crate) struct WorkerBootstrap<P, Storage> {
-    protocol: Option<P>,
-    storage: Option<Storage>,
-    committed: Arc<AtomicBool>,
-    recovery: Sender<(P, Storage)>,
+    protocol: P,
+    storage: Arc<Storage>,
 }
 
 struct WorkerState<P, Storage> {
     bootstrap: WorkerBootstrap<P, Storage>,
-}
-
-impl<P, Storage> Drop for WorkerBootstrap<P, Storage> {
-    fn drop(&mut self) {
-        if !self.committed.load(Ordering::Acquire) {
-            if let (Some(protocol), Some(storage)) = (self.protocol.take(), self.storage.take()) {
-                if let Err(error) = self.recovery.send((protocol, storage)) {
-                    error!("failed to return Ringline startup state for fallback: {error}");
-                }
-            }
-        }
-    }
-}
-
-pub(crate) struct StartupRecovery<P, Storage> {
-    committed: Arc<AtomicBool>,
-    receiver: Receiver<(P, Storage)>,
-}
-
-impl<P, Storage> StartupRecovery<P, Storage> {
-    pub(crate) fn commit(self) {
-        self.committed.store(true, Ordering::Release);
-    }
-
-    pub(crate) fn recover(self) -> io::Result<(P, Storage)> {
-        self.receiver.recv().map_err(|error| {
-            io::Error::other(format!(
-                "Ringline startup did not return worker state for mio fallback: {error}"
-            ))
-        })
-    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -112,11 +71,13 @@ impl SendAction {
     }
 }
 
-/// Single-worker Ringline handler.
+/// Ringline worker handler.
 ///
-/// All request state lives in worker thread-local storage. The function-pointer
-/// phantom keeps this value zero-sized without making it inherit the Send
-/// properties of the protocol, request, response, or storage types.
+/// Each worker receives its own protocol clone and a clone of the process's
+/// shared storage Arc. Request execution remains on the Ringline worker thread.
+/// The function-pointer phantom keeps this value zero-sized without making it
+/// inherit the Send properties of the protocol, request, response, or storage
+/// types.
 type HandlerTypes<P, Request, Response, Storage> = fn() -> (P, Request, Response, Storage);
 
 pub struct SingleHandler<P, Request, Response, Storage> {
@@ -124,31 +85,20 @@ pub struct SingleHandler<P, Request, Response, Storage> {
 }
 
 impl<P, Request, Response, Storage> SingleHandler<P, Request, Response, Storage> {
-    pub(crate) fn new(
+    pub(crate) fn bootstraps(
         protocol: P,
-        storage: Storage,
-    ) -> (
-        Self,
-        WorkerBootstrap<P, Storage>,
-        StartupRecovery<P, Storage>,
-    ) {
-        let committed = Arc::new(AtomicBool::new(false));
-        let (recovery, receiver) = mpsc::channel();
-        (
-            Self {
-                _types: PhantomData,
-            },
-            WorkerBootstrap {
-                protocol: Some(protocol),
-                storage: Some(storage),
-                committed: Arc::clone(&committed),
-                recovery,
-            },
-            StartupRecovery {
-                committed,
-                receiver,
-            },
-        )
+        storage: Arc<Storage>,
+        workers: usize,
+    ) -> Vec<WorkerBootstrap<P, Storage>>
+    where
+        P: Clone,
+    {
+        (0..workers)
+            .map(|_| WorkerBootstrap {
+                protocol: protocol.clone(),
+                storage: Arc::clone(&storage),
+            })
+            .collect()
     }
 
     fn install(bootstrap: WorkerBootstrap<P, Storage>)
@@ -184,14 +134,7 @@ impl<P, Request, Response, Storage> SingleHandler<P, Request, Response, Storage>
         P: Clone + 'static,
         Storage: 'static,
     {
-        Self::with_state(|state| {
-            state
-                .bootstrap
-                .protocol
-                .as_ref()
-                .cloned()
-                .ok_or_else(|| io::Error::other("Ringline worker protocol is unavailable"))
-        })
+        Self::with_state(|state| Ok(state.bootstrap.protocol.clone()))
     }
 
     fn process_with_session(
@@ -209,14 +152,7 @@ impl<P, Request, Response, Storage> SingleHandler<P, Request, Response, Storage>
             return Ok(ProcessOutcome::NeedMore);
         };
 
-        let response = Self::with_state(|state| {
-            let storage = state
-                .bootstrap
-                .storage
-                .as_mut()
-                .ok_or_else(|| io::Error::other("Ringline worker storage is unavailable"))?;
-            Ok(storage.execute(&request))
-        })?;
+        let response = Self::with_state(|state| Ok(state.bootstrap.storage.execute(&request)))?;
         PROCESS_REQ.increment();
         request.klog(&response);
         let hangup = response.should_hangup();
@@ -232,11 +168,15 @@ impl<P, Request, Response, Storage> SingleHandler<P, Request, Response, Storage>
     #[cfg(test)]
     fn for_test(protocol: P, storage: Storage) -> Self
     where
-        P: 'static,
+        P: Clone + 'static,
         Storage: 'static,
     {
-        let (handler, bootstrap, recovery) = Self::new(protocol, storage);
-        recovery.commit();
+        let handler = Self {
+            _types: PhantomData,
+        };
+        let bootstrap = Self::bootstraps(protocol, Arc::new(storage), 1)
+            .pop()
+            .expect("one test bootstrap");
         Self::install(bootstrap);
         handler
     }
@@ -260,7 +200,7 @@ where
     P: Protocol<Request, Response> + Clone + Send + 'static,
     Request: Klog<Response = Response> + 'static,
     Response: Compose + 'static,
-    Storage: Execute<Request, Response> + EntryStore + Send + 'static,
+    Storage: Execute<Request, Response> + EntryStore + Send + Sync + 'static,
 {
     #[allow(clippy::manual_async_fn)]
     fn on_accept(&self, conn: ConnCtx) -> impl std::future::Future<Output = ()> + 'static {
@@ -355,36 +295,6 @@ where
         }
     }
 
-    fn on_notify(&mut self, _ctx: &mut ringline::DriverCtx<'_>) {
-        if FLUSH_REQUESTED.swap(false, Ordering::AcqRel) {
-            if let Err(error) = Self::with_state(|state| {
-                state
-                    .bootstrap
-                    .storage
-                    .as_mut()
-                    .ok_or_else(|| io::Error::other("Ringline worker storage is unavailable"))?
-                    .clear();
-                Ok(())
-            }) {
-                error!("Ringline storage flush failed: {error}");
-            }
-        }
-    }
-
-    fn on_tick(&mut self, _ctx: &mut ringline::DriverCtx<'_>) {
-        if let Err(error) = Self::with_state(|state| {
-            state
-                .bootstrap
-                .storage
-                .as_mut()
-                .ok_or_else(|| io::Error::other("Ringline worker storage is unavailable"))?
-                .expire();
-            Ok(())
-        }) {
-            error!("Ringline storage expiration failed: {error}");
-        }
-    }
-
     fn create_for_worker(worker_id: usize) -> Self {
         let bootstrap = ringline::take_worker_bootstrap::<WorkerBootstrap<P, Storage>>(worker_id);
         Self::install(bootstrap);
@@ -403,6 +313,7 @@ mod tests {
     use std::cell::{Cell, RefCell};
     use std::io::{self, ErrorKind};
     use std::rc::Rc;
+    use std::sync::{Arc, Barrier, Mutex};
 
     #[derive(Clone, Default)]
     struct LineProtocol;
@@ -481,11 +392,11 @@ mod tests {
     }
 
     impl EntryStore for EchoStorage {
-        fn clear(&mut self) {}
+        fn clear(&self) {}
     }
 
     impl Execute<LineRequest, LineResponse> for EchoStorage {
-        fn execute(&mut self, request: &LineRequest) -> LineResponse {
+        fn execute(&self, request: &LineRequest) -> LineResponse {
             self.executions.set(self.executions.get() + 1);
             LineResponse {
                 bytes: request.0.clone(),
@@ -528,19 +439,121 @@ mod tests {
         assert_eq!(executions.get(), 0);
     }
 
+    #[derive(Default)]
+    struct SharedStorage {
+        values: std::sync::atomic::AtomicUsize,
+        execution_threads: Mutex<Vec<std::thread::ThreadId>>,
+    }
+
+    impl EntryStore for SharedStorage {
+        fn clear(&self) {
+            self.values.store(0, std::sync::atomic::Ordering::Release);
+        }
+    }
+
+    impl Execute<LineRequest, LineResponse> for SharedStorage {
+        fn execute(&self, request: &LineRequest) -> LineResponse {
+            self.execution_threads
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .push(std::thread::current().id());
+            let value = match request.0.as_slice() {
+                b"write" => {
+                    self.values
+                        .fetch_add(1, std::sync::atomic::Ordering::AcqRel)
+                        + 1
+                }
+                b"read" => self.values.load(std::sync::atomic::Ordering::Acquire),
+                command => panic!("unexpected test command: {command:?}"),
+            };
+            LineResponse {
+                bytes: value.to_string().into_bytes(),
+                hangup: false,
+            }
+        }
+    }
+
+    #[test]
+    fn shared_arc_flush_is_visible_to_every_direct_worker() {
+        let storage = Arc::new(SharedStorage::default());
+        let bootstraps =
+            SingleHandler::<LineProtocol, LineRequest, LineResponse, SharedStorage>::bootstraps(
+                LineProtocol,
+                Arc::clone(&storage),
+                2,
+            );
+        assert!(Arc::ptr_eq(&bootstraps[0].storage, &bootstraps[1].storage));
+
+        let writes_complete = Arc::new(Barrier::new(3));
+        let flush_complete = Arc::new(Barrier::new(3));
+        let workers: Vec<_> = bootstraps
+            .into_iter()
+            .map(|bootstrap| {
+                let writes_complete = Arc::clone(&writes_complete);
+                let flush_complete = Arc::clone(&flush_complete);
+                std::thread::spawn(move || {
+                    let worker_thread = std::thread::current().id();
+                    SingleHandler::<
+                        LineProtocol,
+                        LineRequest,
+                        LineResponse,
+                        SharedStorage,
+                    >::install(bootstrap);
+                    let handler: SingleHandler<
+                        LineProtocol,
+                        LineRequest,
+                        LineResponse,
+                        SharedStorage,
+                    > = SingleHandler {
+                        _types: std::marker::PhantomData,
+                    };
+                    assert!(matches!(
+                        handler.process(b"write\n").unwrap(),
+                        ProcessOutcome::Complete { .. }
+                    ));
+                    writes_complete.wait();
+                    flush_complete.wait();
+                    let ProcessOutcome::Complete { response, .. } =
+                        handler.process(b"read\n").unwrap()
+                    else {
+                        panic!("complete read must produce a response");
+                    };
+                    assert_eq!(response, b"0");
+                    worker_thread
+                })
+            })
+            .collect();
+
+        writes_complete.wait();
+        let flush = crate::process::storage_flush_handle(&storage);
+        flush();
+        flush_complete.wait();
+        let worker_threads: std::collections::HashSet<_> = workers
+            .into_iter()
+            .map(|worker| worker.join().unwrap())
+            .collect();
+        let execution_threads: std::collections::HashSet<_> = storage
+            .execution_threads
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .copied()
+            .collect();
+        assert_eq!(execution_threads, worker_threads);
+    }
+
     struct RecursiveStorage {
         nested_error: Rc<RefCell<Option<io::Error>>>,
-        recurse: bool,
+        recurse: Cell<bool>,
     }
 
     impl EntryStore for RecursiveStorage {
-        fn clear(&mut self) {}
+        fn clear(&self) {}
     }
 
     impl Execute<LineRequest, LineResponse> for RecursiveStorage {
-        fn execute(&mut self, request: &LineRequest) -> LineResponse {
-            if self.recurse {
-                self.recurse = false;
+        fn execute(&self, request: &LineRequest) -> LineResponse {
+            if self.recurse.replace(false) {
                 let handler =
                     SingleHandler::<LineProtocol, LineRequest, LineResponse, RecursiveStorage> {
                         _types: std::marker::PhantomData,
@@ -561,7 +574,7 @@ mod tests {
             LineProtocol,
             RecursiveStorage {
                 nested_error: Rc::clone(&nested_error),
-                recurse: true,
+                recurse: Cell::new(true),
             },
         );
 
@@ -594,11 +607,11 @@ mod tests {
         struct SendEchoStorage;
 
         impl EntryStore for SendEchoStorage {
-            fn clear(&mut self) {}
+            fn clear(&self) {}
         }
 
         impl Execute<LineRequest, LineResponse> for SendEchoStorage {
-            fn execute(&mut self, request: &LineRequest) -> LineResponse {
+            fn execute(&self, request: &LineRequest) -> LineResponse {
                 LineResponse {
                     bytes: request.0.clone(),
                     hangup: false,
@@ -609,11 +622,12 @@ mod tests {
         static LIVE_METRIC_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
         fn launch_live_handler() -> pelikan_net::ringline::RinglineRuntime {
-            let (_handler, bootstrap, recovery) =
-                SingleHandler::<LineProtocol, LineRequest, LineResponse, SendEchoStorage>::new(
-                    LineProtocol,
-                    SendEchoStorage,
-                );
+            let bootstraps = SingleHandler::<
+                LineProtocol,
+                LineRequest,
+                LineResponse,
+                SendEchoStorage,
+            >::bootstraps(LineProtocol, Arc::new(SendEchoStorage), 1);
             let runtime = pelikan_net::ringline::launch_with_bootstraps::<
                 SingleHandler<LineProtocol, LineRequest, LineResponse, SendEchoStorage>,
                 _,
@@ -626,10 +640,9 @@ mod tests {
                     recv_buffer_size: 4096,
                     pin_to_core: false,
                 },
-                vec![bootstrap],
+                bootstraps,
             )
             .expect("live Ringline launch failed");
-            recovery.commit();
             runtime
         }
 
@@ -723,18 +736,5 @@ mod tests {
             drop(stream);
             runtime.join().unwrap();
         }
-    }
-
-    #[test]
-    fn dropped_startup_bootstrap_returns_protocol_and_storage_for_fallback() {
-        let executions = Rc::new(Cell::new(0));
-        let (_handler, bootstrap, recovery) =
-            SingleHandler::<LineProtocol, LineRequest, LineResponse, EchoStorage>::new(
-                LineProtocol,
-                EchoStorage::new(Rc::clone(&executions)),
-            );
-
-        drop(bootstrap);
-        assert!(recovery.recover().is_ok());
     }
 }

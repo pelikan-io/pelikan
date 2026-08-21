@@ -2,7 +2,7 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-//! Runs the RDS conformance suite with two workers.
+//! Runs the Segcache conformance suite with eight workers.
 
 mod common;
 
@@ -21,7 +21,7 @@ fn configure(backend: &str) -> SegcacheConfig {
     config.server_mut().set_host("127.0.0.1");
     config.server_mut().set_port("0");
     config.server_mut().set_io_backend(backend);
-    config.worker_mut().set_threads(2);
+    config.worker_mut().set_threads(8);
     config.admin_mut().set_host("127.0.0.1");
     config.admin_mut().set_port("0");
     config
@@ -76,6 +76,7 @@ fn run_backend(backend: &str) {
     tests();
     conformance_tests();
     admin_tests();
+    flush_all_tests();
     let started = Instant::now();
     server.shutdown();
     assert!(started.elapsed() < Duration::from_secs(2));
