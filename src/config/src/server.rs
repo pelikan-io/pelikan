@@ -12,6 +12,7 @@ const SERVER_PORT: &str = "12321";
 const SERVER_TIMEOUT: usize = 100;
 const SERVER_NEVENT: usize = 1024;
 const SERVER_IO_BACKEND: &str = "mio";
+const SERVER_RINGLINE_MAX_CONNECTIONS: u32 = 16_000;
 
 // helper functions
 fn host() -> String {
@@ -34,6 +35,10 @@ fn io_backend() -> String {
     SERVER_IO_BACKEND.to_string()
 }
 
+fn ringline_max_connections() -> u32 {
+    SERVER_RINGLINE_MAX_CONNECTIONS
+}
+
 // definitions
 #[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Server {
@@ -47,6 +52,8 @@ pub struct Server {
     nevent: usize,
     #[serde(default = "io_backend")]
     io_backend: String,
+    #[serde(default = "ringline_max_connections")]
+    ringline_max_connections: u32,
 }
 
 // implementation
@@ -93,6 +100,16 @@ impl Server {
     pub fn set_io_backend(&mut self, backend: impl Into<String>) {
         self.io_backend = backend.into();
     }
+
+    /// Maximum number of connections per Ringline worker.
+    pub fn ringline_max_connections(&self) -> u32 {
+        self.ringline_max_connections
+    }
+
+    /// Set the maximum number of connections per Ringline worker.
+    pub fn set_ringline_max_connections(&mut self, max_connections: u32) {
+        self.ringline_max_connections = max_connections;
+    }
 }
 
 // trait implementations
@@ -104,6 +121,7 @@ impl Default for Server {
             timeout: timeout(),
             nevent: nevent(),
             io_backend: io_backend(),
+            ringline_max_connections: ringline_max_connections(),
         }
     }
 }
@@ -142,6 +160,19 @@ mod tests {
         let mut server = Server::default();
         server.set_io_backend("ringline");
         assert_eq!(server.io_backend(), "ringline");
+    }
+
+    #[test]
+    fn ringline_max_connections_defaults_to_production_capacity() {
+        let server: Server = toml::from_str("").unwrap();
+        assert_eq!(server.ringline_max_connections(), 16_000);
+    }
+
+    #[test]
+    fn ringline_max_connections_can_be_bounded_for_a_runtime_harness() {
+        let mut server = Server::default();
+        server.set_ringline_max_connections(128);
+        assert_eq!(server.ringline_max_connections(), 128);
     }
 
     #[test]
