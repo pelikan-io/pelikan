@@ -10,13 +10,11 @@ use signal_hook::iterator::Signals;
 use std::any::Any;
 #[cfg(all(feature = "ringline", target_os = "linux"))]
 use std::io;
+use std::marker::PhantomData;
 use std::thread::JoinHandle;
 
 #[cfg(all(feature = "ringline", target_os = "linux"))]
-use crate::ringline::{
-    all_response_wakes_attached, request_flush, response_channel, MultiHandler, ResponseEnvelope,
-    RinglineStorageWorker, SingleHandler, StorageRequest,
-};
+use crate::ringline::SingleHandler;
 #[cfg(all(feature = "ringline", target_os = "linux"))]
 use pelikan_net::ringline::{launch_with_bootstraps, RinglineRuntimeConfig};
 
@@ -81,7 +79,7 @@ pub struct MioProcessBuilder<Parser, Request, Response, Storage> {
     config: CacheConfig,
     log_drain: LogDrain,
     protocol: Parser,
-    storage: Storage,
+    storage: Arc<Storage>,
     _request: PhantomData<Request>,
     _response: PhantomData<Response>,
 }
@@ -91,12 +89,20 @@ pub struct RinglineProcessBuilder<Parser, Request, Response, Storage> {
     mio: MioProcessBuilder<Parser, Request, Response, Storage>,
 }
 
+pub(crate) fn storage_flush_handle<Storage>(storage: &Arc<Storage>) -> admin::FlushHandle
+where
+    Storage: EntryStore + Send + Sync + 'static,
+{
+    let storage = Arc::clone(storage);
+    Arc::new(move || storage.clear())
+}
+
 impl<P, Request, Response, Storage> ProcessBuilder<P, Request, Response, Storage>
 where
     P: 'static + Protocol<Request, Response> + Clone + Send,
     Request: 'static + Klog + Klog<Response = Response> + Send,
     Response: 'static + Compose + Send,
-    Storage: 'static + Execute<Request, Response> + EntryStore + Send,
+    Storage: 'static + Execute<Request, Response> + EntryStore + Send + Sync,
 {
     pub fn new<T: AdminConfig + ServerConfig + TlsConfig + WorkerConfig>(
         config: &T,
@@ -104,11 +110,14 @@ where
         protocol: P,
         storage: Storage,
     ) -> Result<Self> {
+        let storage = Arc::new(storage);
+        let flush_handle = storage_flush_handle(&storage);
         let requested = pelikan_net::IoBackend::parse(config.server().io_backend())
             .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
         let available = cfg!(all(feature = "ringline", target_os = "linux"));
         let resolution = pelikan_net::resolve_backend(requested, available);
-        let mio = MioProcessBuilder::new(config, log_drain, protocol, storage)?;
+        let mut mio = MioProcessBuilder::new(config, log_drain, protocol, storage)?;
+        mio.admin.flush_handle(flush_handle);
 
         match process_kind(resolution.clone()) {
             ProcessKind::Mio => {
@@ -256,13 +265,13 @@ where
     P: 'static + Protocol<Request, Response> + Clone + Send,
     Request: 'static + Klog + Klog<Response = Response> + Send,
     Response: 'static + Compose + Send,
-    Storage: 'static + Execute<Request, Response> + EntryStore + Send,
+    Storage: 'static + Execute<Request, Response> + EntryStore + Send + Sync,
 {
     fn new<T: AdminConfig + ServerConfig + TlsConfig + WorkerConfig>(
         config: &T,
         log_drain: LogDrain,
         protocol: P,
-        storage: Storage,
+        storage: Arc<Storage>,
     ) -> Result<Self> {
         let admin = AdminBuilder::new(config)?;
 
@@ -307,7 +316,7 @@ where
     P: 'static + Protocol<Request, Response> + Clone + Send,
     Request: 'static + Klog + Klog<Response = Response> + Send,
     Response: 'static + Compose + Send,
-    Storage: 'static + Execute<Request, Response> + EntryStore + Send,
+    Storage: 'static + Execute<Request, Response> + EntryStore + Send + Sync,
 {
     set_admin_backend_info(&mut admin, &backend_resolution());
     let admin_addr = admin
@@ -377,7 +386,7 @@ where
     P: 'static + Protocol<Request, Response> + Clone + Send,
     Request: 'static + Klog + Klog<Response = Response> + Send,
     Response: 'static + Compose + Send,
-    Storage: 'static + Execute<Request, Response> + EntryStore + Send,
+    Storage: 'static + Execute<Request, Response> + EntryStore + Send + Sync,
 {
     pub fn single(mio: MioProcessBuilder<P, Request, Response, Storage>) -> Result<Self> {
         ringline_preflight(&mio)?;
@@ -406,113 +415,21 @@ where
             recv_buffer_size: 4096,
             pin_to_core: false,
         };
-        if workers == 1 {
-            return spawn_ringline_single(
-                admin,
-                config,
-                log_drain,
-                protocol,
-                storage,
-                addr,
-                runtime_config,
-            );
-        }
-
-        let fallback_protocol = protocol.clone();
-        let (request_tx, request_rx) = bounded::<StorageRequest<Request>>(QUEUE_CAPACITY);
-        let mut response_senders = Vec::with_capacity(workers);
-        let mut bootstraps = Vec::with_capacity(workers);
-        for worker_id in 0..workers {
-            let (response_tx, response_rx) =
-                response_channel::<ResponseEnvelope<Request, Response>>(QUEUE_CAPACITY);
-            let (_handler, bootstrap) =
-                MultiHandler::new(protocol.clone(), worker_id, request_tx.clone(), response_rx);
-            response_senders.push(response_tx);
-            bootstraps.push(bootstrap);
-        }
-
-        match launch_with_bootstraps::<MultiHandler<P, Request, Response>, _>(
+        let bootstraps = SingleHandler::<P, Request, Response, Storage>::bootstraps(
+            protocol.clone(),
+            Arc::clone(&storage),
+            workers,
+        );
+        match launch_with_bootstraps::<SingleHandler<P, Request, Response, Storage>, _>(
             addr,
             runtime_config,
             bootstraps,
         ) {
             Ok(runtime) => {
-                for (worker_id, sender) in response_senders.iter().enumerate() {
-                    let Some(wake) = runtime.worker_wake_handle(worker_id) else {
-                        let error = io::Error::other(format!(
-                            "Ringline worker {worker_id} wake handle unavailable during startup"
-                        ));
-                        let _ = runtime.join();
-                        log_ringline_fallback(&error);
-                        return Process::Mio(
-                            MioProcessBuilder {
-                                admin,
-                                config,
-                                log_drain,
-                                protocol: fallback_protocol,
-                                storage,
-                                _request: PhantomData,
-                                _response: PhantomData,
-                            }
-                            .spawn(),
-                        );
-                    };
-                    if sender.attach(wake).is_err() {
-                        let error = io::Error::other(format!(
-                            "Ringline worker {worker_id} wake handle was attached more than once"
-                        ));
-                        let _ = runtime.join();
-                        log_ringline_fallback(&error);
-                        return Process::Mio(
-                            MioProcessBuilder {
-                                admin,
-                                config,
-                                log_drain,
-                                protocol: fallback_protocol,
-                                storage,
-                                _request: PhantomData,
-                                _response: PhantomData,
-                            }
-                            .spawn(),
-                        );
-                    }
-                }
-                if !all_response_wakes_attached(&response_senders) {
-                    let error = io::Error::other(
-                        "Ringline storage cannot start before every worker wake handle is attached",
-                    );
-                    let _ = runtime.join();
-                    log_ringline_fallback(&error);
-                    return Process::Mio(
-                        MioProcessBuilder {
-                            admin,
-                            config,
-                            log_drain,
-                            protocol: fallback_protocol,
-                            storage,
-                            _request: PhantomData,
-                            _response: PhantomData,
-                        }
-                        .spawn(),
-                    );
-                }
-                let (storage_signal_tx, storage_signal_rx) = bounded(QUEUE_CAPACITY);
-                let storage_worker = RinglineStorageWorker::new(
-                    request_rx,
-                    response_senders,
-                    storage_signal_rx,
-                    storage,
-                    Duration::from_millis(config.worker.timeout() as u64),
-                );
-                let pending_storage = PendingRinglineStorage {
-                    signal_tx: storage_signal_tx,
-                    run: Box::new(move || storage_worker.run()),
-                };
-                let process = spawn_ringline(admin, log_drain, runtime, Some(pending_storage))
-                    .unwrap_or_else(|error| {
-                        error!("Ringline control-plane initialization failed: {error}");
-                        panic!("Ringline control-plane initialization failed: {error}")
-                    });
+                let process = spawn_ringline(admin, log_drain, runtime).unwrap_or_else(|error| {
+                    error!("Ringline control-plane initialization failed: {error}");
+                    panic!("Ringline control-plane initialization failed: {error}")
+                });
                 log_ringline_active();
                 Process::Ringline(process)
             }
@@ -523,7 +440,7 @@ where
                         admin,
                         config,
                         log_drain,
-                        protocol: fallback_protocol,
+                        protocol,
                         storage,
                         _request: PhantomData,
                         _response: PhantomData,
@@ -531,60 +448,6 @@ where
                     .spawn(),
                 )
             }
-        }
-    }
-}
-
-#[cfg(all(feature = "ringline", target_os = "linux"))]
-fn spawn_ringline_single<P, Request, Response, Storage>(
-    admin: AdminBuilder,
-    config: CacheConfig,
-    log_drain: LogDrain,
-    protocol: P,
-    storage: Storage,
-    addr: std::net::SocketAddr,
-    runtime_config: RinglineRuntimeConfig,
-) -> Process
-where
-    P: 'static + Protocol<Request, Response> + Clone + Send,
-    Request: 'static + Klog + Klog<Response = Response> + Send,
-    Response: 'static + Compose + Send,
-    Storage: 'static + Execute<Request, Response> + EntryStore + Send,
-{
-    let (_handler, bootstrap, recovery) =
-        SingleHandler::<P, Request, Response, Storage>::new(protocol, storage);
-    match launch_with_bootstraps::<SingleHandler<P, Request, Response, Storage>, _>(
-        addr,
-        runtime_config,
-        vec![bootstrap],
-    ) {
-        Ok(runtime) => {
-            recovery.commit();
-            log_ringline_active();
-            Process::Ringline(
-                spawn_ringline(admin, log_drain, runtime, None).unwrap_or_else(|error| {
-                    error!("Ringline control-plane initialization failed: {error}");
-                    panic!("Ringline control-plane initialization failed: {error}")
-                }),
-            )
-        }
-        Err(ringline_error) => {
-            log_ringline_runtime_fallback(&ringline_error);
-            let (protocol, storage) = recovery.recover().unwrap_or_else(|recovery_error| {
-                panic!("Ringline initialization failed ({ringline_error}); mio fallback state recovery failed: {recovery_error}")
-            });
-            Process::Mio(
-                MioProcessBuilder {
-                    admin,
-                    config,
-                    log_drain,
-                    protocol,
-                    storage,
-                    _request: PhantomData,
-                    _response: PhantomData,
-                }
-                .spawn(),
-            )
         }
     }
 }
@@ -618,7 +481,6 @@ fn spawn_ringline(
     mut admin: AdminBuilder,
     log_drain: LogDrain,
     runtime: pelikan_net::ringline::RinglineRuntime,
-    pending_storage: Option<PendingRinglineStorage>,
 ) -> io::Result<RinglineProcess> {
     set_admin_backend_info(
         &mut admin,
@@ -664,20 +526,17 @@ fn spawn_ringline(
     let (runtime_tx, runtime_rx) = std::sync::mpsc::sync_channel::<(
         pelikan_net::ringline::RinglineShutdown,
         JoinHandle<io::Result<()>>,
-        Option<LiveRinglineStorage>,
     )>(1);
     let bridge_signal_tx = signal_tx.clone();
     let bridge = match std::thread::Builder::new()
         .name(format!("{THREAD_PREFIX}_ringline_control"))
         .spawn(move || {
-            let Ok((control, worker_monitor, mut storage)) = runtime_rx.recv() else {
+            let Ok((control, worker_monitor)) = runtime_rx.recv() else {
                 return;
             };
-            let worker_wake = control.worker_wake_handle(0);
             let mut worker_monitor = Some(worker_monitor);
             loop {
                 if worker_monitor.as_ref().is_some_and(JoinHandle::is_finished) {
-                    stop_ringline_storage(&mut storage);
                     if let Some(monitor) = worker_monitor.take() {
                         log_ringline_monitor(monitor);
                     } else {
@@ -693,7 +552,6 @@ fn spawn_ringline(
                     Some(Duration::from_millis(100)),
                 ) {
                     error!("Ringline admin bridge poll failed: {error}");
-                    stop_ringline_storage(&mut storage);
                     control.shutdown();
                     if let Some(monitor) = worker_monitor.take() {
                         log_ringline_monitor(monitor);
@@ -709,25 +567,13 @@ fn spawn_ringline(
 
                 while let Some(signal) = bridge_signals.try_recv().map(|item| item.into_inner()) {
                     match signal {
-                        Signal::FlushAll => {
-                            if let Some(storage) = &storage {
-                                if let Err(error) = storage.signal_tx.try_send(Signal::FlushAll) {
-                                    error!(
-                                        "failed to forward FlushAll to Ringline storage: {error}"
-                                    );
-                                }
-                            } else {
-                                request_flush();
-                                if let Some(wake) = &worker_wake {
-                                    wake.wake();
-                                } else {
-                                    error!("Ringline worker wake handle unavailable for FlushAll");
-                                }
-                            }
-                        }
+                        // Cache servers install an admin flush handle which
+                        // clears the process-owned Arc synchronously. This arm
+                        // remains for the shared Signal type, but no cache
+                        // server flush is routed through the data plane.
+                        Signal::FlushAll => {}
                         Signal::Shutdown => {
                             control.shutdown();
-                            stop_ringline_storage(&mut storage);
                             if let Some(monitor) = worker_monitor.take() {
                                 log_ringline_monitor(monitor);
                             } else {
@@ -757,26 +603,9 @@ fn spawn_ringline(
             return Err(error);
         }
     };
-    let live_storage = match pending_storage {
-        Some(storage) => match storage.start() {
-            Ok(storage) => Some(storage),
-            Err(error) => {
-                let (control, monitor) = monitored;
-                control.shutdown();
-                log_ringline_monitor(monitor);
-                drop(runtime_tx);
-                shutdown_signal(&signal_tx);
-                let _ = bridge.join();
-                let _ = admin.join();
-                return Err(error);
-            }
-        },
-        None => None,
-    };
-    if let Err(error) = runtime_tx.send((monitored.0, monitored.1, live_storage)) {
-        let (control, monitor, mut storage) = error.0;
+    if let Err(error) = runtime_tx.send(monitored) {
+        let (control, monitor) = error.0;
         control.shutdown();
-        stop_ringline_storage(&mut storage);
         log_ringline_monitor(monitor);
         shutdown_signal(&signal_tx);
         let bridge_error = match bridge.join() {
@@ -809,47 +638,6 @@ fn spawn_ringline(
         bridge,
         signal_tx,
     })
-}
-
-#[cfg(all(feature = "ringline", target_os = "linux"))]
-struct PendingRinglineStorage {
-    signal_tx: Sender<Signal>,
-    run: Box<dyn FnOnce() + Send>,
-}
-
-#[cfg(all(feature = "ringline", target_os = "linux"))]
-impl PendingRinglineStorage {
-    fn start(self) -> io::Result<LiveRinglineStorage> {
-        let join = std::thread::Builder::new()
-            .name(format!("{THREAD_PREFIX}_storage"))
-            .spawn(self.run)?;
-        Ok(LiveRinglineStorage {
-            signal_tx: self.signal_tx,
-            join: Some(join),
-        })
-    }
-}
-
-#[cfg(all(feature = "ringline", target_os = "linux"))]
-struct LiveRinglineStorage {
-    signal_tx: Sender<Signal>,
-    join: Option<JoinHandle<()>>,
-}
-
-#[cfg(all(feature = "ringline", target_os = "linux"))]
-fn stop_ringline_storage(storage: &mut Option<LiveRinglineStorage>) {
-    let Some(mut storage) = storage.take() else {
-        return;
-    };
-    let _ = storage.signal_tx.send(Signal::Shutdown);
-    if let Some(join) = storage.join.take() {
-        if let Err(payload) = join.join() {
-            error!(
-                "Ringline storage worker panicked: {}",
-                panic_payload(payload)
-            );
-        }
-    }
 }
 
 #[cfg(all(feature = "ringline", target_os = "linux"))]

@@ -31,6 +31,10 @@ pub use crate::response::Response;
 pub type Result<T> = std::result::Result<T, Error>;
 pub type ParseResult = Result<Request>;
 
+// NOTE: this trait predates the `&self` storage-trait conversion (the other
+// protocol storage traits now take `&self` so workers can share the engine)
+// and currently has no implementors; convert it to `&self` when the http
+// protocol is next touched.
 pub trait Storage {
     fn get(&mut self, key: &[u8], headers: &Headers) -> Response;
     fn put(&mut self, key: &[u8], value: &[u8], headers: &Headers) -> Response;

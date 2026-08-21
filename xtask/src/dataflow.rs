@@ -17,53 +17,28 @@ const OUT: &str = "docs/diagrams/dataflow.svg";
 const CLAIMS: &[Claim] = &[
     Claim {
         path: "src/core/server/src/ringline/single.rs",
-        pattern: r"storage\.execute\(&request\)",
-        what: "Ringline single worker executes on worker-local storage",
+        pattern: r"state\.bootstrap\.storage\.execute\(&request\)",
+        what: "Ringline task executes in place on the Arc-shared storage",
     },
     Claim {
-        path: "src/core/server/src/ringline/multi.rs",
-        pattern: r"self\.storage\.execute\(&request\.request\)",
-        what: "Ringline storage thread executes queued requests",
-    },
-    Claim {
-        path: "src/core/server/src/workers/single.rs",
+        path: "src/core/server/src/workers/worker.rs",
         pattern: r"session\.receive\(\)",
-        what: "single worker: session.receive parses a request",
+        what: "worker: session.receive parses a request",
     },
     Claim {
-        path: "src/core/server/src/workers/single.rs",
+        path: "src/core/server/src/workers/worker.rs",
         pattern: r"self\.storage\.execute\(&request\)",
-        what: "single worker executes on thread-local storage",
+        what: "worker executes in place on the Arc-shared storage",
     },
     Claim {
-        path: "src/core/server/src/workers/single.rs",
+        path: "src/core/server/src/workers/worker.rs",
         pattern: r"session\.send\(response\)",
-        what: "single worker composes the response",
+        what: "worker composes the response",
     },
     Claim {
-        path: "src/core/server/src/workers/single.rs",
+        path: "src/core/server/src/workers/worker.rs",
         pattern: r"session\.flush\(\)",
-        what: "single worker flushes to the socket",
-    },
-    Claim {
-        path: "src/core/server/src/workers/multi.rs",
-        pattern: r"try_send_to\(0, \(request, token\)\)",
-        what: "multi worker enqueues the parsed request to storage",
-    },
-    Claim {
-        path: "src/core/server/src/workers/storage.rs",
-        pattern: r"self\.storage\.execute\(&request\)",
-        what: "storage thread executes requests",
-    },
-    Claim {
-        path: "src/core/server/src/workers/storage.rs",
-        pattern: r"try_send_to\(sender, message\)",
-        what: "storage thread returns responses to the sending worker",
-    },
-    Claim {
-        path: "src/core/server/src/workers/multi.rs",
-        pattern: r"session\.send\(response\)",
-        what: "multi worker composes the returned response",
+        what: "worker flushes to the socket",
     },
     Claim {
         path: "src/core/proxy/src/frontend.rs",
@@ -81,6 +56,13 @@ const CLAIMS: &[Claim] = &[
         what: "proxy backend parses the upstream response",
     },
 ];
+
+/// Claims of absence: the diagram relies on these NOT existing.
+const NEG_CLAIMS: &[Claim] = &[Claim {
+    path: "src/core/server/src/workers/worker.rs",
+    pattern: r"try_send_to\(0, \(request",
+    what: "no request queue hop to a storage thread",
+}];
 
 type Chip = (&'static str, &'static str);
 const CHIP_SESSION: Chip = ("session", FILL_CORE);
@@ -217,16 +199,14 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
 }
 
 enum Kind {
-    Single,
-    Multi,
+    Server,
     Proxy,
 }
 
 fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String>, f64) {
     let mut parts: Vec<String> = Vec::new();
     let lanes: Vec<&str> = match kind {
-        Kind::Single => vec!["clients", "pelikan_work"],
-        Kind::Multi => vec!["clients", "pelikan_work_i", "pelikan_storage"],
+        Kind::Server => vec!["clients", "pelikan_work_i"],
         Kind::Proxy => vec!["clients", "pelikan_fe_i", "pelikan_be_i", "servers"],
     };
     let h = 44.0 + LANE_H * lanes.len() as f64 + 28.0;
@@ -332,8 +312,11 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
     };
 
     match kind {
-        Kind::Single => {
-            let wl = "pelikan_work";
+        Kind::Server => {
+            // all four stages run on whichever worker owns the session; the
+            // execute stage calls into the Arc-shared cache in place, so the
+            // path crosses no queue after the listener hand-off
+            let wl = "pelikan_work_i";
             let xs = columns(4);
             stage(
                 &mut parts,
@@ -366,40 +349,6 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
             }
             gap_label(&mut parts, &xs, 0, "request (object)", wl);
             gap_label(&mut parts, &xs, 1, "response (object)", wl);
-            wire_out(&mut parts, &xs, wl);
-        }
-        Kind::Multi => {
-            let (wl, sl) = ("pelikan_work_i", "pelikan_storage");
-            let xs = columns(4);
-            stage(
-                &mut parts,
-                xs[0],
-                st_y(wl),
-                1,
-                "receive",
-                &[CHIP_SESSION, CHIP_PROTOCOL],
-            );
-            stage(
-                &mut parts,
-                xs[1],
-                st_y(sl),
-                2,
-                "execute",
-                &[CHIP_ENTRYSTORE, CHIP_SEGCACHE],
-            );
-            stage(
-                &mut parts,
-                xs[2],
-                st_y(wl),
-                3,
-                "send",
-                &[CHIP_SESSION, CHIP_PROTOCOL],
-            );
-            stage(&mut parts, xs[3], st_y(wl), 4, "flush", &[CHIP_SESSION]);
-            wire_in(&mut parts, &xs, wl);
-            crossing(&mut parts, &xs, 0, wl, sl, "request (object)");
-            crossing(&mut parts, &xs, 1, sl, wl, "response (object)");
-            straight(&mut parts, &xs, 2, wl);
             wire_out(&mut parts, &xs, wl);
         }
         Kind::Proxy => {
@@ -506,7 +455,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
 }
 
 pub fn generate() {
-    verify(CLAIMS, &[]);
+    verify(CLAIMS, NEG_CLAIMS);
     let server_rows = [
         ("segcache", "memcache"),
         ("rds", "resp"),
@@ -518,24 +467,16 @@ pub fn generate() {
     let mut y = 24.0;
     let (p1, h1) = panel(
         y,
-        "single worker · mio callback or Ringline task",
+        "server · Mio callback or Ringline task",
         &server_rows,
-        Kind::Single,
+        Kind::Server,
     );
     parts.extend(p1);
     y += h1 + 20.0;
-    let (p2, h2) = panel(
-        y,
-        "multiple workers · mio callback or Ringline task",
-        &server_rows,
-        Kind::Multi,
-    );
+    let (p2, h2) = panel(y, "proxy", &proxy_rows, Kind::Proxy);
     parts.extend(p2);
-    y += h2 + 20.0;
-    let (p3, h3) = panel(y, "proxy", &proxy_rows, Kind::Proxy);
-    parts.extend(p3);
 
-    let (w, h) = (X0 + PANEL_W + 260.0 + 24.0, y + h3 + 24.0);
+    let (w, h) = (X0 + PANEL_W + 260.0 + 24.0, y + h2 + 24.0);
     fs::write(OUT, svg_document(w, h, "cargo xtask diagrams", &parts)).unwrap();
     println!("generated: {OUT}");
 }

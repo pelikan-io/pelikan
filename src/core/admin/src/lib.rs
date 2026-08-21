@@ -138,9 +138,20 @@ fn map_err(e: std::io::Error) -> Result<()> {
     }
 }
 
+/// A type-erased handle which clears the process's storage.
+///
+/// The admin thread owns `flush_all`: it calls this and only then acks. The
+/// handle is type-erased so that `Admin` does not have to become generic over
+/// the storage type, which would push a `Storage` parameter through every
+/// admin-side type for the sake of one call.
+pub type FlushHandle = Arc<dyn Fn() + Send + Sync>;
+
 pub struct Admin {
     /// A backlog of tokens that need to be handled
     backlog: VecDeque<Token>,
+    /// Clears the storage on `flush_all`. `None` for processes which have no
+    /// storage of their own, such as the proxy.
+    flush_handle: Option<FlushHandle>,
     http_server: Option<tiny_http::Server>,
     /// The actual network listener for the ASCII Admin Endpoint
     listener: pelikan_net::Listener,
@@ -167,6 +178,7 @@ pub struct Admin {
 
 pub struct AdminBuilder {
     backlog: VecDeque<Token>,
+    flush_handle: Option<FlushHandle>,
     http_server: Option<tiny_http::Server>,
     listener: pelikan_net::Listener,
     nevent: usize,
@@ -225,6 +237,7 @@ impl AdminBuilder {
 
         Ok(Self {
             backlog,
+            flush_handle: None,
             http_server,
             listener,
             nevent,
@@ -235,6 +248,13 @@ impl AdminBuilder {
             backend_info,
             waker,
         })
+    }
+
+    /// Give the admin thread the ability to clear the storage itself, so that
+    /// `flush_all` can be applied exactly once and acked only afterwards.
+    /// Callers with no storage — the proxy — simply never set one.
+    pub fn flush_handle(&mut self, flush_handle: FlushHandle) {
+        self.flush_handle = Some(flush_handle);
     }
 
     pub fn version(&mut self, version: &str) {
@@ -273,6 +293,7 @@ impl AdminBuilder {
     ) -> Admin {
         Admin {
             backlog: self.backlog,
+            flush_handle: self.flush_handle,
             http_server: self.http_server,
             listener: self.listener,
             _log_drain,
@@ -393,7 +414,39 @@ impl Admin {
                 // do some request handling
                 match request {
                     AdminRequest::FlushAll => {
-                        let _ = self.signal_queue_tx.try_send_all(Signal::FlushAll);
+                        if let Some(flush) = self.flush_handle.as_ref() {
+                            // The storage is shared by all the workers, so one
+                            // sweep clears it for all of them. Doing it here,
+                            // synchronously, buys the client-visible ordering
+                            // that matters: once `OK` has been written the
+                            // sweep is already complete, so anything the client
+                            // writes next cannot be destroyed by it.
+                            //
+                            // The cost is that the admin thread is blocked for
+                            // the duration of the sweep (~6-8 ms in release for
+                            // segcache, irrespective of heap size) and serves
+                            // no other admin request meanwhile. That is a
+                            // deliberate trade: `flush_all` is rare and
+                            // inherently heavy, and the control plane is the
+                            // right place to absorb it — no data-plane thread
+                            // stalls at all.
+                            //
+                            // Writes still in flight *during* the sweep can
+                            // still be destroyed. Avoiding that would require
+                            // quiescing the workers; memcached leaves writes
+                            // concurrent with a flush undefined too.
+                            flush();
+                        } else {
+                            // No storage of our own (the proxy). Keep the
+                            // historical broadcast so any sibling thread that
+                            // cares can react.
+                            if self.signal_queue_tx.try_send_all(Signal::FlushAll).is_err() {
+                                warn!("failed to broadcast flush_all signal");
+                            }
+                            if self.signal_queue_tx.wake().is_err() {
+                                warn!("error waking threads for flush_all");
+                            }
+                        }
                         session.send(AdminResponse::Ok)?;
                     }
                     AdminRequest::Quit => {
@@ -798,3 +851,105 @@ fn human_formatted_stats() -> Vec<String> {
 }
 
 common::metrics::test_no_duplicates!();
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct TestConfig {
+        admin: config::Admin,
+        tls: config::Tls,
+        debug: config::Debug,
+        klog: config::Klog,
+    }
+
+    impl TestConfig {
+        fn ephemeral() -> Self {
+            let mut admin = config::Admin::default();
+            admin.set_host("127.0.0.1");
+            admin.set_port("0");
+            Self {
+                admin,
+                tls: config::Tls::default(),
+                debug: config::Debug::default(),
+                klog: config::Klog::default(),
+            }
+        }
+    }
+
+    impl config::AdminConfig for TestConfig {
+        fn admin(&self) -> &config::Admin {
+            &self.admin
+        }
+    }
+
+    impl config::TlsConfig for TestConfig {
+        fn tls(&self) -> &config::Tls {
+            &self.tls
+        }
+    }
+
+    impl config::DebugConfig for TestConfig {
+        fn debug(&self) -> &config::Debug {
+            &self.debug
+        }
+    }
+
+    impl config::KlogConfig for TestConfig {
+        fn klog(&self) -> &config::Klog {
+            &self.klog
+        }
+    }
+
+    #[test]
+    fn flush_all_waits_for_flush_handle_before_sending_ok() {
+        let config = TestConfig::ephemeral();
+        let mut builder = AdminBuilder::new(&config).unwrap();
+        let addr = builder.local_addr().unwrap();
+        let (flush_started_tx, flush_started_rx) = crossbeam_channel::bounded(1);
+        let (release_flush_tx, release_flush_rx) = crossbeam_channel::bounded(1);
+        let flush_complete = Arc::new(AtomicBool::new(false));
+        let flush_complete_for_handle = Arc::clone(&flush_complete);
+        builder.flush_handle(Arc::new(move || {
+            flush_started_tx.send(()).unwrap();
+            release_flush_rx.recv().unwrap();
+            flush_complete_for_handle.store(true, Ordering::Release);
+        }));
+
+        let (signal_tx, signal_rx) = crossbeam_channel::bounded(4);
+        let waker = builder.waker();
+        let (mut admin_queues, _peer_queues) =
+            Queues::<Signal, ()>::new(vec![Arc::clone(&waker)], vec![waker], 4).unwrap();
+        let log_drain = logger::configure_logging(&config);
+        let mut admin = builder.build(log_drain, signal_rx, admin_queues.remove(0));
+        let admin_thread = std::thread::spawn(move || admin.run());
+
+        let mut client = std::net::TcpStream::connect(addr).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
+        client.write_all(b"flush_all\r\n").unwrap();
+        flush_started_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("admin did not invoke the flush handle");
+
+        let error = client
+            .read(&mut [0_u8; 1])
+            .expect_err("admin sent a response before the flush completed");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::WouldBlock | ErrorKind::TimedOut
+        ));
+
+        release_flush_tx.send(()).unwrap();
+        let mut response = [0_u8; 4];
+        client.read_exact(&mut response).unwrap();
+        assert_eq!(&response, b"OK\r\n");
+        assert!(flush_complete.load(Ordering::Acquire));
+
+        signal_tx.send(Signal::Shutdown).unwrap();
+        admin_thread.join().unwrap();
+    }
+}

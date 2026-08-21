@@ -5,7 +5,7 @@
 //! A collection of storage datastructures suitable for use within Pelikan. A
 //! typical storage module will implement one or more storage protocol traits in
 //! addition to the base `EntryStore` trait. For example [`Seg`] implements both
-//! [`EntryStore`] and [`protocol::memcache::MemcacheStorage`].
+//! [`EntryStore`] and `protocol_memcache::Storage`.
 
 mod noop;
 mod segcache;
@@ -16,12 +16,6 @@ pub use self::segcache::*;
 /// A trait defining the basic requirements of a type which may be used for
 /// storage.
 pub trait EntryStore {
-    /// Eager expiration of items/values from storage. Not all storage types
-    /// will be able to efficiently implement this function. The default
-    /// implementation is a no-op. Types which can efficiently implement eager
-    /// expiration should implement their own handling logic for this function.
-    fn expire(&mut self) {}
-
     /// Remove all existing values from the entry store.
-    fn clear(&mut self);
+    fn clear(&self);
 }

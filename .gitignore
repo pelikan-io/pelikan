@@ -51,3 +51,8 @@ CMAKE_BINARY_DIR
 
 # Cargo build directory
 /target
+
+# artefacts written by the concurrent driver harness in docs/journal/
+docs/journal/*/conc-*.toml
+docs/journal/*/st-*
+docs/journal/*/*.server.log

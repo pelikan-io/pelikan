@@ -5,6 +5,7 @@
 pub mod bytes;
 pub mod expiry;
 pub mod metrics;
+pub mod product;
 pub mod signal;
 pub mod ssl;
 pub mod traits;
