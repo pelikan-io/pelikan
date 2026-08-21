@@ -21,6 +21,7 @@ fn configure(backend: &str) -> RdsConfig {
     config.server_mut().set_host("127.0.0.1");
     config.server_mut().set_port("0");
     config.server_mut().set_io_backend(backend);
+    config.server_mut().set_ringline_max_connections(256);
     config.worker_mut().set_threads(2);
     config.admin_mut().set_host("127.0.0.1");
     config.admin_mut().set_port("0");

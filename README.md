@@ -220,7 +220,12 @@ The Pingserver, Segcache, and RDS plain-TCP data listeners can opt in to Ringlin
 ```toml
 [server]
 io_backend = "ringline" # Linux only; defaults and falls back to "mio"
+ringline_max_connections = 16000 # per worker
 ```
+
+Ringline's file-descriptor budget scales with `ringline_max_connections`
+times the configured worker count. Lower this value when the process hard
+`RLIMIT_NOFILE` cannot cover that budget.
 
 The binary must also be built with its opt-in Cargo feature, for example
 `cargo build --release -p pelikan-segcache --features ringline` (or the

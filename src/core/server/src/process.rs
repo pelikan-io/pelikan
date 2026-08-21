@@ -378,9 +378,6 @@ fn ringline_preflight<P, Request, Response, Storage>(
 }
 
 #[cfg(all(feature = "ringline", target_os = "linux"))]
-const RINGLINE_MAX_CONNECTIONS: u32 = 16_000;
-
-#[cfg(all(feature = "ringline", target_os = "linux"))]
 impl<P, Request, Response, Storage> RinglineProcessBuilder<P, Request, Response, Storage>
 where
     P: 'static + Protocol<Request, Response> + Clone + Send,
@@ -406,7 +403,7 @@ where
             .server
             .socket_addr()
             .expect("Ringline listen address was validated at builder creation");
-        let max_connections = RINGLINE_MAX_CONNECTIONS;
+        let max_connections = config.server.ringline_max_connections();
         let workers = config.worker.threads();
         let runtime_config = RinglineRuntimeConfig {
             workers,
@@ -790,8 +787,6 @@ impl RinglineProcess {
 mod tests {
     #[cfg(all(feature = "ringline", target_os = "linux"))]
     use super::ringline_fallback_reason;
-    #[cfg(all(feature = "ringline", target_os = "linux"))]
-    use super::RINGLINE_MAX_CONNECTIONS;
     use super::{backend_resolution, process_kind, record_resolution, ProcessKind};
     use crate::{SERVER_IO_BACKEND_ACTIVE, SERVER_IO_BACKEND_FALLBACK};
     use pelikan_net::{resolve_backend, BackendResolution, FallbackReason, IoBackend};
@@ -829,12 +824,6 @@ mod tests {
 
         assert!(rolled_back.get());
         assert_eq!(error.to_string(), "injected bridge spawn failure");
-    }
-
-    #[cfg(all(feature = "ringline", target_os = "linux"))]
-    #[test]
-    fn ringline_connection_limit_uses_ringline_default_not_mio_event_batch() {
-        assert_eq!(RINGLINE_MAX_CONNECTIONS, 16_000);
     }
 
     #[cfg(all(feature = "ringline", target_os = "linux"))]
