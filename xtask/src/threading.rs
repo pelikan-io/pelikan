@@ -42,7 +42,12 @@ const CLAIMS: &[Claim] = &[
     Claim {
         path: "vendor/ringline-0.5.3/src/backend/uring/event_loop.rs",
         pattern: r"self\.executor\.task_slab\.spawn\(conn_index, future\);",
-        what: "Ringline worker event loop schedules the accepted connection task",
+        what: "Ringline io_uring worker schedules the accepted connection task",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.3/src/backend/mio/event_loop.rs",
+        pattern: r"self\.executor\.task_slab\.spawn\(conn_index, future\);",
+        what: "Ringline Mio worker schedules the accepted connection task",
     },
     Claim {
         path: "src/core/server/src/process.rs",
@@ -96,6 +101,11 @@ const CLAIMS: &[Claim] = &[
     },
     Claim {
         path: "src/core/server/src/process.rs",
+        pattern: r"let mut thread_wakers = vec!\[listener\.waker\(\)\]",
+        what: "Mio signal broadcast includes the listener waker",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
         pattern: r"let \(mut listener_session_queues, worker_session_queues\)",
         what: "listener->worker session queues",
     },
@@ -103,6 +113,21 @@ const CLAIMS: &[Claim] = &[
         path: "src/core/server/src/process.rs",
         pattern: r"thread_wakers\.extend_from_slice\(&workers\.wakers\(\)\)",
         what: "signal queues include every worker's waker",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
+        pattern: r"spawn_signal_handler\(signal_tx\.clone\(\)\);",
+        what: "Mio signal thread feeds the admin signal channel",
+    },
+    Claim {
+        path: "src/core/admin/src/lib.rs",
+        pattern: r"self\.signal_queue_tx\.try_send_all\(Signal::Shutdown\)",
+        what: "admin broadcasts Mio shutdown to sibling threads",
+    },
+    Claim {
+        path: "src/core/admin/src/lib.rs",
+        pattern: r"self\.signal_queue_tx\.wake\(\)",
+        what: "admin wakes threads after a signal broadcast",
     },
     Claim {
         path: "src/core/server/src/ringline/single.rs",
@@ -462,7 +487,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f6
 
 fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = 850.0;
+    let h = 1000.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
@@ -482,7 +507,7 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
     let dispatch_x = mio_x + 430.0;
     let worker_x = dispatch_x + 430.0;
     let mio_y = y0 + 55.0;
-    let ring_y = y0 + 280.0;
+    let ring_y = y0 + 380.0;
     thread_box(
         &mut parts,
         cfg_x,
@@ -545,8 +570,17 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
         false,
     );
 
-    let control_y = y0 + 575.0;
+    let control_y = y0 + 675.0;
     let control_mid = control_y + TB_H / 2.0;
+    thread_box(
+        &mut parts,
+        cfg_x,
+        control_y,
+        "pelikan_signal",
+        Some("SIGINT/TERM/QUIT"),
+        &[],
+        false,
+    );
     thread_box(
         &mut parts,
         mio_x,
@@ -574,6 +608,18 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
         Some("shutdown + monitor"),
         &[],
         false,
+    );
+
+    let broadcast_q_x = dispatch_x + 120.0;
+    let broadcast_q_y = y0 + 300.0;
+    let broadcast_q_mid = broadcast_q_y + 11.0;
+    queue_glyph(
+        &mut parts,
+        broadcast_q_x,
+        broadcast_q_y,
+        50.0,
+        22.0,
+        "Mio broadcast queue / wake",
     );
 
     let cfg_mid = y0 + 164.0 + TB_H / 2.0;
@@ -639,6 +685,48 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
             (dispatch_x + 50.0, ring_y + TB_H / 2.0),
             (worker_x, ring_y + TB_H / 2.0),
         ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[(cfg_x + TB_W, control_mid), (mio_x, control_mid)])
+            .signal()
+            .build(),
+    );
+    parts.push(
+        text(
+            (cfg_x + TB_W + mio_x) / 2.0,
+            control_mid - 18.0,
+            "OS signals",
+        )
+        .fill("#777")
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (mio_x + TB_W / 2.0, control_y),
+            (mio_x + TB_W / 2.0, control_y - 40.0),
+            (broadcast_q_x + 25.0, control_y - 40.0),
+            (broadcast_q_x + 25.0, broadcast_q_y + 22.0),
+        ])
+        .signal()
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (broadcast_q_x, broadcast_q_mid),
+            (mio_x + TB_W / 2.0, broadcast_q_mid),
+            (mio_x + TB_W / 2.0, mio_y + TB_H),
+        ])
+        .signal()
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (broadcast_q_x + 50.0, broadcast_q_mid),
+            (worker_x + TB_W / 2.0, broadcast_q_mid),
+            (worker_x + TB_W / 2.0, mio_y + TB_H),
+        ])
+        .signal()
         .build(),
     );
     parts.push(
@@ -940,6 +1028,16 @@ mod tests {
         assert!(svg.contains("pelikan_ringline_control"));
         assert!(svg.contains("schedules async tasks"));
         assert!(!svg.contains("runtime task dispatch"));
+    }
+
+    #[test]
+    fn backend_panel_inventories_server_signal_thread_and_mio_broadcast() {
+        let (parts, _) = backend_choice_panel(0.0);
+        let svg = parts.concat();
+
+        assert!(svg.contains("pelikan_signal"));
+        assert!(svg.contains("OS signals"));
+        assert!(svg.contains("Mio broadcast queue / wake"));
     }
 
     #[test]

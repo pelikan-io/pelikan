@@ -89,8 +89,10 @@ established connections. The admin `FlushHandle` also clones the shared `Arc`;
 Two conventions carry the meaning: heavier edges are bytes crossing the
 process boundary (the wire); queue glyphs mark real internal queues, while thin
 edges without a queue are direct calls or control signals. `pelikan_signal`
-relays SIGINT/SIGTERM/SIGQUIT to `pelikan_admin` (port 9999). Under Ringline,
-the admin thread sends shutdown through a signal queue/wake to the real
+relays SIGINT/SIGTERM/SIGQUIT to `pelikan_admin` (port 9999). Under Mio, the
+admin thread broadcasts shutdown through queues and wakes to the listener and
+every worker. Under Ringline, the admin thread sends shutdown through a signal
+queue/wake to the real
 `pelikan_ringline_control` thread, which shuts down and monitors the runtime
 and reports unexpected termination back to admin. A per-panel margin table
 expands which binaries and protocols each panel covers.
