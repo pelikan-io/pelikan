@@ -628,7 +628,7 @@ mod tests {
                 LineResponse,
                 SendEchoStorage,
             >::bootstraps(LineProtocol, Arc::new(SendEchoStorage), 1);
-            let runtime = pelikan_net::ringline::launch_with_bootstraps::<
+            pelikan_net::ringline::launch_with_bootstraps::<
                 SingleHandler<LineProtocol, LineRequest, LineResponse, SendEchoStorage>,
                 _,
             >(
@@ -642,8 +642,7 @@ mod tests {
                 },
                 bootstraps,
             )
-            .expect("live Ringline launch failed");
-            runtime
+            .expect("live Ringline launch failed")
         }
 
         fn wait_for_counter(counter: &metriken::Counter, before: u64) {
