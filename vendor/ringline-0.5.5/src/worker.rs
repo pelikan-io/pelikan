@@ -902,10 +902,8 @@ impl RinglineBuilder {
         }
 
         if let Some(setup_error) = setup_error {
-            let first_err = rollback_workers(&shutdown_flag, &worker_wake_fds, handles);
-            return Err(
-                first_err.unwrap_or_else(|| crate::error::Error::Io(io::Error::other(setup_error)))
-            );
+            rollback_workers(&shutdown_flag, &worker_wake_fds, handles);
+            return Err(crate::error::Error::Io(io::Error::other(setup_error)));
         }
 
         // Commit the listener only after every worker has completed fallible
@@ -1246,6 +1244,30 @@ mod startup_gate_tests {
         let _ = std::fs::remove_file(path);
         assert!(absent_before_worker_ready);
         assert!(absent_after_rollback);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn startup_returns_the_reported_error_after_rollback() {
+        let result = RinglineBuilder::new(one_worker_config()).launch_inner(
+            |_, _, _, _eventfd, _, _, _, _, _, _, _, _, _, _, _, startup_tx| {
+                let _ = startup_tx.send(Err("reported setup failure".to_string()));
+                Err(crate::error::Error::Io(io::Error::other(
+                    "different joined-worker failure",
+                )))
+            },
+        );
+
+        let error = match result {
+            Ok(_) => panic!("reported setup failure must fail launch"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("reported setup failure"));
+        assert!(
+            !error
+                .to_string()
+                .contains("different joined-worker failure")
+        );
     }
 
     #[cfg(target_os = "linux")]

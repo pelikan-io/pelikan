@@ -116,18 +116,20 @@ runtime that would roll back, and queued raw descriptors could be abandoned.
 The upstream fix delays listener creation and acceptor startup until every
 worker reports ready. Failure rollback wakes and joins started workers and
 closes launch-owned descriptors. The generic change merged as Ringline PR #309,
-commit `a04751f0041c0ffc485a706bb124ec40b27823e1`. No published Ringline release
-contained it when this entry was updated, so Pelikan still carries the audited
-0.5.3 source and patch provenance under `vendor/`.
+commit `a04751f0041c0ffc485a706bb124ec40b27823e1`, and is included in the
+published Ringline 0.5.5 crate. Pelikan's vendor baseline was therefore rebased
+from 0.5.3 to the exact 0.5.5 crates.io archive and the duplicate startup patch
+was removed.
 
 The vendored runtime also contains follow-up send and receive lifecycle work:
 bounded FIFO send reservation, oversize rejection before writing bytes, permit
 retention through Mio flush, operation IDs that reject stale completions, and
-generation-tagged receive errors.
+generation-tagged receive errors. It also preserves exact worker bootstrap panic
+payloads so the Pelikan facade can report type-erasure and initialization faults.
 
 ### Metrics dependency convergence
 
-Ringline 0.5.3 uses `metriken-core` 0.2. Pelikan and Segcache previously used
+Ringline 0.5.5 uses `metriken-core` 0.2. Pelikan and Segcache previously used
 the 0.1 domain, which would split the process-global metric registry.
 
 A temporary compatibility facade compiled but was not correct: its histogram
@@ -166,8 +168,8 @@ and removed in the same PR update.
 ## Deferred or Reopen Items
 
 - Mark this entry `shipped` after PR #187 merges and record the merge commit.
-- Replace the vendored Ringline source when a release contains the required
-  startup and runtime behavior.
+- Replace the vendored Ringline source when a release contains the remaining
+  bounded-send and receive-error APIs.
 - Add Ringline TLS support as a separate design and implementation.
 - Evaluate proxy support separately; proxy behavior did not change here.
 - Run native io_uring conformance on a capable Linux host in addition to the
