@@ -60,6 +60,12 @@ capability-classified fallback. The forced-Mio Ringline feature exercised the
 Ringline runtime and worker lifecycle without depending on host io_uring
 support.
 
+The journal-only CI run 32621999549 exposed a false positive in the concurrent
+flush test on macOS. A writer sampled the pre-flush phase before sending, then
+could be descheduled until after the clear and incorrectly label its surviving
+write as an uncleared key. Early samples now require the write to complete
+before flush start; four fresh forced-Ringline runs passed after the correction.
+
 The eight-worker Segcache integration originally failed under GitHub's
 `RLIMIT_NOFILE=65536`: Ringline's default 16,000 connections per worker
 required about 128,128 descriptors. A `server.ringline_max_connections`
@@ -184,6 +190,7 @@ and removed in the same PR update.
 
 - `engineering-journal` — durable effort record and lifecycle index.
 - `technical-prose` — word-level pass over the journal and PR material.
+- `sweep-comments` — ordering-comment audit for the CI regression fix.
 - `review-guide` (beta) — reviewer attention, test gaps, and production risks.
 - `superpowers:brainstorming` — backend scope and lifecycle design.
 - `superpowers:systematic-debugging` — startup, metrics, CI, and lifecycle failures.

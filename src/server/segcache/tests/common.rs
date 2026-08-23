@@ -601,14 +601,16 @@ pub fn flush_all_tests() {
 
     for round in 0..ROUNDS {
         let ok_received = Arc::new(AtomicBool::new(false));
+        let flush_started = Arc::new(AtomicBool::new(false));
         let stop = Arc::new(AtomicBool::new(false));
-        // (keys written well before the flush, keys written after `OK`)
+        // (writes completed before flush start, writes started after `OK`)
         let collected: Arc<Mutex<(Vec<String>, Vec<String>)>> =
             Arc::new(Mutex::new((Vec::new(), Vec::new())));
 
         let mut handles = Vec::new();
         for tid in 0..WRITERS {
             let ok_received = ok_received.clone();
+            let flush_started = flush_started.clone();
             let stop = stop.clone();
             let collected = collected.clone();
             handles.push(std::thread::spawn(move || {
@@ -640,7 +642,7 @@ pub fn flush_all_tests() {
 
                     if post {
                         post_ok.push(key);
-                    } else if early.len() < EARLY_SAMPLE {
+                    } else if !flush_started.load(Ordering::Acquire) && early.len() < EARLY_SAMPLE {
                         early.push(key);
                     }
                 }
@@ -654,6 +656,7 @@ pub fn flush_all_tests() {
         std::thread::sleep(PRE_FLUSH);
 
         let mut admin_client = Client::connect(admin);
+        flush_started.store(true, Ordering::Release);
         admin_client.send(b"flush_all\r\n");
         let response = admin_client.line();
         // publish only once `OK` has been fully read
