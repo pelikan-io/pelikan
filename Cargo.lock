@@ -1558,7 +1558,7 @@ dependencies = [
 
 [[package]]
 name = "ringline"
-version = "0.5.3"
+version = "0.5.5"
 dependencies = [
  "bytes",
  "crossbeam-channel",

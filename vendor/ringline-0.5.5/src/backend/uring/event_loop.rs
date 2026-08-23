@@ -4038,28 +4038,45 @@ mod tests {
     /// Create a test event loop from an explicit config (e.g. to exercise the
     /// segmented-recv low-water reserve, which `test_config` pins to 0).
     fn make_test_loop_with_config(config: Config) -> AsyncEventLoop<NoopHandler> {
-        let shutdown = Arc::new(AtomicBool::new(false));
-        let eventfd = unsafe { libc::eventfd(0, libc::EFD_NONBLOCK | libc::EFD_CLOEXEC) };
-        assert!(eventfd >= 0, "eventfd creation failed");
-        let (_region_tx, region_rx) = crossbeam_channel::unbounded();
-        AsyncEventLoop::new(
-            &config,
-            NoopHandler,
-            None,
-            eventfd,
-            shutdown,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            region_rx,
-        )
-        .expect("failed to create test event loop")
+        // Parallel release-mode test runs can transiently exhaust kernel memory
+        // for io_uring_setup while sibling tests hold their rings — the daily
+        // scheduled CI intermittently fails several of these tests at once with
+        // ENOMEM (e.g. runs 31887895010, 31710717130). The pressure clears as
+        // sibling tests finish, so retry briefly before failing.
+        let mut attempts = 0;
+        loop {
+            let shutdown = Arc::new(AtomicBool::new(false));
+            let eventfd = unsafe { libc::eventfd(0, libc::EFD_NONBLOCK | libc::EFD_CLOEXEC) };
+            assert!(eventfd >= 0, "eventfd creation failed");
+            let (_region_tx, region_rx) = crossbeam_channel::unbounded();
+            match AsyncEventLoop::new(
+                &config,
+                NoopHandler,
+                None,
+                eventfd,
+                shutdown,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                region_rx,
+            ) {
+                Ok(el) => return el,
+                Err(e) if attempts < 10 => {
+                    attempts += 1;
+                    let _ = e;
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                }
+                Err(e) => {
+                    panic!("failed to create test event loop after {attempts} retries: {e:?}")
+                }
+            }
+        }
     }
 
     /// Simulate an accepted plaintext connection at the given index.

@@ -12,7 +12,7 @@
 [package]
 edition = "2024"
 name = "ringline"
-version = "0.5.3"
+version = "0.5.5"
 authors = ["Brian Martin <brayniac@gmail.com>"]
 build = "build.rs"
 autolib = false
