@@ -121,6 +121,9 @@ published Ringline 0.5.5 crate. Pelikan's vendor baseline was therefore rebased
 from 0.5.3 to the exact 0.5.5 crates.io archive and the duplicate startup patch
 was removed.
 
+The remaining generic result-aware receive, bounded-send, and startup-diagnostic
+changes are proposed upstream in ringline-rs/ringline#318.
+
 The vendored runtime also contains follow-up send and receive lifecycle work:
 bounded FIFO send reservation, oversize rejection before writing bytes, permit
 retention through Mio flush, operation IDs that reject stale completions, and

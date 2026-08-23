@@ -1,5 +1,7 @@
 # Add result-aware receives and FIFO backpressured sends
 
+Upstream pull request: https://github.com/ringline-rs/ringline/pull/318
+
 ## Base and scope
 
 This patch applies to the exact crates.io Ringline 0.5.5 source at archive VCS
