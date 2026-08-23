@@ -15,37 +15,37 @@ const OUT: &str = "docs/diagrams/threading.svg";
 
 const CLAIMS: &[Claim] = &[
     Claim {
-        path: "vendor/ringline-0.5.3/src/worker.rs",
+        path: "vendor/ringline-0.5.5/src/worker.rs",
         pattern: r#"name\(format!\("ringline-worker-\{worker_id\}"\)\)"#,
         what: "Ringline worker thread spawn",
     },
     Claim {
-        path: "vendor/ringline-0.5.3/src/worker.rs",
+        path: "vendor/ringline-0.5.5/src/worker.rs",
         pattern: r#"name\("ringline-acceptor"\.to_string\(\)\)"#,
         what: "Ringline acceptor thread spawn",
     },
     Claim {
-        path: "vendor/ringline-0.5.3/src/worker.rs",
+        path: "vendor/ringline-0.5.5/src/worker.rs",
         pattern: r"crossbeam_channel::bounded::<\(RawFd, SocketAddr\)>",
         what: "Ringline accepted-fd queues are bounded per worker",
     },
     Claim {
-        path: "vendor/ringline-0.5.3/src/acceptor.rs",
+        path: "vendor/ringline-0.5.5/src/acceptor.rs",
         pattern: r"worker_channels\[worker_idx\]\.try_send\(\(fd, peer_addr\)\)",
         what: "Ringline acceptor queues accepted fds to workers",
     },
     Claim {
-        path: "vendor/ringline-0.5.3/src/acceptor.rs",
+        path: "vendor/ringline-0.5.5/src/acceptor.rs",
         pattern: r"worker_wake_handles\[worker_idx\]\.wake\(\)",
         what: "Ringline acceptor wakes the selected worker",
     },
     Claim {
-        path: "vendor/ringline-0.5.3/src/backend/uring/event_loop.rs",
+        path: "vendor/ringline-0.5.5/src/backend/uring/event_loop.rs",
         pattern: r"self\.executor\.task_slab\.spawn\(conn_index, future\);",
         what: "Ringline io_uring worker schedules the accepted connection task",
     },
     Claim {
-        path: "vendor/ringline-0.5.3/src/backend/mio/event_loop.rs",
+        path: "vendor/ringline-0.5.5/src/backend/mio/event_loop.rs",
         pattern: r"self\.executor\.task_slab\.spawn\(conn_index, future\);",
         what: "Ringline Mio worker schedules the accepted connection task",
     },
