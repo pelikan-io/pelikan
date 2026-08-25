@@ -220,6 +220,10 @@ const EXT_H: f64 = 68.0;
 const GAP: f64 = 40.0; // minimum arrow length between columns
 const ELBOW: f64 = 130.0; // elbow verticals route outside the queue labels
 const PANEL_W: f64 = 2190.0;
+const CAPTION_GAP: f64 = 40.0;
+const CAPTION_W: f64 = 460.0;
+const OUTER_PAD: f64 = 24.0;
+const CANVAS_W: f64 = X0 + PANEL_W + CAPTION_GAP + CAPTION_W + OUTER_PAD;
 
 const TS: TypeScale = TYPE_SCALE;
 
@@ -228,6 +232,10 @@ fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {
     crate::svg::text(x, y, s).size(TS.body)
 }
 const X0: f64 = 24.0;
+
+fn caption_center() -> f64 {
+    X0 + PANEL_W + CAPTION_GAP + CAPTION_W / 2.0
+}
 
 fn gap_for(label: &str) -> f64 {
     (label_w_at(label, TS.body as f64) + 10.0).max(GAP)
@@ -383,7 +391,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f6
             .sw(2.0)
             .build(),
     );
-    margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
+    margin_block(&mut parts, caption_center(), y0 + h / 2.0, title, rows);
 
     let context_x = X0 + 120.0;
     let context_w = 390.0;
@@ -496,7 +504,7 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
     );
     margin_block(
         &mut parts,
-        X0 + PANEL_W + 130.0,
+        caption_center(),
         y0 + h / 2.0,
         "launch-time backend fork",
         &[("cache servers", "plain TCP")],
@@ -771,7 +779,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .sw(2.0)
             .build(),
     );
-    margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
+    margin_block(&mut parts, caption_center(), y0 + h / 2.0, title, rows);
 
     let row_a = y0 + 80.0;
     let mid_a = row_a + TB_H / 2.0;
@@ -1010,7 +1018,7 @@ pub fn generate() {
     let (p2, h2) = proxy_panel(y, "proxy", &proxy_rows);
     parts.extend(p2);
 
-    let (w, h) = (24.0 + PANEL_W + 260.0 + 24.0, y + h2 + 24.0);
+    let (w, h) = (CANVAS_W, y + h2 + OUTER_PAD);
     fs::write(OUT, svg_document(w, h, "cargo xtask diagrams", &parts)).unwrap();
     println!("generated: {OUT}");
 }
@@ -1018,6 +1026,43 @@ pub fn generate() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn text_x(svg: &str, label: &str) -> f64 {
+        let needle = format!(">{label}</text>");
+        let end = svg.find(&needle).expect("label is rendered");
+        let start = svg[..end].rfind("<text ").expect("text element starts");
+        let tag = &svg[start..end];
+        let x_start = tag.find(" x=\"").expect("text has x") + 4;
+        let x_end = tag[x_start..].find('"').expect("text x closes") + x_start;
+        tag[x_start..x_end].parse().expect("numeric text x")
+    }
+
+    #[test]
+    fn right_caption_titles_clear_the_panel_and_viewport() {
+        const MIN_GAP: f64 = 32.0;
+        let panel_right = X0 + PANEL_W;
+        let viewport_right = CANVAS_W;
+
+        for (title, parts) in [
+            ("launch-time backend fork", backend_choice_panel(0.0).0),
+            (
+                "common Arc-shared storage",
+                server_panel(0.0, "common Arc-shared storage", &[]).0,
+            ),
+        ] {
+            let svg = parts.concat();
+            let center = text_x(&svg, title);
+            let half_width = label_w_at(title, TS.h1 as f64) / 2.0;
+            assert!(
+                center - half_width >= panel_right + MIN_GAP,
+                "{title:?} overlaps the drawing"
+            );
+            assert!(
+                center + half_width <= viewport_right,
+                "{title:?} exceeds the viewport"
+            );
+        }
+    }
 
     #[test]
     fn backend_panel_shows_real_ringline_queue_workers_and_control_thread() {
