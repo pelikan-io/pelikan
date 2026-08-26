@@ -18,7 +18,7 @@
 <rect x="944" y="164" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="954" y="164" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="964" y="164" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="949" y="148" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">session queue</text>
+<text x="949" y="139" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">session queue</text>
 <rect x="1354" y="79" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
 <text x="1499" y="129" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_work_i</text>
 <text x="1499" y="163" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#333" text-anchor="middle">callback state machine</text>
@@ -32,7 +32,7 @@
 <rect x="944" y="489" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="954" y="489" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="964" y="489" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="949" y="473" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">accepted fd queue / wake</text>
+<text x="949" y="464" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">accepted fd queue / wake</text>
 <rect x="1354" y="404" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
 <text x="1499" y="454" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">ringline-worker-i</text>
 <text x="1499" y="488" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#333" text-anchor="middle">schedules async tasks</text>
@@ -51,7 +51,7 @@
 <rect x="944" y="784" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="954" y="784" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="964" y="784" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="949" y="768" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">signal queue / wake</text>
+<text x="949" y="759" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">signal queue / wake</text>
 <rect x="1354" y="699" width="430" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
 <text x="1569" y="776" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_ringline_control</text>
 <text x="1569" y="810" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#333" text-anchor="middle">shutdown + monitor</text>
@@ -60,24 +60,24 @@
 <rect x="1064" y="324" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="1074" y="324" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="1084" y="324" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="1069" y="308" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">Mio broadcast queue / wake</text>
+<text x="1069" y="299" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">Mio broadcast queue / wake</text>
 <path d="M 354 284 L 454 284 L 454 175 L 494 175" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
-<text x="424" y="157" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">mio (default)</text>
+<text x="424" y="150" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">mio (default)</text>
 <path d="M 354 284 L 454 284 L 454 500 L 494 500" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
-<text x="424" y="518" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">ringline (Linux)</text>
+<text x="424" y="525" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">ringline (Linux)</text>
 <path d="M 784 175 L 924 175" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 974 175 L 1354 175" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 784 500 L 924 500" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 974 500 L 1354 500" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 354 795 L 494 795" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
-<text x="424" y="777" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">OS signals</text>
+<text x="424" y="770" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">OS signals</text>
 <path d="M 639 699 L 639 659 L 1069 659 L 1069 346" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <path d="M 1044 335 L 639 335 L 639 271" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <path d="M 1094 335 L 1499 335 L 1499 271" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <path d="M 784 795 L 924 795" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <path d="M 974 795 L 1354 795" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <path d="M 1569 891 L 1569 919 L 639 919 L 639 891" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
-<text x="1104" y="937" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">runtime termination report</text>
+<text x="1104" y="944" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">runtime termination report</text>
 <rect x="24" y="1044" width="2190" height="560" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
 <text x="2484" y="1267" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">common Arc-shared storage</text>
 <text x="2478" y="1315" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">segcache</text>
@@ -118,7 +118,7 @@
 <rect x="1604" y="1349" width="350" height="36" fill="#FBB4AE" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <text x="1779" y="1367" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-admin</text>
 <path d="M 1584 1324 L 1254 1324" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
-<text x="1419" y="1306" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">synchronous clear</text>
+<text x="1419" y="1299" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">synchronous clear</text>
 <rect x="24" y="1624" width="2190" height="792" fill="#FAFAFA" stroke="#9E9E9E" stroke-width="2" rx="0"/>
 <text x="2484" y="1997" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="30" font-weight="bold" fill="#000" text-anchor="middle">proxy</text>
 <text x="2478" y="2045" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="end">pingproxy</text>
@@ -130,13 +130,13 @@
 <text x="525" y="1781" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_listener</text>
 <text x="525" y="1815" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#333" text-anchor="middle">:12321</text>
 <path d="M 174 1800 L 380 1800" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)"/>
-<text x="277" y="1785" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">accept</text>
+<text x="277" y="1775" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">accept</text>
 <rect x="816" y="1789" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="826" y="1789" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="836" y="1789" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="846" y="1789" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="856" y="1789" width="10" height="22" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="841" y="1773" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">sessions</text>
+<text x="841" y="1764" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">sessions</text>
 <path d="M 670 1800 L 816 1800" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <rect x="1012" y="1704" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
 <text x="1157" y="1773" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_fe_0</text>
@@ -152,14 +152,14 @@
 <path d="M 866 1800 L 992 1800 L 992 1800 L 1012 1800" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 866 1800 L 992 1800 L 992 2032 L 1012 2032" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)"/>
 <path d="M 112 1766 L 112 1664 L 1157 1664 L 1157 1704" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)" marker-start="url(#a)"/>
-<text x="676" y="1649" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">requests / responses (wire)</text>
+<text x="676" y="1639" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">requests / responses (wire)</text>
 <rect x="1448" y="1907" width="10" height="18" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="1458" y="1907" width="10" height="18" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="1468" y="1907" width="10" height="18" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="1478" y="1907" width="10" height="18" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
 <rect x="1488" y="1907" width="10" height="18" fill="#F2F2F2" stroke="#4D4D4D" stroke-width="1" rx="0"/>
-<text x="1473" y="1865" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">requests / responses</text>
-<text x="1473" y="1891" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">(object)</text>
+<text x="1473" y="1854" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">requests / responses</text>
+<text x="1473" y="1882" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">(object)</text>
 <path d="M 1302 1800 L 1318 1800 L 1318 1916 L 1448 1916" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)" marker-start="url(#a)"/>
 <path d="M 1302 2032 L 1318 2032 L 1318 1916 L 1448 1916" fill="none" stroke="#4D4D4D" stroke-width="1.4" marker-end="url(#a)" marker-start="url(#a)"/>
 <rect x="1644" y="1704" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
@@ -178,7 +178,7 @@
 <rect x="2045" y="1766" width="124" height="68" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="0" stroke-dasharray="6,4"/>
 <text x="2107" y="1800" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="normal" fill="#000" font-style="italic" text-anchor="middle">servers</text>
 <path d="M 1934 1800 L 2045 1800" fill="none" stroke="#4D4D4D" stroke-width="2.4" marker-end="url(#a)" marker-start="url(#a)"/>
-<text x="1989" y="1785" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">connect</text>
+<text x="1989" y="1775" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#555" text-anchor="middle">connect</text>
 <rect x="50" y="2204" width="290" height="192" fill="#FFFFFF" stroke="#4D4D4D" stroke-width="1.5" rx="10"/>
 <text x="195" y="2281" dy="0.35em" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="26" font-weight="bold" fill="#000" text-anchor="middle">pelikan_signal</text>
 <text x="195" y="2315" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#333" font-style="italic" text-anchor="middle">SIGINT/TERM/QUIT</text>
@@ -189,7 +189,7 @@
 <text x="525" y="2343" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#000" text-anchor="middle">protocol-admin</text>
 <path d="M 340 2300 L 380 2300" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <path d="M 428 2204 L 428 1896" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
-<text x="396" y="2050" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">signals</text>
+<text x="363" y="2050" dy="0.35em" font-family="Helvetica, Arial, sans-serif" font-size="22" font-weight="normal" fill="#777" text-anchor="middle">signals</text>
 <path d="M 670 2300 L 1157 2300 L 1157 2128" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 <path d="M 670 2300 L 1789 2300 L 1789 2128" fill="none" stroke="#999999" stroke-width="1.4" stroke-dasharray="5,4" marker-end="url(#a)"/>
 </svg>

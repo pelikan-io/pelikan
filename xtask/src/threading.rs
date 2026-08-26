@@ -224,6 +224,8 @@ const CAPTION_GAP: f64 = 40.0;
 const CAPTION_W: f64 = 460.0;
 const OUTER_PAD: f64 = 24.0;
 const CANVAS_W: f64 = X0 + PANEL_W + CAPTION_GAP + CAPTION_W + OUTER_PAD;
+const TEXT_CLEARANCE: f64 = 14.0;
+const TEXT_LINE_GAP: f64 = 6.0;
 
 const TS: TypeScale = TYPE_SCALE;
 
@@ -235,6 +237,18 @@ const X0: f64 = 24.0;
 
 fn caption_center() -> f64 {
     X0 + PANEL_W + CAPTION_GAP + CAPTION_W / 2.0
+}
+
+fn label_above(edge_y: f64) -> f64 {
+    edge_y - TS.body as f64 / 2.0 - TEXT_CLEARANCE
+}
+
+fn label_below(edge_y: f64) -> f64 {
+    edge_y + TS.body as f64 / 2.0 + TEXT_CLEARANCE
+}
+
+fn label_left(edge_x: f64, label: &str) -> f64 {
+    edge_x - label_w_at(label, TS.body as f64) / 2.0 - TEXT_CLEARANCE - 1.0
 }
 
 fn gap_for(label: &str) -> f64 {
@@ -320,15 +334,17 @@ fn queue_glyph(parts: &mut Vec<String>, x: f64, y: f64, w: f64, h: f64, label: &
                 .build(),
         );
     }
+    let near_y = label_above(y);
     if let Some((first, rest)) = label.split_once(" (") {
-        parts.push(text(x + w / 2.0, y - 42.0, first).fill("#555").build());
+        let far_y = near_y - TS.body as f64 - TEXT_LINE_GAP;
+        parts.push(text(x + w / 2.0, far_y, first).fill("#555").build());
         parts.push(
-            text(x + w / 2.0, y - 16.0, &format!("({rest}"))
+            text(x + w / 2.0, near_y, &format!("({rest}"))
                 .fill("#555")
                 .build(),
         );
     } else {
-        parts.push(text(x + w / 2.0, y - 16.0, label).fill("#555").build());
+        parts.push(text(x + w / 2.0, near_y, label).fill("#555").build());
     }
 }
 
@@ -484,7 +500,7 @@ fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f6
     parts.push(
         text(
             (storage_x + storage_w + admin_x) / 2.0,
-            storage_mid - 18.0,
+            label_above(storage_mid),
             "synchronous clear",
         )
         .fill("#777")
@@ -643,7 +659,7 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
     parts.push(
         text(
             (cfg_x + TB_W + mio_x) / 2.0,
-            mio_y + TB_H / 2.0 - 18.0,
+            label_above(mio_y + TB_H / 2.0),
             "mio (default)",
         )
         .fill("#555")
@@ -661,7 +677,7 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
     parts.push(
         text(
             (cfg_x + TB_W + mio_x) / 2.0,
-            ring_y + TB_H / 2.0 + 18.0,
+            label_below(ring_y + TB_H / 2.0),
             "ringline (Linux)",
         )
         .fill("#555")
@@ -703,7 +719,7 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
     parts.push(
         text(
             (cfg_x + TB_W + mio_x) / 2.0,
-            control_mid - 18.0,
+            label_above(control_mid),
             "OS signals",
         )
         .fill("#777")
@@ -761,7 +777,7 @@ fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
     parts.push(
         text(
             (mio_x + TB_W / 2.0 + worker_x + control_w / 2.0) / 2.0,
-            report_y + 18.0,
+            label_below(report_y),
             "runtime termination report",
         )
         .fill("#777")
@@ -803,7 +819,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 15.0, "accept")
+        text((cl_x + EXT_W + li_x) / 2.0, label_above(mid_a), "accept")
             .fill("#555")
             .build(),
     );
@@ -857,7 +873,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     parts.push(
         text(
             (cl_x + fe_x + TB_W) / 2.0,
-            top_y - 15.0,
+            label_above(top_y),
             "requests / responses (wire)",
         )
         .fill("#555")
@@ -935,7 +951,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text((be_x + TB_W + sv_x) / 2.0, mid_a - 15.0, "connect")
+        text((be_x + TB_W + sv_x) / 2.0, label_above(mid_a), "connect")
             .fill("#555")
             .build(),
     );
@@ -973,9 +989,13 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text(li_x + 16.0, (row_b + row_a + TB_H) / 2.0, "signals")
-            .fill("#777")
-            .build(),
+        text(
+            label_left(li_x + 48.0, "signals"),
+            (row_b + row_a + TB_H) / 2.0,
+            "signals",
+        )
+        .fill("#777")
+        .build(),
     );
     parts.push(
         ortho(&[
@@ -1037,6 +1057,34 @@ mod tests {
         tag[x_start..x_end].parse().expect("numeric text x")
     }
 
+    const MIN_TEXT_CLEARANCE: f64 = 14.0;
+
+    fn text_y(svg: &str, label: &str) -> f64 {
+        let needle = format!(">{label}</text>");
+        let end = svg.find(&needle).expect("label is rendered");
+        let start = svg[..end].rfind("<text ").expect("text element starts");
+        let tag = &svg[start..end];
+        let y_start = tag.find(" y=\"").expect("text has y") + 4;
+        let y_end = tag[y_start..].find('"').expect("text y closes") + y_start;
+        tag[y_start..y_end].parse().expect("numeric text y")
+    }
+
+    fn assert_above(svg: &str, label: &str, edge_y: f64) {
+        let clearance = edge_y - (text_y(svg, label) + TS.body as f64 / 2.0);
+        assert!(
+            clearance >= MIN_TEXT_CLEARANCE,
+            "{label:?} has only {clearance}px above its edge"
+        );
+    }
+
+    fn assert_below(svg: &str, label: &str, edge_y: f64) {
+        let clearance = text_y(svg, label) - TS.body as f64 / 2.0 - edge_y;
+        assert!(
+            clearance >= MIN_TEXT_CLEARANCE,
+            "{label:?} has only {clearance}px below its edge"
+        );
+    }
+
     #[test]
     fn right_caption_titles_clear_the_panel_and_viewport() {
         const MIN_GAP: f64 = 32.0;
@@ -1062,6 +1110,46 @@ mod tests {
                 "{title:?} exceeds the viewport"
             );
         }
+    }
+
+    #[test]
+    fn queue_labels_clear_the_queue_border() {
+        let mut parts = Vec::new();
+        queue_glyph(&mut parts, 0.0, 100.0, 50.0, 22.0, "sessions");
+        let svg = parts.concat();
+
+        assert_above(&svg, "sessions", 100.0);
+    }
+
+    #[test]
+    fn backend_arrow_labels_clear_their_edges() {
+        let (parts, _) = backend_choice_panel(0.0);
+        let svg = parts.concat();
+
+        assert_above(&svg, "mio (default)", 55.0 + TB_H / 2.0);
+        assert_below(&svg, "ringline (Linux)", 380.0 + TB_H / 2.0);
+        assert_above(&svg, "OS signals", 675.0 + TB_H / 2.0);
+        assert_below(&svg, "runtime termination report", 675.0 + TB_H + 28.0);
+    }
+
+    #[test]
+    fn proxy_arrow_labels_clear_their_edges() {
+        let rows = [("pingproxy", "ping")];
+        let (parts, _) = proxy_panel(0.0, "proxy", &rows);
+        let svg = parts.concat();
+        let edge_y = 80.0 + TB_H / 2.0;
+
+        assert_above(&svg, "accept", edge_y);
+        assert_above(&svg, "connect", edge_y);
+
+        let listener_x = X0 + 26.0 + EXT_W + gap_for("accept").max(TB_W + GAP - EXT_W);
+        let signal_edge_x = listener_x + 48.0;
+        let label_right = text_x(&svg, "signals") + label_w_at("signals", TS.body as f64) / 2.0;
+        let clearance = signal_edge_x - label_right;
+        assert!(
+            clearance >= MIN_TEXT_CLEARANCE,
+            "signals has only {clearance}px beside its edge"
+        );
     }
 
     #[test]
