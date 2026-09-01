@@ -1,0 +1,3040 @@
+diff --git a/src/backend/mio/driver.rs b/src/backend/mio/driver.rs
+index aca1be1..74f9c95 100644
+--- a/src/backend/mio/driver.rs
++++ b/src/backend/mio/driver.rs
+@@ -18,13 +18,37 @@ use mio::Interest;
+ 
+ /// mio token 0 is reserved for the wake pipe.
+ pub(crate) const WAKE_TOKEN: mio::Token = mio::Token(0);
++/// Per-connection buffered send. Backpressured sends retain their copy-pool
++/// permits until the final byte reaches the socket.
++pub(crate) struct PendingSend {
++    pub(crate) data: Vec<u8>,
++    pub(crate) offset: usize,
++    pub(crate) notify_len: Option<u32>,
++    pub(crate) bounded_send_id: Option<u64>,
++    pub(crate) pool_slots: Vec<u16>,
++}
++
++impl PendingSend {
++    pub(crate) fn unbounded(data: Vec<u8>) -> Self {
++        Self {
++            data,
++            offset: 0,
++            notify_len: None,
++            bounded_send_id: None,
++            pool_slots: Vec::new(),
++        }
++    }
+ 
+-/// Per-connection pending send: `(data, offset, notify_len)` for partial
+-/// writes. `notify_len` is `Some(len)` for awaitable sends: the completion
+-/// (wake_send) is delivered only when the entry has fully reached the
+-/// socket — completing at queue time reported success for bytes that were
+-/// never written and swallowed write errors entirely.
+-pub(crate) type PendingSend = (Vec<u8>, usize, Option<u32>);
++    pub(crate) fn bounded(data: Vec<u8>, pool_slots: Vec<u16>, bounded_send_id: u64) -> Self {
++        Self {
++            data,
++            offset: 0,
++            notify_len: None,
++            bounded_send_id: Some(bounded_send_id),
++            pool_slots,
++        }
++    }
++}
+ 
+ /// Per-worker mio driver state.
+ pub(crate) struct Driver {
+@@ -57,7 +81,7 @@ pub(crate) struct Driver {
+     // ── mio-specific state ───────────────────────────────────────────
+     /// Per-connection mio TcpStream storage.
+     pub(crate) tcp_streams: Vec<Option<mio::net::TcpStream>>,
+-    /// Per-connection pending send buffers: `VecDeque<(data, offset)>`.
++    /// Per-connection pending send buffers, including optional pool permits.
+     /// Populated by DriverCtx::send(), drained by the event loop on writable.
+     pub(crate) pending_sends: Vec<VecDeque<PendingSend>>,
+     /// Connection indices with non-empty `pending_sends`, so the per-loop
+@@ -92,6 +116,8 @@ pub(crate) struct Driver {
+     /// `DriverCtx::send_await()` pushes len here; the event loop drains
+     /// these and calls `Executor::wake_send()` for each.
+     pub(crate) send_completions: Vec<VecDeque<u32>>,
++    /// Exact logical-send completions for `send_backpressured` futures.
++    pub(crate) bounded_send_completions: VecDeque<(u64, io::Result<u32>)>,
+     /// Bound UDP sockets (one per `config.udp_bind` address).
+     pub(crate) udp_sockets: Vec<mio::net::UdpSocket>,
+     /// Whether UDP GRO was requested; when set, the readable handler uses
+@@ -240,6 +266,7 @@ impl Driver {
+             wake_pipe_fd: eventfd,
+             tcp_nodelay: config.tcp_nodelay,
+             send_completions: (0..max_conn).map(|_| VecDeque::new()).collect(),
++            bounded_send_completions: VecDeque::new(),
+             udp_sockets,
+             udp_gro: config.udp_gro,
+             udp_token_base,
+@@ -300,6 +327,7 @@ impl Driver {
+             poll: &mut self.poll,
+             writable: &mut self.writable,
+             send_completions: &mut self.send_completions,
++            bounded_send_completions: &mut self.bounded_send_completions,
+             connect_deadlines: &mut self.connect_deadlines,
+             disk_io_pool: &self.disk_io_pool,
+             disk_io_tx: &self.disk_io_tx,
+@@ -374,7 +402,7 @@ impl Driver {
+             .map(|c| c.established)
+             .unwrap_or(false);
+ 
+-        self.pending_sends[idx].clear();
++        self.clear_pending_sends(idx);
+         self.writable[idx] = false;
+         if self.connect_deadlines[idx].take().is_some() {
+             self.connect_pending -= 1;
+@@ -398,6 +426,22 @@ impl Driver {
+         }
+     }
+ 
++    /// Drop queued sends and return any bounded-send permits.
++    pub(crate) fn clear_pending_sends(&mut self, idx: usize) {
++        for pending in self.pending_sends[idx].drain(..) {
++            for slot in pending.pool_slots {
++                self.send_copy_pool.release(slot);
++            }
++        }
++    }
++
++    pub(crate) fn pending_bounded_send_ids(&self, idx: usize) -> Vec<u64> {
++        self.pending_sends[idx]
++            .iter()
++            .filter_map(|pending| pending.bounded_send_id)
++            .collect()
++    }
++
+     /// Record `idx` in the dirty-sends list so the event loop's flush pass
+     /// visits it. Invariant: non-empty `pending_sends[idx]` ⇒ flag set.
+     /// Every push into `pending_sends` — including the TLS paths that push
+@@ -438,11 +482,11 @@ impl Driver {
+         while !self.pending_sends[idx].is_empty() {
+             let mut iovecs: Vec<libc::iovec> =
+                 Vec::with_capacity(self.pending_sends[idx].len().min(1024));
+-            for (data, offset, _notify) in self.pending_sends[idx].iter() {
++            for pending in self.pending_sends[idx].iter() {
+                 if iovecs.len() >= 1024 {
+                     break;
+                 }
+-                let remaining = &data[*offset..];
++                let remaining = &pending.data[pending.offset..];
+                 if !remaining.is_empty() {
+                     iovecs.push(libc::iovec {
+                         iov_base: remaining.as_ptr() as *mut libc::c_void,
+@@ -452,7 +496,7 @@ impl Driver {
+             }
+ 
+             if iovecs.is_empty() {
+-                self.pending_sends[idx].clear();
++                self.clear_pending_sends(idx);
+                 break;
+             }
+ 
+@@ -481,20 +525,28 @@ impl Driver {
+             let mut remaining = result as usize;
+             total_written += result as u32;
+             while remaining > 0 {
+-                if let Some((data, offset, notify)) = self.pending_sends[idx].front_mut() {
+-                    let avail = data.len() - *offset;
++                if let Some(pending) = self.pending_sends[idx].front_mut() {
++                    let avail = pending.data.len() - pending.offset;
+                     if remaining >= avail {
+                         remaining -= avail;
+-                        if let Some(len) = notify.take() {
++                        if let Some(len) = pending.notify_len.take() {
+                             self.send_completions[idx].push_back(len);
+                             if !self.completions_dirty_flag[idx] {
+                                 self.completions_dirty_flag[idx] = true;
+                                 self.completions_dirty.push(idx as u32);
+                             }
+                         }
+-                        self.pending_sends[idx].pop_front();
++                        if let Some(id) = pending.bounded_send_id.take() {
++                            self.bounded_send_completions
++                                .push_back((id, Ok(pending.data.len() as u32)));
++                        }
++                        if let Some(completed) = self.pending_sends[idx].pop_front() {
++                            for slot in completed.pool_slots {
++                                self.send_copy_pool.release(slot);
++                            }
++                        }
+                     } else {
+-                        *offset += remaining;
++                        pending.offset += remaining;
+                         remaining = 0;
+                     }
+                 } else {
+diff --git a/src/backend/mio/event_loop.rs b/src/backend/mio/event_loop.rs
+index 3046b35..9921d0d 100644
+--- a/src/backend/mio/event_loop.rs
++++ b/src/backend/mio/event_loop.rs
+@@ -365,7 +365,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             let idx = conn_index as usize;
+             self.driver.tcp_streams[idx] = Some(mio_stream);
+             self.driver.accumulators.reset(conn_index);
+-            self.driver.pending_sends[idx].clear();
++            self.driver.clear_pending_sends(idx);
+             self.driver.writable[idx] = false;
+ 
+             // TLS path: defer accept until handshake completes in handle_readable.
+@@ -527,12 +527,13 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+                         self.driver.tcp_streams[idx] = Some(stream);
+                         break;
+                     }
+-                    Err(_) => {
++                    Err(error) => {
+                         self.driver.tcp_streams[idx] = Some(stream);
++                        let generation = self.driver.connections.generation(conn_index);
+                         if let Some(cs) = self.driver.connections.get_mut(conn_index) {
+                             cs.recv_mode = RecvMode::Closed;
+                         }
+-                        self.executor.wake_recv(conn_index);
++                        self.executor.fail_recv(conn_index, generation, error);
+                         break;
+                     }
+                 };
+@@ -660,12 +661,13 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+                 Err(ref e) if e.kind() == io::ErrorKind::WouldBlock => {
+                     break;
+                 }
+-                Err(_) => {
+-                    // Read error — mark as closed.
++                Err(error) => {
++                    // Preserve the exact non-WouldBlock transport error.
++                    let generation = self.driver.connections.generation(conn_index);
+                     if let Some(cs) = self.driver.connections.get_mut(conn_index) {
+                         cs.recv_mode = RecvMode::Closed;
+                     }
+-                    self.executor.wake_recv(conn_index);
++                    self.executor.fail_recv(conn_index, generation, error);
+                     break;
+                 }
+             }
+@@ -743,7 +745,9 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+ 
+         // Normal writable — mark writable and flush sends.
+         self.driver.writable[idx] = true;
+-        if let Err(e) = self.driver.flush_sends(conn_index) {
++        let flush_result = self.driver.flush_sends(conn_index);
++        self.executor.wake_send_capacity();
++        if let Err(e) = flush_result {
+             self.fail_connection_on_send_error(conn_index, e);
+         }
+     }
+@@ -754,7 +758,15 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+     /// error was swallowed — the queue was retried every loop iteration
+     /// forever while send().await had already reported success.
+     fn fail_connection_on_send_error(&mut self, conn_index: u32, e: io::Error) {
+-        self.driver.pending_sends[conn_index as usize].clear();
++        let bounded_ids = self.driver.pending_bounded_send_ids(conn_index as usize);
++        let error_kind = e.kind();
++        let error_message = e.to_string();
++        self.driver.clear_pending_sends(conn_index as usize);
++        self.executor.wake_send_capacity();
++        for id in bounded_ids {
++            self.executor
++                .complete_bounded_send(id, Err(io::Error::new(error_kind, error_message.clone())));
++        }
+         self.executor.wake_send(conn_index, Err(e));
+         self.executor.wake_recv(conn_index);
+         self.driver.close_connection(conn_index);
+@@ -883,11 +895,13 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             // Register writable interest so mio tells us when we can write.
+             self.driver.register_writable(conn_index);
+             // If we already know the socket is writable, try flushing now.
+-            if self.driver.writable[idx]
+-                && let Err(e) = self.driver.flush_sends(conn_index)
+-            {
+-                self.fail_connection_on_send_error(conn_index, e);
+-                continue;
++            if self.driver.writable[idx] {
++                let flush_result = self.driver.flush_sends(conn_index);
++                self.executor.wake_send_capacity();
++                if let Err(e) = flush_result {
++                    self.fail_connection_on_send_error(conn_index, e);
++                    continue;
++                }
+             }
+             if !self.driver.pending_sends[idx].is_empty() && !self.driver.sends_dirty_flag[idx] {
+                 self.driver.sends_dirty_flag[idx] = true;
+@@ -915,6 +929,10 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+     fn drain_send_completions(&mut self) {
+         loop {
+             let mut delivered = false;
++            while let Some((id, result)) = self.driver.bounded_send_completions.pop_front() {
++                self.executor.complete_bounded_send(id, result);
++                delivered = true;
++            }
+             let dirty = std::mem::take(&mut self.driver.completions_dirty);
+             for conn_index in dirty {
+                 let idx = conn_index as usize;
+diff --git a/src/backend/uring/driver.rs b/src/backend/uring/driver.rs
+index 261a6fc..f5e8cf8 100644
+--- a/src/backend/uring/driver.rs
++++ b/src/backend/uring/driver.rs
+@@ -419,6 +419,8 @@ pub(crate) struct Driver {
+     pub(crate) pending_recv_forward_retries: Vec<(u32, u32, u16, u8)>,
+     /// Pending close retries: (conn_index, retries). Drained each tick.
+     pub(crate) pending_close_retries: Vec<(u32, u8)>,
++    /// Logical sends whose queued SQEs were discarded after terminal SQ pressure.
++    pub(crate) bounded_send_failures: VecDeque<(u64, io::Error)>,
+     /// Scratch buffers swapped with the corresponding `pending_*_retries`
+     /// queue at drain time so the per-tick drain reuses a single allocation
+     /// across ticks (the primary queue is left empty for in-iteration
+@@ -680,6 +682,7 @@ impl Driver {
+             pending_coalesced_retries: Vec::new(),
+             pending_recv_forward_retries: Vec::new(),
+             pending_close_retries: Vec::new(),
++            bounded_send_failures: VecDeque::new(),
+             zc_retry_scratch: Vec::new(),
+             copy_retry_scratch: Vec::new(),
+             send_pollout_retry_scratch: Vec::new(),
+@@ -1155,6 +1158,7 @@ impl Driver {
+     pub(crate) fn flush_queued_sends_or_release(&mut self, conn_index: u32) -> usize {
+         let state = &mut self.send_queues[conn_index as usize];
+         let mut pushed = 0usize;
++        let mut failed_ids = Vec::new();
+         while let Some(built) = state.queue.pop_front() {
+             match unsafe { self.ring.push_sqe(built.entry) } {
+                 Ok(()) => {
+@@ -1162,22 +1166,32 @@ impl Driver {
+                 }
+                 Err(_) => {
+                     // SQ full — release this entry and drain remaining queue.
+-                    Self::release_built_resources(
++                    failed_ids.extend(Self::release_built_resources(
+                         &mut self.send_slab,
+                         &mut self.send_copy_pool,
+                         built.pool_slot,
+                         built.slab_idx,
+-                    );
+-                    Self::release_queued_sends(
++                    ));
++                    failed_ids.extend(Self::release_queued_sends(
+                         &mut state.queue,
+                         &mut self.send_slab,
+                         &mut self.send_copy_pool,
+-                    );
++                    ));
+                     state.in_flight = false;
+                     break;
+                 }
+             }
+         }
++        failed_ids.sort_unstable();
++        failed_ids.dedup();
++        for id in failed_ids {
++            self.bounded_send_failures.push_back((
++                id,
++                io::Error::other(
++                    "io_uring submission queue remained full while draining bounded send",
++                ),
++            ));
++        }
+         pushed
+     }
+ 
+@@ -1301,16 +1315,30 @@ impl Driver {
+                     Err(_) => {
+                         // SQ full — release the coalesced slab entry + its pool
+                         // slots, drain the rest of the queue, clear in_flight.
++                        let mut failed_ids = Vec::new();
+                         for &s in &pool_slots[..n] {
++                            if let Some(id) = self.send_copy_pool.bounded_send_id(s) {
++                                failed_ids.push(id);
++                            }
+                             self.send_copy_pool.release(s);
+                         }
+                         self.send_slab.release(slab_idx);
+                         let state = &mut self.send_queues[ci];
+-                        Self::release_queued_sends(
++                        failed_ids.extend(Self::release_queued_sends(
+                             &mut state.queue,
+                             &mut self.send_slab,
+                             &mut self.send_copy_pool,
+-                        );
++                        ));
++                        failed_ids.sort_unstable();
++                        failed_ids.dedup();
++                        for id in failed_ids {
++                            self.bounded_send_failures.push_back((
++                                id,
++                                io::Error::other(
++                                    "io_uring submission queue remained full while draining bounded send",
++                                ),
++                            ));
++                        }
+                         state.in_flight = false;
+                         state.shutdown_pending = false;
+                         self.try_finalize_close(conn_index);
+@@ -1330,17 +1358,27 @@ impl Driver {
+                     Ok(()) => true,
+                     Err(_) => {
+                         // SQ full — release this entry and drain remaining queue.
+-                        Self::release_built_resources(
++                        let mut failed_ids = Self::release_built_resources(
+                             &mut self.send_slab,
+                             &mut self.send_copy_pool,
+                             pool_slot,
+                             slab_idx,
+                         );
+-                        Self::release_queued_sends(
++                        failed_ids.extend(Self::release_queued_sends(
+                             &mut state.queue,
+                             &mut self.send_slab,
+                             &mut self.send_copy_pool,
+-                        );
++                        ));
++                        failed_ids.sort_unstable();
++                        failed_ids.dedup();
++                        for id in failed_ids {
++                            self.bounded_send_failures.push_back((
++                                id,
++                                io::Error::other(
++                                    "io_uring submission queue remained full while draining bounded send",
++                                ),
++                            ));
++                        }
+                         state.in_flight = false;
+                         state.shutdown_pending = false;
+                         // If a deferred close was pending, fire it now that
+@@ -1443,7 +1481,7 @@ impl Driver {
+     /// Drain and release all queued sends for a connection.
+     pub(crate) fn drain_conn_send_queue(&mut self, conn_index: u32) {
+         let state = &mut self.send_queues[conn_index as usize];
+-        Self::release_queued_sends(
++        let bounded_ids = Self::release_queued_sends(
+             &mut state.queue,
+             &mut self.send_slab,
+             &mut self.send_copy_pool,
+@@ -1455,6 +1493,15 @@ impl Driver {
+         // The queue is now empty and nothing is in flight — fire a deferred
+         // close if one was pending so the connection can't leak.
+         self.try_finalize_close(conn_index);
++        for id in bounded_ids {
++            self.bounded_send_failures.push_back((
++                id,
++                io::Error::new(
++                    io::ErrorKind::BrokenPipe,
++                    "preceding send failed before queued bounded send was submitted",
++                ),
++            ));
++        }
+     }
+ 
+     /// Release all entries from a send queue.
+@@ -1462,15 +1509,19 @@ impl Driver {
+         queue: &mut VecDeque<BuiltSend>,
+         send_slab: &mut InFlightSendSlab,
+         send_copy_pool: &mut SendCopyPool,
+-    ) {
++    ) -> Vec<u64> {
++        let mut bounded_ids = Vec::new();
+         for built in queue.drain(..) {
+-            Self::release_built_resources(
++            bounded_ids.extend(Self::release_built_resources(
+                 send_slab,
+                 send_copy_pool,
+                 built.pool_slot,
+                 built.slab_idx,
+-            );
++            ));
+         }
++        bounded_ids.sort_unstable();
++        bounded_ids.dedup();
++        bounded_ids
+     }
+ 
+     /// Release pool slot and/or slab entry for a single BuiltSend.
+@@ -1479,15 +1530,28 @@ impl Driver {
+         send_copy_pool: &mut SendCopyPool,
+         pool_slot: u16,
+         slab_idx: u16,
+-    ) {
++    ) -> Vec<u64> {
++        let mut bounded_ids = Vec::new();
+         if slab_idx != u16::MAX {
++            for slot in send_slab.coalesced_pool_slots(slab_idx) {
++                if let Some(id) = send_copy_pool.bounded_send_id(*slot) {
++                    bounded_ids.push(id);
++                }
++            }
+             let ps = send_slab.release(slab_idx);
+             if ps != u16::MAX {
++                if let Some(id) = send_copy_pool.bounded_send_id(ps) {
++                    bounded_ids.push(id);
++                }
+                 send_copy_pool.release(ps);
+             }
+         } else if pool_slot != u16::MAX {
++            if let Some(id) = send_copy_pool.bounded_send_id(pool_slot) {
++                bounded_ids.push(id);
++            }
+             send_copy_pool.release(pool_slot);
+         }
++        bounded_ids
+     }
+ 
+     /// Create a UDP socket, bind with SO_REUSEPORT, register in fixed file table.
+diff --git a/src/backend/uring/event_loop.rs b/src/backend/uring/event_loop.rs
+index 1622130..c0719f3 100644
+--- a/src/backend/uring/event_loop.rs
++++ b/src/backend/uring/event_loop.rs
+@@ -25,6 +25,30 @@ pub(crate) struct AsyncEventLoop<A: AsyncEventHandler> {
+     executor: Executor,
+ }
+ 
++/// Capture the bounded logical-send identity before releasing a coalesced
++/// send's slab and copy-pool state. Slot release clears that identity.
++fn release_coalesced_resources(
++    send_slab: &mut crate::buffer::send_slab::InFlightSendSlab,
++    send_copy_pool: &mut crate::buffer::send_copy::SendCopyPool,
++    slab_idx: u16,
++) -> Option<u64> {
++    let bounded_send_id = send_slab
++        .coalesced_pool_slots(slab_idx)
++        .iter()
++        .find_map(|slot| send_copy_pool.bounded_send_id(*slot));
++    let mut slots = [u16::MAX; crate::buffer::send_slab::MAX_IOVECS];
++    let mut n = 0;
++    for &slot in send_slab.coalesced_pool_slots(slab_idx) {
++        slots[n] = slot;
++        n += 1;
++    }
++    for &slot in &slots[..n] {
++        send_copy_pool.release(slot);
++    }
++    send_slab.release(slab_idx);
++    bounded_send_id
++}
++
+ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+     /// Create a new async event loop for a worker thread.
+     #[allow(clippy::too_many_arguments)]
+@@ -672,6 +696,15 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             }
+         }
+ 
++        // Any completion may have returned a pool slot or made SQ room. Wake
++        // only the FIFO head; a still-blocked head parks again until progress.
++        if !self.driver.cqe_batch.is_empty() {
++            self.executor.wake_send_capacity();
++        }
++        while let Some((id, error)) = self.driver.bounded_send_failures.pop_front() {
++            self.executor.complete_bounded_send(id, Err(error));
++        }
++
+         // Eagerly return consumed recv buffers to the kernel ring in the same
+         // iteration they were consumed, keeping the ring fuller under burst.
+         self.flush_replenish_and_rearm();
+@@ -869,7 +902,8 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+                 }
+                 return;
+             }
+-            self.executor.wake_recv(conn_index);
++            self.executor
++                .fail_recv(conn_index, owner_gen, io::Error::from_raw_os_error(-result));
+             self.driver.close_connection(conn_index);
+             return;
+         }
+@@ -1052,7 +1086,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+                 self.maybe_rearm_throttled_forward(conn_index);
+                 return;
+             } else if !has_more {
+-                self.executor.wake_recv(conn_index);
++                let generation = self.driver.connections.generation(conn_index);
++                self.executor.fail_recv(
++                    conn_index,
++                    generation,
++                    io::Error::from_raw_os_error(errno),
++                );
+                 self.driver.close_connection(conn_index);
+             }
+             return;
+@@ -1454,7 +1493,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             } else if errno == libc::ECANCELED {
+                 return;
+             } else if !has_more {
+-                self.executor.wake_recv(conn_index);
++                let generation = self.driver.connections.generation(conn_index);
++                self.executor.fail_recv(
++                    conn_index,
++                    generation,
++                    io::Error::from_raw_os_error(errno),
++                );
+                 self.driver.close_connection(conn_index);
+             }
+             return;
+@@ -1771,6 +1815,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             let total = self.driver.send_copy_pool.original_len(pool_slot);
+             // Read the end-of-send flag before releasing the slot.
+             let end_of_send = self.driver.send_copy_pool.is_end_of_send(pool_slot);
++            let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
+             metrics::BYTES.add(metrics::bytes::SENT, total as u64);
+             self.driver.send_copy_pool.release(pool_slot);
+ 
+@@ -1793,7 +1838,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             if end_of_send {
+                 let acked =
+                     std::mem::take(&mut self.driver.send_queues[conn_index as usize].acked_bytes);
+-                self.executor.wake_send(conn_index, Ok(acked));
++                if let Some(id) = bounded_send_id {
++                    self.executor.complete_bounded_send(id, Ok(acked));
++                } else {
++                    self.executor.wake_send(conn_index, Ok(acked));
++                }
+             }
+             return;
+         }
+@@ -1822,6 +1871,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             return;
+         }
+ 
++        let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
+         self.driver.send_copy_pool.release(pool_slot);
+         self.driver.drain_conn_send_queue(conn_index);
+         self.driver.note_send_finalized(conn_index);
+@@ -1831,7 +1881,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         } else {
+             Err(io::Error::from_raw_os_error(-result))
+         };
+-        self.executor.wake_send(conn_index, io_result);
++        if let Some(id) = bounded_send_id {
++            self.executor.complete_bounded_send(id, io_result);
++        } else {
++            self.executor.wake_send(conn_index, io_result);
++        }
+     }
+ 
+     /// Handle a `POLLOUT` CQE armed after a `Send` returned `-EAGAIN`.
+@@ -1861,11 +1915,16 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         // the same as a generic send failure: drop everything for
+         // this connection.
+         if result < 0 {
++            let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
++            let error = io::Error::from_raw_os_error(-result);
+             self.driver.send_copy_pool.release(pool_slot);
+             self.driver.drain_conn_send_queue(conn_index);
+             self.driver.note_send_finalized(conn_index);
+-            self.executor
+-                .wake_send(conn_index, Err(io::Error::from_raw_os_error(-result)));
++            if let Some(id) = bounded_send_id {
++                self.executor.complete_bounded_send(id, Err(error));
++            } else {
++                self.executor.wake_send(conn_index, Err(error));
++            }
+             return;
+         }
+ 
+@@ -1889,18 +1948,13 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         }
+     }
+ 
+-    /// Release the backing pool slots of a coalesced send, then the slab entry.
+-    fn release_coalesced(&mut self, slab_idx: u16) {
+-        let mut slots = [u16::MAX; crate::buffer::send_slab::MAX_IOVECS];
+-        let mut n = 0;
+-        for &s in self.driver.send_slab.coalesced_pool_slots(slab_idx) {
+-            slots[n] = s;
+-            n += 1;
+-        }
+-        for &s in &slots[..n] {
+-            self.driver.send_copy_pool.release(s);
+-        }
+-        self.driver.send_slab.release(slab_idx);
++    /// Release coalesced resources while retaining bounded-send identity.
++    fn release_coalesced(&mut self, slab_idx: u16) -> Option<u64> {
++        release_coalesced_resources(
++            &mut self.driver.send_slab,
++            &mut self.driver.send_copy_pool,
++            slab_idx,
++        )
+     }
+ 
+     /// Handle completion of a coalesced plaintext `sendmsg` (OpTag::SendMsgCoalesced).
+@@ -1936,7 +1990,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             // Read the end-of-send flag before releasing the slab entry.
+             let end_of_send = self.driver.send_slab.is_end_of_send(slab_idx);
+             metrics::BYTES.add(metrics::bytes::SENT, total as u64);
+-            self.release_coalesced(slab_idx);
++            let bounded_send_id = self.release_coalesced(slab_idx);
+ 
+             // Accumulate these chunks' bytes against the logical send, and wake
+             // the waiter once, when the entry carrying the send's final chunk
+@@ -1948,7 +2002,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             if end_of_send {
+                 let acked =
+                     std::mem::take(&mut self.driver.send_queues[conn_index as usize].acked_bytes);
+-                self.executor.wake_send(conn_index, Ok(acked));
++                if let Some(id) = bounded_send_id {
++                    self.executor.complete_bounded_send(id, Ok(acked));
++                } else {
++                    self.executor.wake_send(conn_index, Ok(acked));
++                }
+             }
+             return;
+         }
+@@ -1973,7 +2031,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         }
+ 
+         // Real error — release everything and drain the connection's queue.
+-        self.release_coalesced(slab_idx);
++        let bounded_send_id = self.release_coalesced(slab_idx);
+         self.driver.drain_conn_send_queue(conn_index);
+         self.driver.note_send_finalized(conn_index);
+         let io_result = if result == 0 {
+@@ -1981,7 +2039,11 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         } else {
+             Err(io::Error::from_raw_os_error(-result))
+         };
+-        self.executor.wake_send(conn_index, io_result);
++        if let Some(id) = bounded_send_id {
++            self.executor.complete_bounded_send(id, io_result);
++        } else {
++            self.executor.wake_send(conn_index, io_result);
++        }
+     }
+ 
+     /// Handle a POLLOUT CQE armed after a coalesced send returned `-EAGAIN`.
+@@ -1997,11 +2059,15 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         }
+ 
+         if result < 0 {
+-            self.release_coalesced(slab_idx);
++            let error = io::Error::from_raw_os_error(-result);
++            let bounded_send_id = self.release_coalesced(slab_idx);
+             self.driver.drain_conn_send_queue(conn_index);
+             self.driver.note_send_finalized(conn_index);
+-            self.executor
+-                .wake_send(conn_index, Err(io::Error::from_raw_os_error(-result)));
++            if let Some(id) = bounded_send_id {
++                self.executor.complete_bounded_send(id, Err(error));
++            } else {
++                self.executor.wake_send(conn_index, Err(error));
++            }
+             return;
+         }
+ 
+@@ -2877,6 +2943,7 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             }
+         }
+ 
++        let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
+         self.driver.send_copy_pool.release(pool_slot);
+ 
+         // Intermediate TLS chunks are serialized through the per-connection
+@@ -2893,6 +2960,12 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+         // and close.
+         if result < 0 {
+             self.driver.drain_conn_send_queue(conn_index);
++            let error = io::Error::from_raw_os_error(-result);
++            if let Some(id) = bounded_send_id {
++                self.executor.complete_bounded_send(id, Err(error));
++            } else {
++                self.executor.wake_send(conn_index, Err(error));
++            }
+             self.driver.close_connection(conn_index);
+         }
+     }
+@@ -3535,16 +3608,29 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             if self.driver.connections.get(conn_index).is_none()
+                 || self.driver.connections.generation(conn_index) != generation
+             {
+-                self.release_coalesced(slab_idx);
++                let bounded_send_id = self.release_coalesced(slab_idx);
++                if let Some(id) = bounded_send_id {
++                    self.executor.complete_bounded_send(
++                        id,
++                        Err(io::Error::new(
++                            io::ErrorKind::ConnectionAborted,
++                            "connection closed during coalesced send retry",
++                        )),
++                    );
++                }
+                 continue;
+             }
+             if retries >= 2 {
+                 // Give up: fail the waiter and close so the connection isn't
+                 // left open with a hole in its byte stream.
+-                self.release_coalesced(slab_idx);
++                let bounded_send_id = self.release_coalesced(slab_idx);
+                 self.driver.drain_conn_send_queue(conn_index);
+                 let err = io::Error::other("max retries during coalesced send resubmit");
+-                self.executor.wake_send(conn_index, Err(err));
++                if let Some(id) = bounded_send_id {
++                    self.executor.complete_bounded_send(id, Err(err));
++                } else {
++                    self.executor.wake_send(conn_index, Err(err));
++                }
+                 self.driver.close_connection(conn_index);
+                 continue;
+             }
+@@ -3635,16 +3721,31 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             if self.driver.connections.get(conn_index).is_none()
+                 || self.driver.connections.generation(conn_index) != generation
+             {
++                let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
+                 self.driver.send_copy_pool.release(pool_slot);
++                if let Some(id) = bounded_send_id {
++                    self.executor.complete_bounded_send(
++                        id,
++                        Err(io::Error::new(
++                            io::ErrorKind::ConnectionAborted,
++                            "connection closed during copied send retry",
++                        )),
++                    );
++                }
+                 continue;
+             }
+             if retries >= 2 {
+                 // Give up: fail the waiter and close so the connection isn't
+                 // left open with a hole in its byte stream.
++                let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
+                 self.driver.send_copy_pool.release(pool_slot);
+                 self.driver.drain_conn_send_queue(conn_index);
+                 let err = io::Error::other("max retries during send resubmit");
+-                self.executor.wake_send(conn_index, Err(err));
++                if let Some(id) = bounded_send_id {
++                    self.executor.complete_bounded_send(id, Err(err));
++                } else {
++                    self.executor.wake_send(conn_index, Err(err));
++                }
+                 self.driver.close_connection(conn_index);
+                 continue;
+             }
+@@ -3716,12 +3817,17 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+                 self.driver.send_pollout_retry_scratch[idx];
+             if retry >= 3 {
+                 // Max retries exceeded — release pool + drain queue + close.
++                let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
+                 if self.driver.send_copy_pool.in_use(pool_slot) {
+                     self.driver.send_copy_pool.release(pool_slot);
+                 }
+                 self.driver.drain_conn_send_queue(conn_index);
+                 let err = io::Error::other("max retries during send pollout retry");
+-                self.executor.wake_send(conn_index, Err(err));
++                if let Some(id) = bounded_send_id {
++                    self.executor.complete_bounded_send(id, Err(err));
++                } else {
++                    self.executor.wake_send(conn_index, Err(err));
++                }
+                 self.driver.close_connection(conn_index);
+                 continue;
+             }
+@@ -3738,9 +3844,19 @@ impl<A: AsyncEventHandler> AsyncEventLoop<A> {
+             if self.driver.connections.get(conn_index).is_none()
+                 || self.driver.connections.generation(conn_index) != generation
+             {
++                let bounded_send_id = self.driver.send_copy_pool.bounded_send_id(pool_slot);
+                 if self.driver.send_copy_pool.in_use(pool_slot) {
+                     self.driver.send_copy_pool.release(pool_slot);
+                 }
++                if let Some(id) = bounded_send_id {
++                    self.executor.complete_bounded_send(
++                        id,
++                        Err(io::Error::new(
++                            io::ErrorKind::ConnectionAborted,
++                            "connection closed during send pollout retry",
++                        )),
++                    );
++                }
+                 continue;
+             }
+             if self
+@@ -3977,6 +4093,55 @@ mod tests {
+         conn_index
+     }
+ 
++    #[test]
++    fn coalesced_pollout_error_releases_resources_and_completes_bounded_operation() {
++        let mut executor = Executor::new(4, 4, 4, 0, 0);
++        let mut registration = executor.enqueue_send_capacity(1, 7, 1);
++        let operation_id = registration.id();
++        registration.admit();
++
++        let mut pool = crate::buffer::send_copy::SendCopyPool::new(2, 8);
++        let (first_slot, first_ptr, first_len) = pool.copy_in(b"first").unwrap();
++        let (second_slot, second_ptr, second_len) = pool.copy_in(b"second").unwrap();
++        pool.set_bounded_send_id(first_slot, Some(operation_id));
++        pool.set_bounded_send_id(second_slot, Some(operation_id));
++        let iovecs = [
++            libc::iovec {
++                iov_base: first_ptr.cast_mut().cast(),
++                iov_len: first_len as usize,
++            },
++            libc::iovec {
++                iov_base: second_ptr.cast_mut().cast(),
++                iov_len: second_len as usize,
++            },
++        ];
++        let mut slab = crate::buffer::send_slab::InFlightSendSlab::new(1);
++        let (slab_idx, _) = slab
++            .allocate_coalesced(
++                1,
++                &iovecs,
++                &[first_slot, second_slot],
++                first_len + second_len,
++                true,
++            )
++            .expect("coalesced slab has capacity");
++
++        let retained_id = release_coalesced_resources(&mut slab, &mut pool, slab_idx);
++        assert_eq!(retained_id, Some(operation_id));
++        assert_eq!(pool.free_count(), 2);
++        assert!(!slab.in_use(slab_idx));
++
++        executor.complete_bounded_send(
++            retained_id.expect("bounded identity survived resource cleanup"),
++            Err(io::Error::from_raw_os_error(libc::EPIPE)),
++        );
++        let error = registration
++            .take_result()
++            .expect("bounded operation remained submitted")
++            .expect_err("negative POLLOUT completion reported success");
++        assert_eq!(error.raw_os_error(), Some(libc::EPIPE));
++    }
++
+     // ── Send path tests ────────────────────────────────────────────
+ 
+     #[test]
+diff --git a/src/backend/uring/ring.rs b/src/backend/uring/ring.rs
+index 57e7c7f..ee1a1b0 100644
+--- a/src/backend/uring/ring.rs
++++ b/src/backend/uring/ring.rs
+@@ -794,7 +794,10 @@ impl Ring {
+                 self.ring.submit()?;
+                 if self.ring.submission().push(&entry).is_err() {
+                     crate::metrics::RING.increment(crate::metrics::ring::SQE_SUBMIT_FAILURES);
+-                    return Err(io::Error::other("SQ still full after submit"));
++                    return Err(io::Error::new(
++                        io::ErrorKind::WouldBlock,
++                        "SQ still full after submit",
++                    ));
+                 }
+             }
+         }
+diff --git a/src/buffer/send_copy.rs b/src/buffer/send_copy.rs
+index 660c66b..9ef91eb 100644
+--- a/src/buffer/send_copy.rs
++++ b/src/buffer/send_copy.rs
+@@ -15,6 +15,8 @@ pub struct SendCopyPool {
+     // is marked, so the send waiter is woken once per logical send rather
+     // than once per chunk. Independent single-slot sends are always final.
+     slot_end_of_send: Vec<bool>,
++    /// Bounded logical-send identity, carried through partial/POLLOUT CQEs.
++    slot_bounded_send_id: Vec<Option<u64>>,
+ }
+ 
+ impl SendCopyPool {
+@@ -33,9 +35,53 @@ impl SendCopyPool {
+             slot_remaining: vec![0u32; n],
+             in_use: vec![false; n],
+             slot_end_of_send: vec![true; n],
++            slot_bounded_send_id: vec![None; n],
+         }
+     }
+ 
++    /// Transactionally reserve and fill every slot needed for `data`.
++    ///
++    /// Returns `None` without reserving any slot when the whole logical send
++    /// does not fit. Callers may therefore report pressure without having
++    /// committed a prefix of the buffer.
++    pub fn copy_in_chunks(&mut self, data: &[u8]) -> Option<Vec<(u16, *const u8, u32)>> {
++        let slot_size = self.slot_size as usize;
++        let required = data.len().div_ceil(slot_size);
++        if required > self.free_list.len() {
++            crate::metrics::POOL.increment(crate::metrics::pool::SEND_EXHAUSTED);
++            return None;
++        }
++
++        Some(
++            data.chunks(slot_size)
++                .map(|chunk| self.copy_in(chunk).expect("capacity was reserved"))
++                .collect(),
++        )
++    }
++
++    /// Reserve `required` empty slots as capacity permits.
++    ///
++    /// Returns `None` without changing the pool unless all requested slots
++    /// are available. Reserved slots must be released by the caller.
++    #[cfg(not(has_io_uring))]
++    pub fn reserve_slots(&mut self, required: usize) -> Option<Vec<u16>> {
++        if required > self.free_list.len() {
++            crate::metrics::POOL.increment(crate::metrics::pool::SEND_EXHAUSTED);
++            return None;
++        }
++        let mut slots = Vec::with_capacity(required);
++        for _ in 0..required {
++            let slot = self.free_list.pop().expect("capacity was checked");
++            self.in_use[slot as usize] = true;
++            self.slot_offset[slot as usize] = 0;
++            self.slot_remaining[slot as usize] = 0;
++            self.slot_end_of_send[slot as usize] = true;
++            self.slot_bounded_send_id[slot as usize] = None;
++            slots.push(slot);
++        }
++        Some(slots)
++    }
++
+     /// Allocate a slot, copy `data` into it, and return (slot_index, ptr, len).
+     /// Returns `None` if no slots are free or data exceeds slot size.
+     pub fn copy_in(&mut self, data: &[u8]) -> Option<(u16, *const u8, u32)> {
+@@ -56,6 +102,7 @@ impl SendCopyPool {
+         self.slot_remaining[idx as usize] = data.len() as u32;
+         self.in_use[idx as usize] = true;
+         self.slot_end_of_send[idx as usize] = true;
++        self.slot_bounded_send_id[idx as usize] = None;
+         Some((idx, ptr, data.len() as u32))
+     }
+ 
+@@ -91,6 +138,7 @@ impl SendCopyPool {
+         self.slot_remaining[idx as usize] = total_len as u32;
+         self.in_use[idx as usize] = true;
+         self.slot_end_of_send[idx as usize] = true;
++        self.slot_bounded_send_id[idx as usize] = None;
+         Some((idx, out_ptr, total_len as u32))
+     }
+ 
+@@ -112,6 +160,7 @@ impl SendCopyPool {
+         self.slot_remaining[idx as usize] = 0;
+         self.in_use[idx as usize] = true;
+         self.slot_end_of_send[idx as usize] = true;
++        self.slot_bounded_send_id[idx as usize] = None;
+         let ptr = self.backing.as_mut_ptr().wrapping_add(offset);
+         Some((idx, ptr, self.slot_size))
+     }
+@@ -134,6 +183,7 @@ impl SendCopyPool {
+         self.in_use[idx as usize] = false;
+         self.slot_offset[idx as usize] = 0;
+         self.slot_remaining[idx as usize] = 0;
++        self.slot_bounded_send_id[idx as usize] = None;
+         self.free_list.push(idx);
+     }
+ 
+@@ -194,16 +244,28 @@ impl SendCopyPool {
+         self.slot_end_of_send[slot as usize]
+     }
+ 
++    pub fn set_bounded_send_id(&mut self, slot: u16, id: Option<u64>) {
++        self.slot_bounded_send_id[slot as usize] = id;
++    }
++
++    pub fn bounded_send_id(&self, slot: u16) -> Option<u64> {
++        self.slot_bounded_send_id[slot as usize]
++    }
++
+     /// Bytes per slot.
+     pub fn slot_size(&self) -> u32 {
+         self.slot_size
+     }
+ 
+     /// Number of free slots.
+-    #[cfg(test)]
+     pub fn free_count(&self) -> usize {
+         self.free_list.len()
+     }
++
++    /// Total number of slots.
++    pub fn slot_count(&self) -> usize {
++        self.count as usize
++    }
+ }
+ 
+ #[cfg(test)]
+@@ -245,6 +307,14 @@ mod tests {
+         assert!(pool.copy_in(b"second").is_none());
+     }
+ 
++    #[test]
++    fn chunk_reservation_is_transactional_under_pool_pressure() {
++        let mut pool = SendCopyPool::new(1, 4);
++
++        assert!(pool.copy_in_chunks(b"abcdefgh").is_none());
++        assert_eq!(pool.free_count(), 1);
++    }
++
+     #[test]
+     fn exhausted_pool_returns_none_copy_in_gather() {
+         // Same as above but exercising the gather variant.
+@@ -300,6 +370,19 @@ mod tests {
+         assert_eq!(pool.free_count(), 4);
+     }
+ 
++    #[test]
++    fn bounded_send_identity_survives_partial_progress_and_clears_on_release() {
++        let mut pool = SendCopyPool::new(1, 16);
++        let (slot, _, _) = pool.copy_in(b"identity").unwrap();
++        pool.set_bounded_send_id(slot, Some(42));
++
++        assert!(pool.try_advance(slot, 3).is_some());
++        assert_eq!(pool.bounded_send_id(slot), Some(42));
++
++        pool.release(slot);
++        assert_eq!(pool.bounded_send_id(slot), None);
++    }
++
+     #[test]
+     fn try_advance_full_send() {
+         let mut pool = SendCopyPool::new(4, 128);
+diff --git a/src/handler.rs b/src/handler.rs
+index 480de21..1d82f41 100644
+--- a/src/handler.rs
++++ b/src/handler.rs
+@@ -217,12 +217,19 @@ impl<'a> DriverCtx<'a> {
+ 
+     /// Regular (copying) send — copies data into library-owned pool before SQE submission.
+     ///
+-    /// Data larger than one send-pool slot is queued as multiple chunks. If
+-    /// a chunk fails mid-loop (pool exhausted), the chunks queued before it
+-    /// are already committed to the wire and `Err` is returned — retrying
+-    /// the whole buffer would duplicate that prefix. Treat a mid-buffer
+-    /// error as fatal for the connection (close it) rather than retrying.
++    /// Data larger than one send-pool slot is queued as multiple chunks. All
++    /// required slots are reserved before the first chunk is submitted, so
++    /// pool pressure returns `Err` without committing a response prefix.
+     pub fn send(&mut self, conn: ConnToken, data: &[u8]) -> io::Result<()> {
++        self.send_with_id(conn, data, None)
++    }
++
++    fn send_with_id(
++        &mut self,
++        conn: ConnToken,
++        data: &[u8],
++        bounded_send_id: Option<u64>,
++    ) -> io::Result<()> {
+         let conn_state = self
+             .connections
+             .get(conn.index)
+@@ -239,6 +246,12 @@ impl<'a> DriverCtx<'a> {
+             if tls_table.get_mut(conn.index).is_some() {
+                 let sends =
+                     crate::tls::encrypt_to_sends(tls_table, self.send_copy_pool, conn.index, data)?;
++                for send in &sends {
++                    if send.pool_slot != u16::MAX {
++                        self.send_copy_pool
++                            .set_bounded_send_id(send.pool_slot, bounded_send_id);
++                    }
++                }
+                 // Route every ciphertext chunk through the per-connection
+                 // send queue: io_uring doesn't order independent SQEs, and
+                 // a partial-send resubmit would interleave chunks on the
+@@ -247,23 +260,20 @@ impl<'a> DriverCtx<'a> {
+             }
+         }
+ 
+-        let slot_size = self.send_copy_pool.slot_size() as usize;
+-
+-        // Chunk data that exceeds the send copy slot size. Each chunk gets its
+-        // own pool slot and SQE; the per-connection send queue ensures they are
+-        // transmitted in order. Only the final chunk is marked end-of-send, so
+-        // the waiter is woken once for the whole logical send rather than once
+-        // per chunk (which would report a short count and, for pipelined sends,
+-        // wake the wrong future).
+-        let mut chunks = data.chunks(slot_size).peekable();
+-        while let Some(chunk) = chunks.next() {
+-            let (slot, ptr, len) = self
+-                .send_copy_pool
+-                .copy_in(chunk)
+-                .ok_or_else(|| io::Error::other("send copy pool exhausted"))?;
++        // Reserve every pool slot before submitting the first SQE. This is a
++        // logical-send transaction: pressure returns an error with no prefix
++        // queued to the socket, so callers never observe a truncated response.
++        let chunks = self
++            .send_copy_pool
++            .copy_in_chunks(data)
++            .ok_or_else(|| io::Error::other("send copy pool exhausted"))?;
++        let last = chunks.len().saturating_sub(1);
++        let mut sends = Vec::with_capacity(chunks.len());
++        for (chunk_index, (slot, ptr, len)) in chunks.into_iter().enumerate() {
+             self.send_copy_pool
+-                .set_end_of_send(slot, chunks.peek().is_none());
+-
++                .set_end_of_send(slot, chunk_index == last);
++            self.send_copy_pool
++                .set_bounded_send_id(slot, bounded_send_id);
+             let user_data = crate::completion::UserData::encode(
+                 crate::completion::OpTag::Send,
+                 conn.index,
+@@ -273,18 +283,26 @@ impl<'a> DriverCtx<'a> {
+                 .flags(crate::completion::STREAM_SEND_FLAGS)
+                 .build()
+                 .user_data(user_data.raw());
+-
+-            let built = BuiltSend {
++            sends.push(BuiltSend {
+                 entry,
+                 pool_slot: slot,
+                 slab_idx: u16::MAX,
+-                total_len: chunk.len() as u32,
+-            };
+-
+-            self.submit_or_queue(conn.index, built)?;
++                total_len: len,
++            });
+         }
+ 
+-        Ok(())
++        self.queue_built_sends(conn.index, sends)
++    }
++
++    /// Bounded submission used by `ConnCtx::send_backpressured`. Capacity
++    /// admission is performed by the future before this transactional send.
++    pub(crate) fn send_backpressured(
++        &mut self,
++        conn: ConnToken,
++        data: &[u8],
++        id: u64,
++    ) -> io::Result<()> {
++        self.send_with_id(conn, data, Some(id))
+     }
+ 
+     /// Allocate a unique 32-bit disk-I/O completion key: monotonic sequence
+@@ -1851,6 +1869,8 @@ pub struct DriverCtx<'a> {
+     pub(crate) writable: &'a mut Vec<bool>,
+     /// Per-connection send completion queue (byte counts for awaitable sends).
+     pub(crate) send_completions: &'a mut Vec<std::collections::VecDeque<u32>>,
++    /// ID-keyed completions for bounded sends.
++    pub(crate) bounded_send_completions: &'a mut std::collections::VecDeque<(u64, io::Result<u32>)>,
+     /// Per-connection connect timeout deadlines.
+     pub(crate) connect_deadlines: &'a mut Vec<Option<std::time::Instant>>,
+     pub(crate) sends_dirty: &'a mut Vec<u32>,
+@@ -1924,7 +1944,9 @@ impl<'a> DriverCtx<'a> {
+                 let ciphertext = crate::tls::encrypt_for_send_mio(tls_table, conn.index, data)?;
+                 if !ciphertext.is_empty() {
+                     let idx = conn.index as usize;
+-                    self.pending_sends[idx].push_back((ciphertext, 0, None));
++                    self.pending_sends[idx].push_back(
++                        crate::backend::mio::driver::PendingSend::unbounded(ciphertext),
++                    );
+                     self.mark_send_dirty(idx);
+                 }
+                 return Ok(());
+@@ -1932,7 +1954,63 @@ impl<'a> DriverCtx<'a> {
+         }
+ 
+         let idx = conn.index as usize;
+-        self.pending_sends[idx].push_back((data.to_vec(), 0, None));
++        self.pending_sends[idx].push_back(crate::backend::mio::driver::PendingSend::unbounded(
++            data.to_vec(),
++        ));
++        self.mark_send_dirty(idx);
++        Ok(())
++    }
++
++    /// Bounded submission used by `ConnCtx::send_backpressured`. The copied
++    /// bytes retain one configured send-pool permit per logical chunk until
++    /// their pending socket write completes.
++    pub(crate) fn send_backpressured(
++        &mut self,
++        conn: ConnToken,
++        data: &[u8],
++        id: u64,
++    ) -> io::Result<()> {
++        let conn_state = self
++            .connections
++            .get(conn.index)
++            .ok_or_else(|| io::Error::new(io::ErrorKind::NotConnected, "invalid connection"))?;
++        if conn_state.generation != conn.generation {
++            return Err(io::Error::new(
++                io::ErrorKind::NotConnected,
++                "stale connection",
++            ));
++        }
++
++        let slot_size = self.send_copy_pool.slot_size() as usize;
++        let required = data.len().div_ceil(slot_size);
++        let slots = self
++            .send_copy_pool
++            .reserve_slots(required)
++            .ok_or_else(|| io::Error::new(io::ErrorKind::WouldBlock, "send copy pool exhausted"))?;
++
++        let queued = if !self.tls_table.is_null() {
++            let tls_table = unsafe { &mut *self.tls_table };
++            if tls_table.has(conn.index) {
++                match crate::tls::encrypt_for_send_mio(tls_table, conn.index, data) {
++                    Ok(ciphertext) => ciphertext,
++                    Err(error) => {
++                        for slot in slots {
++                            self.send_copy_pool.release(slot);
++                        }
++                        return Err(error);
++                    }
++                }
++            } else {
++                data.to_vec()
++            }
++        } else {
++            data.to_vec()
++        };
++
++        let idx = conn.index as usize;
++        self.pending_sends[idx].push_back(crate::backend::mio::driver::PendingSend::bounded(
++            queued, slots, id,
++        ));
+         self.mark_send_dirty(idx);
+         Ok(())
+     }
+@@ -1951,8 +2029,8 @@ impl<'a> DriverCtx<'a> {
+     /// fully reached the socket, not at queue time.
+     pub(crate) fn mark_last_send_awaited(&mut self, conn_index: u32) {
+         let idx = conn_index as usize;
+-        if let Some((data, offset, notify)) = self.pending_sends[idx].back_mut() {
+-            *notify = Some((data.len() - *offset) as u32);
++        if let Some(pending) = self.pending_sends[idx].back_mut() {
++            pending.notify_len = Some((pending.data.len() - pending.offset) as u32);
+         } else {
+             // The send was flushed... it can't have been (mio sends are
+             // queued, never written inline) — but if the queue is somehow
+@@ -2011,8 +2089,17 @@ impl<'a> DriverCtx<'a> {
+         // Flush any pending send data before shutting down.
+         if let Some(ref mut stream) = self.tcp_streams[idx] {
+             use std::io::Write;
+-            for (data, offset, _notify) in self.pending_sends[idx].drain(..) {
+-                let _ = stream.write_all(&data[offset..]);
++            for mut pending in self.pending_sends[idx].drain(..) {
++                let logical_len = pending.data.len() as u32;
++                let result = stream
++                    .write_all(&pending.data[pending.offset..])
++                    .map(|()| logical_len);
++                if let Some(id) = pending.bounded_send_id.take() {
++                    self.bounded_send_completions.push_back((id, result));
++                }
++                for slot in pending.pool_slots {
++                    self.send_copy_pool.release(slot);
++                }
+             }
+             let _ = stream.flush();
+             let _ = stream.shutdown(std::net::Shutdown::Write);
+@@ -2055,7 +2142,11 @@ impl<'a> DriverCtx<'a> {
+         let idx = conn_index as usize;
+         self.tcp_streams[idx] = Some(mio_stream);
+         self.writable[idx] = false;
+-        self.pending_sends[idx].clear();
++        for pending in self.pending_sends[idx].drain(..) {
++            for slot in pending.pool_slots {
++                self.send_copy_pool.release(slot);
++            }
++        }
+         if let Some(cs) = self.connections.get_mut(conn_index) {
+             cs.peer_addr = Some(crate::connection::PeerAddr::Tcp(addr));
+         }
+diff --git a/src/lib.rs b/src/lib.rs
+index 446f60e..67f4545 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -236,6 +236,8 @@ pub use runtime::handler::AsyncEventHandler;
+ #[cfg(has_io_uring)]
+ /// Async scatter-gather send builder.
+ pub use runtime::io::AsyncSendBuilder;
++/// Future that completes when a send finishes.
++pub use runtime::io::BackpressuredSendFuture;
+ /// Future returned by [`spawn_blocking()`]. Resolves to the closure's return value.
+ pub use runtime::io::BlockingJoinHandle;
+ /// Async connection context with send/recv futures.
+@@ -274,7 +276,6 @@ pub use runtime::io::SegConsumed;
+ /// Async lending iterator over received provided buffers (segmented recv, Mode B).
+ #[cfg(has_io_uring)]
+ pub use runtime::io::SegmentReader;
+-/// Future that completes when a send finishes.
+ pub use runtime::io::SendFuture;
+ /// Non-raw sink descriptor for [`ConnCtx::forward_to()`] (segmented recv, Mode A).
+ #[cfg(has_io_uring)]
+@@ -291,6 +292,7 @@ pub use runtime::io::UdpRecvFuture;
+ pub use runtime::io::WithBytesFuture;
+ /// Future that provides received data.
+ pub use runtime::io::WithDataFuture;
++pub use runtime::io::WithDataResultFuture;
+ /// Future returned by [`ConnCtx::with_segments()`] (segmented recv, Mode B).
+ #[cfg(has_io_uring)]
+ pub use runtime::io::WithSegmentsFuture;
+diff --git a/src/runtime/io.rs b/src/runtime/io.rs
+index e9000a4..43d3afc 100644
+--- a/src/runtime/io.rs
++++ b/src/runtime/io.rs
+@@ -806,6 +806,17 @@ impl ConnCtx {
+         }
+     }
+ 
++    /// Result-aware form of `with_data` that preserves non-WouldBlock
++    /// transport read failures. Clean EOF remains `Ok(0)`.
++    pub fn with_data_result<F: FnMut(&[u8]) -> ParseResult>(
++        &self,
++        f: F,
++    ) -> WithDataResultFuture<F> {
++        WithDataResultFuture {
++            inner: self.with_data(f),
++        }
++    }
++
+     /// Wait until recv data is available, then provide it as zero-copy `Bytes`.
+     ///
+     /// Like [`with_data()`](Self::with_data), but the closure receives a `Bytes`
+@@ -1425,6 +1436,25 @@ impl ConnCtx {
+         })
+     }
+ 
++    /// Send one logical buffer with bounded, FIFO copy-pool backpressure.
++    ///
++    /// Construction is inert. On its first poll, the future registers the
++    /// polling task in the worker-local FIFO. Unlike `send`, transient pool
++    /// pressure parks this future. The whole
++    /// logical buffer is admitted before submission, so callers never retry
++    /// and cannot duplicate or truncate a response. A buffer larger than the
++    /// configured pool capacity fails with `InvalidInput` before any bytes are
++    /// submitted.
++    pub fn send_backpressured<'a>(&self, data: &'a [u8]) -> BackpressuredSendFuture<'a> {
++        BackpressuredSendFuture {
++            conn_index: self.conn_index,
++            generation: self.generation,
++            registration: None,
++            data,
++            submitted: false,
++        }
++    }
++
+     // ── Connect ──────────────────────────────────────────────────────
+ 
+     /// Initiate an outbound TCP connection and await the result.
+@@ -1541,9 +1571,13 @@ impl ConnCtx {
+     ///
+     /// Sends a TCP FIN to the peer. The read side remains open.
+     pub fn shutdown_write(&self) {
+-        with_state(|driver, _| {
+-            let mut ctx = driver.make_ctx();
+-            ctx.shutdown_write(self.token());
++        with_state(|driver, executor| {
++            executor.fail_bounded_capacity_for_connection(self.conn_index, self.generation);
++            {
++                let mut ctx = driver.make_ctx();
++                ctx.shutdown_write(self.token());
++            }
++            executor.wake_send_capacity();
+         })
+     }
+ 
+@@ -2048,6 +2082,48 @@ impl<F: FnMut(&[u8]) -> ParseResult + Unpin> Future for WithDataFuture<F> {
+     }
+ }
+ 
++/// Result-aware wrapper around [`WithDataFuture`].
++pub struct WithDataResultFuture<F> {
++    inner: WithDataFuture<F>,
++}
++
++impl<F: FnMut(&[u8]) -> ParseResult + Unpin> Future for WithDataResultFuture<F> {
++    type Output = io::Result<usize>;
++
++    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
++        let conn_index = self.inner.conn_index;
++        let generation = self.inner.generation;
++        let buffered = with_state(|driver, _executor| {
++            let accumulator_has_data = !driver.accumulators.is_empty(conn_index);
++            #[cfg(has_io_uring)]
++            let pending_has_data = driver.pending_recv_bufs[conn_index as usize].is_some();
++            #[cfg(not(has_io_uring))]
++            let pending_has_data = false;
++            accumulator_has_data || pending_has_data
++        });
++        if !buffered
++            && let Some(error) =
++                with_state(|_driver, executor| executor.take_recv_error(conn_index, generation))
++        {
++            return Poll::Ready(Err(error));
++        }
++
++        match Pin::new(&mut self.inner).poll(cx) {
++            Poll::Ready(0) => {
++                if let Some(error) =
++                    with_state(|_driver, executor| executor.take_recv_error(conn_index, generation))
++                {
++                    Poll::Ready(Err(error))
++                } else {
++                    Poll::Ready(Ok(0))
++                }
++            }
++            Poll::Ready(consumed) => Poll::Ready(Ok(consumed)),
++            Poll::Pending => Poll::Pending,
++        }
++    }
++}
++
+ // ── WithBytesFuture ──────────────────────────────────────────────────
+ 
+ /// Future returned by [`ConnCtx::with_bytes`].
+@@ -3169,6 +3245,116 @@ impl Future for RecvReadyFuture {
+ 
+ // ── SendFuture ───────────────────────────────────────────────────────
+ 
++/// Future returned by [`ConnCtx::send_backpressured`]. It owns no bytes and
++/// does not register for capacity until first poll. The caller's slice is
++/// copied only after this waiter reaches the FIFO head and the configured send
++/// pool can admit the complete logical buffer. Once submitted, a unique
++/// operation ID routes its completion; dropping the future abandons only that
++/// operation.
++pub struct BackpressuredSendFuture<'a> {
++    conn_index: u32,
++    generation: u32,
++    registration: Option<super::SendCapacityRegistration>,
++    data: &'a [u8],
++    submitted: bool,
++}
++
++impl Future for BackpressuredSendFuture<'_> {
++    type Output = io::Result<u32>;
++
++    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
++        let this = self.get_mut();
++        let task_id = CURRENT_TASK_ID.with(|current| current.get());
++        if this.registration.is_none() {
++            this.registration = Some(with_state(|_driver, executor| {
++                executor.enqueue_send_capacity(this.conn_index, this.generation, task_id)
++            }));
++        }
++        let registration = this
++            .registration
++            .as_mut()
++            .expect("registered on first poll");
++        // This !Send future can move only between tasks on the same worker.
++        // Refresh before observing state so every later wake targets this poller.
++        registration.refresh_owner(task_id);
++        if let Some(result) = registration.take_result() {
++            return Poll::Ready(result);
++        }
++        with_state(|driver, executor| {
++            if driver.connections.generation(this.conn_index) != this.generation {
++                this.registration.take();
++                return Poll::Ready(Err(io::Error::new(
++                    io::ErrorKind::ConnectionAborted,
++                    "connection closed",
++                )));
++            }
++
++            if this.submitted {
++                return this
++                    .registration
++                    .as_mut()
++                    .expect("submitted send retains its identity")
++                    .take_result()
++                    .map_or(Poll::Pending, Poll::Ready);
++            }
++
++            if this.data.is_empty() {
++                this.registration.take();
++                return Poll::Ready(Ok(0));
++            }
++
++            let slot_size = driver.send_copy_pool.slot_size() as usize;
++            let slot_count = driver.send_copy_pool.slot_count();
++            let total_capacity = slot_size.saturating_mul(slot_count);
++            if this.data.len() > total_capacity {
++                this.registration.take();
++                return Poll::Ready(Err(io::Error::new(
++                    io::ErrorKind::InvalidInput,
++                    format!(
++                        "logical send size {} exceeds send pool capacity {}",
++                        this.data.len(),
++                        total_capacity
++                    ),
++                )));
++            }
++
++            let waiter_id = this
++                .registration
++                .as_ref()
++                .expect("registered on first poll")
++                .id();
++            if !executor.send_capacity_turn(waiter_id) {
++                return Poll::Pending;
++            }
++            let required = this.data.len().div_ceil(slot_size);
++            if driver.send_copy_pool.free_count() < required {
++                return Poll::Pending;
++            }
++
++            let mut ctx = driver.make_ctx();
++            match ctx.send_backpressured(
++                ConnToken::new(this.conn_index, this.generation),
++                this.data,
++                waiter_id,
++            ) {
++                Ok(()) => {
++                    this.submitted = true;
++                    this.registration
++                        .as_mut()
++                        .expect("registered before submission")
++                        .admit();
++                    Poll::Pending
++                }
++                Err(error) if error.kind() == io::ErrorKind::WouldBlock => Poll::Pending,
++                Err(error) => {
++                    this.registration.take();
++                    Poll::Ready(Err(error))
++                }
++            }
++        })
++    }
++}
++
+ /// Future that awaits send completion. The SQE was already submitted eagerly
+ /// by [`ConnCtx::send`] — this future only waits for the CQE result.
+ /// No data stored in the future. No allocation.
+diff --git a/src/runtime/mod.rs b/src/runtime/mod.rs
+index 2dc8f51..cdc1c4b 100644
+--- a/src/runtime/mod.rs
++++ b/src/runtime/mod.rs
+@@ -28,9 +28,10 @@ pub(crate) mod stream;
+ pub(crate) mod task;
+ pub(crate) mod waker;
+ 
+-use std::cell::Cell;
++use std::cell::{Cell, RefCell};
+ use std::collections::{HashMap, VecDeque};
+ use std::io as stdio;
++use std::rc::Rc;
+ 
+ use self::task::{StandaloneTaskSlab, TaskSlab};
+ use self::waker::drain_ready_queue;
+@@ -409,6 +410,256 @@ impl TimerSlotPool {
+     }
+ }
+ 
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub(crate) struct SendCapacityWaiter {
++    pub(crate) id: u64,
++    pub(crate) conn_index: u32,
++    pub(crate) generation: u32,
++}
++
++#[derive(Default)]
++struct SendCapacityQueue {
++    waiters: VecDeque<SendCapacityWaiter>,
++    operations: HashMap<u64, BoundedSendOperation>,
++    pending_wakes: VecDeque<u64>,
++    next_id: u64,
++}
++
++enum BoundedSendStatus {
++    Waiting,
++    Submitted,
++    Completed(stdio::Result<u32>),
++    Abandoned,
++}
++
++struct BoundedSendOperation {
++    conn_index: u32,
++    generation: u32,
++    task_id: u32,
++    status: BoundedSendStatus,
++}
++
++impl SendCapacityQueue {
++    fn register(
++        queue: &Rc<RefCell<Self>>,
++        conn_index: u32,
++        generation: u32,
++        task_id: u32,
++    ) -> SendCapacityRegistration {
++        let mut state = queue.borrow_mut();
++        let id = state.next_id;
++        state.next_id = state
++            .next_id
++            .checked_add(1)
++            .expect("bounded send operation ID space exhausted");
++        state.waiters.push_back(SendCapacityWaiter {
++            id,
++            conn_index,
++            generation,
++        });
++        state.operations.insert(
++            id,
++            BoundedSendOperation {
++                conn_index,
++                generation,
++                task_id,
++                status: BoundedSendStatus::Waiting,
++            },
++        );
++        SendCapacityRegistration {
++            id,
++            queue: Rc::clone(queue),
++            registered: true,
++        }
++    }
++
++    fn refresh_owner(&mut self, id: u64, task_id: u32) {
++        if let Some(operation) = self.operations.get_mut(&id) {
++            operation.task_id = task_id;
++        }
++    }
++
++    fn cancel(&mut self, id: u64) {
++        let was_head = self.waiters.front().is_some_and(|waiter| waiter.id == id);
++        if let Some(position) = self.waiters.iter().position(|waiter| waiter.id == id) {
++            self.waiters.remove(position);
++        }
++        if was_head && let Some(next) = self.waiters.front() {
++            self.pending_wakes.push_back(next.id);
++        }
++    }
++
++    fn finish_unsubmitted(&mut self, id: u64) {
++        self.cancel(id);
++        self.operations.remove(&id);
++    }
++
++    fn mark_submitted(&mut self, id: u64) {
++        self.cancel(id);
++        if let Some(operation) = self.operations.get_mut(&id) {
++            operation.status = BoundedSendStatus::Submitted;
++        }
++    }
++
++    fn abandon(&mut self, id: u64) {
++        let Some(operation) = self.operations.get_mut(&id) else {
++            return;
++        };
++        match operation.status {
++            BoundedSendStatus::Waiting => self.finish_unsubmitted(id),
++            BoundedSendStatus::Submitted => operation.status = BoundedSendStatus::Abandoned,
++            BoundedSendStatus::Completed(_) | BoundedSendStatus::Abandoned => {
++                self.operations.remove(&id);
++            }
++        }
++    }
++
++    fn complete(&mut self, id: u64, result: stdio::Result<u32>) {
++        let Some(operation) = self.operations.get_mut(&id) else {
++            return;
++        };
++        match operation.status {
++            BoundedSendStatus::Submitted => {
++                operation.status = BoundedSendStatus::Completed(result);
++                self.pending_wakes.push_back(id);
++            }
++            BoundedSendStatus::Abandoned => {
++                self.operations.remove(&id);
++            }
++            BoundedSendStatus::Waiting | BoundedSendStatus::Completed(_) => {}
++        }
++    }
++
++    fn take_result(&mut self, id: u64) -> Option<stdio::Result<u32>> {
++        let result = match self.operations.get_mut(&id)?.status {
++            BoundedSendStatus::Completed(ref mut result) => Some(std::mem::replace(
++                result,
++                Err(stdio::Error::other("bounded send result already consumed")),
++            )),
++            _ => None,
++        }?;
++        self.operations.remove(&id);
++        Some(result)
++    }
++
++    fn remove_connection(&mut self, conn_index: u32) {
++        let removed_head = self
++            .waiters
++            .front()
++            .is_some_and(|waiter| waiter.conn_index == conn_index);
++        self.waiters
++            .retain(|waiter| waiter.conn_index != conn_index);
++        let ids: Vec<u64> = self
++            .operations
++            .iter()
++            .filter(|(_, operation)| operation.conn_index == conn_index)
++            .map(|(id, _)| *id)
++            .collect();
++        for id in ids {
++            let Some(operation) = self.operations.get_mut(&id) else {
++                continue;
++            };
++            match operation.status {
++                BoundedSendStatus::Waiting | BoundedSendStatus::Submitted => {
++                    operation.status = BoundedSendStatus::Completed(Err(stdio::Error::new(
++                        stdio::ErrorKind::ConnectionAborted,
++                        "connection closed before bounded send completed",
++                    )));
++                    self.pending_wakes.push_back(id);
++                }
++                BoundedSendStatus::Abandoned => {
++                    self.operations.remove(&id);
++                }
++                BoundedSendStatus::Completed(_) => {}
++            }
++        }
++        if removed_head && let Some(next) = self.waiters.front() {
++            self.pending_wakes.push_back(next.id);
++        }
++    }
++
++    fn fail_waiting_for_connection(&mut self, conn_index: u32, generation: u32) {
++        let old_head = self.waiters.front().map(|waiter| waiter.id);
++        let ids: Vec<u64> = self
++            .operations
++            .iter()
++            .filter(|(_, operation)| {
++                operation.conn_index == conn_index
++                    && operation.generation == generation
++                    && matches!(operation.status, BoundedSendStatus::Waiting)
++            })
++            .map(|(id, _)| *id)
++            .collect();
++        self.waiters
++            .retain(|waiter| waiter.conn_index != conn_index || waiter.generation != generation);
++        for id in ids {
++            if let Some(operation) = self.operations.get_mut(&id) {
++                operation.status = BoundedSendStatus::Completed(Err(stdio::Error::new(
++                    stdio::ErrorKind::BrokenPipe,
++                    "connection write side shut down before bounded send admission",
++                )));
++                self.pending_wakes.push_back(id);
++            }
++        }
++        if old_head != self.waiters.front().map(|waiter| waiter.id)
++            && let Some(next) = self.waiters.front()
++        {
++            self.pending_wakes.push_back(next.id);
++        }
++    }
++
++    fn wake_head(&mut self) {
++        if let Some(waiter) = self.waiters.front() {
++            self.pending_wakes.push_back(waiter.id);
++        }
++    }
++}
++
++pub(crate) struct SendCapacityRegistration {
++    id: u64,
++    queue: Rc<RefCell<SendCapacityQueue>>,
++    registered: bool,
++}
++
++impl SendCapacityRegistration {
++    pub(crate) fn id(&self) -> u64 {
++        self.id
++    }
++
++    pub(crate) fn refresh_owner(&mut self, task_id: u32) {
++        // Rc keeps this registration on one worker while local tasks may own it.
++        self.queue.borrow_mut().refresh_owner(self.id, task_id);
++    }
++
++    pub(crate) fn admit(&mut self) {
++        if self.registered {
++            self.queue.borrow_mut().mark_submitted(self.id);
++            self.registered = false;
++        }
++    }
++
++    pub(crate) fn take_result(&mut self) -> Option<stdio::Result<u32>> {
++        let result = self.queue.borrow_mut().take_result(self.id);
++        if result.is_some() {
++            self.id = u64::MAX;
++        }
++        result
++    }
++}
++
++impl Drop for SendCapacityRegistration {
++    fn drop(&mut self) {
++        if self.id == u64::MAX {
++            return;
++        }
++        if self.registered {
++            self.queue.borrow_mut().finish_unsubmitted(self.id);
++        } else {
++            self.queue.borrow_mut().abandon(self.id);
++        }
++    }
++}
++
+ /// Per-worker async executor. Owns the task slab and coordinates
+ /// CQE-driven wakeups with future polling.
+ pub(crate) struct Executor {
+@@ -430,8 +681,12 @@ pub(crate) struct Executor {
+     waker_drain_scratch: VecDeque<u32>,
+     /// Per-connection: task is awaiting recv data.
+     pub(crate) recv_waiters: Vec<bool>,
++    /// Exact non-WouldBlock transport read errors for result-aware receivers.
++    pub(crate) recv_errors: Vec<Option<(u32, stdio::Error)>>,
+     /// Per-connection: task is awaiting send completion.
+     pub(crate) send_waiters: Vec<bool>,
++    /// Worker-local FIFO and cancellation ownership for bounded send admission.
++    send_capacity: Rc<RefCell<SendCapacityQueue>>,
+     /// Per-connection: task is awaiting connect result.
+     pub(crate) connect_waiters: Vec<bool>,
+     /// Per-connection: CQE result storage for send/connect.
+@@ -529,7 +784,13 @@ impl Executor {
+             woken_while_polling: false,
+             waker_drain_scratch: VecDeque::with_capacity(64),
+             recv_waiters: vec![false; cap],
++            recv_errors: {
++                let mut errors = Vec::with_capacity(cap);
++                errors.resize_with(cap, || None);
++                errors
++            },
+             send_waiters: vec![false; cap],
++            send_capacity: Rc::new(RefCell::new(SendCapacityQueue::default())),
+             connect_waiters: vec![false; cap],
+             io_results: {
+                 let mut v = Vec::with_capacity(cap);
+@@ -582,6 +843,22 @@ impl Executor {
+         while let Some(id) = self.waker_drain_scratch.pop_front() {
+             let _ = self.wake_task(id);
+         }
++        self.drain_send_capacity_wakes();
++    }
++
++    fn drain_send_capacity_wakes(&mut self) {
++        // Resolve operation IDs only at drain time so an owner refresh also
++        // retargets a wake that was queued before the future moved locally.
++        let wakes: Vec<u32> = {
++            let mut state = self.send_capacity.borrow_mut();
++            let ids: Vec<u64> = state.pending_wakes.drain(..).collect();
++            ids.into_iter()
++                .filter_map(|id| state.operations.get(&id).map(|operation| operation.task_id))
++                .collect()
++        };
++        for task_id in wakes {
++            let _ = self.wake_task(task_id);
++        }
+     }
+ 
+     /// Reset all per-connection state for a connection that was closed.
+@@ -593,6 +870,10 @@ impl Executor {
+             self.recv_sinks[idx] = None;
+         }
+         self.task_slab.remove(conn_index);
++        self.send_capacity
++            .borrow_mut()
++            .remove_connection(conn_index);
++        self.drain_send_capacity_wakes();
+         if idx < self.recv_waiters.len() {
+             // If a *standalone* task was awaiting recv/send/connect on this
+             // connection, it isn't removed by `task_slab.remove`. Push it
+@@ -647,6 +928,32 @@ impl Executor {
+         false
+     }
+ 
++    /// Preserve a transport receive failure for `with_data_result` and wake
++    /// the registered reader. Existing `with_data` callers continue to see EOF.
++    pub(crate) fn fail_recv(&mut self, conn_index: u32, generation: u32, error: stdio::Error) {
++        let idx = conn_index as usize;
++        if idx < self.recv_errors.len() {
++            self.recv_errors[idx] = Some((generation, error));
++        }
++        self.wake_recv(conn_index);
++    }
++
++    pub(crate) fn take_recv_error(
++        &mut self,
++        conn_index: u32,
++        generation: u32,
++    ) -> Option<stdio::Error> {
++        let slot = self.recv_errors.get_mut(conn_index as usize)?;
++        if slot
++            .as_ref()
++            .is_some_and(|(error_generation, _)| *error_generation == generation)
++        {
++            slot.take().map(|(_, error)| error)
++        } else {
++            None
++        }
++    }
++
+     /// Wake a task that was waiting for recv data.
+     ///
+     /// Resolves through `owner_task` so that outbound connections correctly
+@@ -660,6 +967,47 @@ impl Executor {
+         }
+     }
+ 
++    /// Allocate and enqueue a FIFO copy-pool capacity waiter.
++    pub(crate) fn enqueue_send_capacity(
++        &mut self,
++        conn_index: u32,
++        generation: u32,
++        task_id: u32,
++    ) -> SendCapacityRegistration {
++        SendCapacityQueue::register(&self.send_capacity, conn_index, generation, task_id)
++    }
++
++    /// Whether this waiter is first in the FIFO and may attempt reservation.
++    pub(crate) fn send_capacity_turn(&self, id: u64) -> bool {
++        self.send_capacity
++            .borrow()
++            .waiters
++            .front()
++            .is_some_and(|waiter| waiter.id == id)
++    }
++
++    /// Wake only the FIFO head when send capacity may have increased.
++    pub(crate) fn wake_send_capacity(&mut self) {
++        self.send_capacity.borrow_mut().wake_head();
++        self.drain_send_capacity_wakes();
++    }
++
++    pub(crate) fn complete_bounded_send(&mut self, id: u64, result: stdio::Result<u32>) {
++        self.send_capacity.borrow_mut().complete(id, result);
++        self.drain_send_capacity_wakes();
++    }
++
++    pub(crate) fn fail_bounded_capacity_for_connection(
++        &mut self,
++        conn_index: u32,
++        generation: u32,
++    ) {
++        self.send_capacity
++            .borrow_mut()
++            .fail_waiting_for_connection(conn_index, generation);
++        self.drain_send_capacity_wakes();
++    }
++
+     /// Wake a task that was waiting for send completion.
+     pub(crate) fn wake_send(&mut self, conn_index: u32, result: stdio::Result<u32>) {
+         let idx = conn_index as usize;
+@@ -786,6 +1134,132 @@ impl Executor {
+ mod tests {
+     use super::*;
+ 
++    #[test]
++    fn send_capacity_waiters_are_fifo_and_cancel_safe() {
++        let mut exec = Executor::new(8, 8, 8, 0, 0);
++        for task_id in [1, 2] {
++            exec.task_slab
++                .spawn(task_id, Box::pin(std::future::pending::<()>()));
++            let future = exec.task_slab.take_ready(task_id).unwrap();
++            exec.task_slab.park(task_id, future);
++        }
++
++        let first = exec.enqueue_send_capacity(1, 7, 1);
++        let second = exec.enqueue_send_capacity(2, 9, 2);
++        assert!(exec.send_capacity_turn(first.id()));
++        assert!(!exec.send_capacity_turn(second.id()));
++        assert_eq!(
++            exec.send_capacity
++                .borrow()
++                .waiters
++                .front()
++                .unwrap()
++                .generation,
++            7
++        );
++
++        drop(first);
++        exec.collect_wakeups();
++        assert!(exec.send_capacity_turn(second.id()));
++        assert!(exec.task_slab.take_ready(2).is_some());
++    }
++
++    #[test]
++    fn queued_capacity_wake_follows_refreshed_task_owner() {
++        let mut exec = Executor::new(8, 8, 8, 0, 0);
++        exec.task_slab
++            .spawn(1, Box::pin(std::future::pending::<()>()));
++        let old_future = exec.task_slab.take_ready(1).unwrap();
++        exec.task_slab.park(1, old_future);
++
++        let new_index = exec
++            .standalone_slab
++            .spawn(Box::pin(std::future::pending::<()>()))
++            .expect("standalone slab has capacity");
++        let new_future = exec
++            .standalone_slab
++            .take_ready(new_index)
++            .expect("new task starts ready");
++        exec.standalone_slab.park(new_index, new_future);
++        let new_task = new_index | waker::STANDALONE_BIT;
++
++        let mut registration = exec.enqueue_send_capacity(1, 7, 1);
++        exec.send_capacity.borrow_mut().wake_head();
++        registration.refresh_owner(new_task);
++        exec.drain_send_capacity_wakes();
++
++        assert!(
++            exec.task_slab.take_ready(1).is_none(),
++            "a wake queued before the move targeted the stale task owner"
++        );
++        assert!(
++            exec.standalone_slab.take_ready(new_index).is_some(),
++            "the most recent polling task did not receive the capacity wake"
++        );
++    }
++
++    #[test]
++    fn queued_capacity_drop_without_driver_tls_unregisters_only_that_waiter() {
++        let mut exec = Executor::new(8, 8, 8, 0, 0);
++        for task_id in [1, 3] {
++            exec.task_slab
++                .spawn(task_id, Box::pin(std::future::pending::<()>()));
++            let future = exec.task_slab.take_ready(task_id).unwrap();
++            exec.task_slab.park(task_id, future);
++        }
++
++        let first = exec.enqueue_send_capacity(1, 7, 1);
++        let canceled = exec.enqueue_send_capacity(2, 9, 2);
++        let canceled_id = canceled.id();
++        let third = exec.enqueue_send_capacity(3, 11, 3);
++        assert!(exec.send_capacity_turn(first.id()));
++        assert!(!exec.send_capacity_turn(canceled_id));
++        assert!(!exec.send_capacity_turn(third.id()));
++
++        // Unit tests run without CURRENT_DRIVER. The registration token owns
++        // enough worker-local state to unregister safely without that TLS.
++        drop(canceled);
++        assert_eq!(exec.send_capacity.borrow().waiters.len(), 2);
++        assert!(
++            !exec
++                .send_capacity
++                .borrow()
++                .operations
++                .contains_key(&canceled_id)
++        );
++        drop(first);
++        exec.collect_wakeups();
++        assert!(exec.send_capacity_turn(third.id()));
++        assert!(exec.task_slab.take_ready(3).is_some());
++    }
++
++    #[test]
++    fn connection_removal_retains_tagged_receive_error_for_stale_owner() {
++        let mut exec = Executor::new(4, 4, 4, 0, 0);
++        exec.fail_recv(1, 7, stdio::Error::from_raw_os_error(libc::ECONNRESET));
++        exec.remove_connection(1);
++        assert!(exec.take_recv_error(1, 8).is_none());
++        let error = exec
++            .take_recv_error(1, 7)
++            .expect("error was discarded or stolen by a reused generation");
++        assert_eq!(error.raw_os_error(), Some(libc::ECONNRESET));
++    }
++
++    #[test]
++    fn connection_removal_cancels_capacity_waiter_and_advances_fifo() {
++        let mut exec = Executor::new(8, 8, 8, 0, 0);
++        exec.task_slab
++            .spawn(2, Box::pin(std::future::pending::<()>()));
++        let future = exec.task_slab.take_ready(2).unwrap();
++        exec.task_slab.park(2, future);
++
++        let removed = exec.enqueue_send_capacity(1, 3, 1);
++        let survivor = exec.enqueue_send_capacity(2, 4, 2);
++        assert!(exec.send_capacity_turn(removed.id()));
++        exec.remove_connection(1);
++        assert!(exec.send_capacity_turn(survivor.id()));
++        assert!(exec.task_slab.take_ready(2).is_some());
++    }
+     #[test]
+     fn collect_wakeups_transitions_parked_to_ready() {
+         // A std Waker pushes only the raw id onto the thread-local queue.
+diff --git a/src/tls.rs b/src/tls.rs
+index 6ff4cdd..2f64303 100644
+--- a/src/tls.rs
++++ b/src/tls.rs
+@@ -905,7 +905,9 @@ fn flush_tls_output_mio_inner(
+         return;
+     }
+ 
+-    pending.push_back((std::mem::take(write_buf), 0, None));
++    pending.push_back(crate::backend::mio::driver::PendingSend::unbounded(
++        std::mem::take(write_buf),
++    ));
+ }
+ 
+ /// Direct-write flush for close paths (close_notify): the connection is
+diff --git a/src/worker.rs b/src/worker.rs
+index 43754ec..35cb05b 100644
+--- a/src/worker.rs
++++ b/src/worker.rs
+@@ -1,8 +1,10 @@
++use std::any::Any;
+ use std::io;
+ use std::net::SocketAddr;
+ use std::os::fd::RawFd;
+ #[cfg(not(has_io_uring))]
+ use std::os::fd::{AsRawFd, FromRawFd, IntoRawFd, OwnedFd};
++use std::panic::{AssertUnwindSafe, catch_unwind};
+ use std::path::{Path, PathBuf};
+ use std::sync::Arc;
+ use std::sync::atomic::{AtomicBool, Ordering};
+@@ -22,6 +24,18 @@ type LaunchResult = Result<
+     crate::error::Error,
+ >;
+ type WorkerHandle = thread::JoinHandle<Result<(), crate::error::Error>>;
++type StartupResult = Result<(), String>;
++
++fn panic_payload(payload: Box<dyn Any + Send>) -> String {
++    let payload = match payload.downcast::<String>() {
++        Ok(message) => return *message,
++        Err(payload) => payload,
++    };
++    payload
++        .downcast::<&'static str>()
++        .map(|message| (*message).to_string())
++        .unwrap_or_else(|_| "non-string panic payload".to_string())
++}
+ 
+ fn rollback_workers(
+     shutdown_flag: &Arc<AtomicBool>,
+@@ -566,7 +580,7 @@ impl RinglineBuilder {
+                 let mut event_loop = match event_loop_result {
+                     Ok(event_loop) => event_loop,
+                     Err(e) => {
+-                        let _ = startup_tx.send(Err(()));
++                        let _ = startup_tx.send(Err(e.to_string()));
+                         return Err(e);
+                     }
+                 };
+@@ -577,7 +591,7 @@ impl RinglineBuilder {
+                 // after `prepare_run()` would invalidate that pointer.
+                 eventfd.0.transfer_to_driver();
+                 if let Err(e) = event_loop.prepare_run() {
+-                    let _ = startup_tx.send(Err(()));
++                    let _ = startup_tx.send(Err(e.to_string()));
+                     return Err(e);
+                 }
+ 
+@@ -613,7 +627,7 @@ impl RinglineBuilder {
+                 Option<crossbeam_channel::Sender<crate::blocking::BlockingResponse>>,
+                 Option<Arc<crate::blocking::BlockingPool>>,
+                 crate::region_registry::RegionControlRx,
+-                crossbeam_channel::Sender<Result<(), ()>>,
++                crossbeam_channel::Sender<StartupResult>,
+             ) -> Result<(), crate::error::Error>
+             + Send
+             + Clone
+@@ -734,7 +748,7 @@ impl RinglineBuilder {
+         // errors to the caller of `launch()` instead of silently
+         // swallowing them inside a thread that never gets joined.
+         let mut handles: Vec<WorkerHandle> = Vec::with_capacity(num_threads);
+-        let (startup_tx, startup_rx) = crossbeam_channel::bounded::<Result<(), ()>>(num_threads);
++        let (startup_tx, startup_rx) = crossbeam_channel::bounded::<StartupResult>(num_threads);
+ 
+         // SMT-aware pinning: when the requested worker range fits within
+         // the machine's physical cores, treat `core_offset + worker_id`
+@@ -813,7 +827,7 @@ impl RinglineBuilder {
+                                  against the machine's CPU count",
+                                 config.worker.core_offset
+                             );
+-                            let _ = startup_tx.send(Err(()));
++                            let _ = startup_tx.send(Err(e.to_string()));
+                             return Err(e);
+                         }
+                     }
+@@ -821,24 +835,37 @@ impl RinglineBuilder {
+                     metriken::set_thread_shard(worker_id);
+ 
+                     let accept_rx = if has_acceptor { Some(rx) } else { None };
+-                    worker_fn(
+-                        worker_id,
+-                        config,
+-                        accept_rx,
+-                        eventfd,
+-                        worker_shutdown_flag,
+-                        worker_resolve_rx,
+-                        worker_resolve_tx,
+-                        worker_resolver,
+-                        worker_spawn_rx,
+-                        worker_spawn_tx,
+-                        worker_spawner,
+-                        worker_blocking_rx,
+-                        worker_blocking_tx,
+-                        worker_blocking_pool,
+-                        worker_region_rx,
+-                        startup_tx,
+-                    )
++                    let panic_tx = startup_tx.clone();
++                    match catch_unwind(AssertUnwindSafe(|| {
++                        worker_fn(
++                            worker_id,
++                            config,
++                            accept_rx,
++                            eventfd,
++                            worker_shutdown_flag,
++                            worker_resolve_rx,
++                            worker_resolve_tx,
++                            worker_resolver,
++                            worker_spawn_rx,
++                            worker_spawn_tx,
++                            worker_spawner,
++                            worker_blocking_rx,
++                            worker_blocking_tx,
++                            worker_blocking_pool,
++                            worker_region_rx,
++                            startup_tx,
++                        )
++                    })) {
++                        Ok(result) => result,
++                        Err(payload) => {
++                            let message = format!(
++                                "Ringline worker {worker_id} panicked: {}",
++                                panic_payload(payload)
++                            );
++                            let _ = panic_tx.send(Err(message.clone()));
++                            Err(crate::error::Error::Io(io::Error::other(message)))
++                        }
++                    }
+                 });
+ 
+             let handle = match spawn_result {
+@@ -859,22 +886,24 @@ impl RinglineBuilder {
+         // Collect setup outcomes. If any worker failed setup, signal
+         // shutdown to the rest, join everyone, and surface the first
+         // setup error back to the caller of `launch()`.
+-        let mut setup_failed = false;
++        let mut setup_error = None;
+         for _ in 0..num_threads {
+             match startup_rx.recv() {
+                 Ok(Ok(())) => {}
+-                Ok(Err(())) | Err(_) => {
+-                    setup_failed = true;
++                Ok(Err(error)) => {
++                    setup_error = Some(error);
++                    break;
++                }
++                Err(error) => {
++                    setup_error = Some(format!("worker startup channel disconnected: {error}"));
+                     break;
+                 }
+             }
+         }
+ 
+-        if setup_failed {
+-            let first_err = rollback_workers(&shutdown_flag, &worker_wake_fds, handles);
+-            return Err(first_err.unwrap_or_else(|| {
+-                crate::error::Error::Io(io::Error::other("worker setup failed"))
+-            }));
++        if let Some(setup_error) = setup_error {
++            rollback_workers(&shutdown_flag, &worker_wake_fds, handles);
++            return Err(crate::error::Error::Io(io::Error::other(setup_error)));
+         }
+ 
+         // Commit the listener only after every worker has completed fallible
+@@ -1197,7 +1226,7 @@ mod startup_gate_tests {
+                         if let Some((fd, _)) = accepted {
+                             unsafe { libc::close(fd) };
+                         }
+-                        let _ = startup_tx.send(Err(()));
++                        let _ = startup_tx.send(Err("injected worker startup failure".to_string()));
+                         Err(crate::error::Error::Io(io::Error::other(
+                             "injected worker startup failure",
+                         )))
+@@ -1217,6 +1246,48 @@ mod startup_gate_tests {
+         assert!(absent_after_rollback);
+     }
+ 
++    #[cfg(target_os = "linux")]
++    #[test]
++    fn startup_returns_the_reported_error_after_rollback() {
++        let result = RinglineBuilder::new(one_worker_config()).launch_inner(
++            |_, _, _, _eventfd, _, _, _, _, _, _, _, _, _, _, _, startup_tx| {
++                let _ = startup_tx.send(Err("reported setup failure".to_string()));
++                Err(crate::error::Error::Io(io::Error::other(
++                    "different joined-worker failure",
++                )))
++            },
++        );
++
++        let error = match result {
++            Ok(_) => panic!("reported setup failure must fail launch"),
++            Err(error) => error,
++        };
++        assert!(error.to_string().contains("reported setup failure"));
++        assert!(
++            !error
++                .to_string()
++                .contains("different joined-worker failure")
++        );
++    }
++
++    #[cfg(target_os = "linux")]
++    #[test]
++    fn worker_startup_panic_payload_is_preserved() {
++        let result = RinglineBuilder::new(one_worker_config()).launch_inner(
++            |_, _, _, _eventfd, _, _, _, _, _, _, _, _, _, _, _, _| {
++                panic!("injected bootstrap type-erasure panic")
++            },
++        );
++
++        assert!(
++            result
++                .err()
++                .expect("startup panic must fail launch")
++                .to_string()
++                .contains("injected bootstrap type-erasure panic")
++        );
++    }
++
+     #[cfg(target_os = "linux")]
+     #[test]
+     fn worker_startup_failure_closes_all_runtime_fds() {
+@@ -1244,7 +1315,7 @@ mod startup_gate_tests {
+         for _ in 0..4 {
+             let result = RinglineBuilder::new(one_worker_config()).launch_inner(
+                 |_, _, _, _eventfd, _, _, _, _, _, _, _, _, _, _, _, startup_tx| {
+-                    let _ = startup_tx.send(Err(()));
++                    let _ = startup_tx.send(Err("injected worker startup failure".to_string()));
+                     Err(crate::error::Error::Io(io::Error::other(
+                         "injected worker startup failure",
+                     )))
+diff --git a/tests/echo.rs b/tests/echo.rs
+index b49811f..f7c2b3d 100644
+--- a/tests/echo.rs
++++ b/tests/echo.rs
+@@ -2714,6 +2714,406 @@ fn async_join_basic() {
+     }
+ }
+ 
++/// Two logical sends contend for a one-slot copy pool. The second future must
++/// park until the first send releases its slot, then resume without the caller
++/// retrying (which could duplicate a response prefix).
++struct BackpressuredJoinHandler;
++
++impl AsyncEventHandler for BackpressuredJoinHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            let n = conn
++                .with_data(|data| ParseResult::Consumed(data.len()))
++                .await;
++            if n == 0 {
++                return;
++            }
++
++            let first = conn.send_backpressured(b"FIRST---");
++            let second = conn.send_backpressured(b"SECOND--");
++            let (first, second) = ringline::join(first, second).await;
++            assert_eq!(first.expect("first send failed"), 8);
++            assert_eq!(second.expect("second send failed"), 8);
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        BackpressuredJoinHandler
++    }
++}
++
++#[test]
++fn backpressured_send_waits_for_pool_capacity_without_duplication() {
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let config = test_config_builder()
++        .send_pool(1, 8)
++        .build()
++        .expect("valid config");
++    let (shutdown, handles) = RinglineBuilder::new(config)
++        .bind(addr.parse().unwrap())
++        .launch::<BackpressuredJoinHandler>()
++        .expect("launch failed");
++    wait_for_server(&addr);
++
++    let mut stream = TcpStream::connect(&addr).unwrap();
++    stream
++        .set_read_timeout(Some(Duration::from_secs(5)))
++        .unwrap();
++    stream.write_all(b"go").unwrap();
++
++    let mut received = [0; 16];
++    stream.read_exact(&mut received).unwrap();
++    assert_eq!(&received, b"FIRST---SECOND--");
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}
++
++/// Constructing and moving a bounded-send future must not reserve a FIFO
++/// position. An unpolled future may be retained while later work completes.
++struct BackpressuredLazyConstructionHandler;
++
++impl AsyncEventHandler for BackpressuredLazyConstructionHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            if conn
++                .with_data(|data| ParseResult::Consumed(data.len()))
++                .await
++                == 0
++            {
++                return;
++            }
++
++            let unpolled = conn.send_backpressured(b"BLOCKED-");
++            let moved_without_poll = Some(unpolled);
++            assert_eq!(
++                conn.send_backpressured(b"ACTIVE--")
++                    .await
++                    .expect("active send blocked behind an unpolled future"),
++                8
++            );
++            drop(moved_without_poll);
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        BackpressuredLazyConstructionHandler
++    }
++}
++
++#[test]
++fn backpressured_send_construction_is_lazy_and_unpolled_drop_is_inert() {
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let config = test_config_builder()
++        .send_pool(1, 8)
++        .build()
++        .expect("valid config");
++    let (shutdown, handles) = RinglineBuilder::new(config)
++        .bind(addr.parse().unwrap())
++        .launch::<BackpressuredLazyConstructionHandler>()
++        .expect("launch failed");
++    wait_for_server(&addr);
++
++    let mut stream = TcpStream::connect(&addr).unwrap();
++    stream
++        .set_read_timeout(Some(Duration::from_millis(500)))
++        .unwrap();
++    stream.write_all(b"go").unwrap();
++    let mut received = [0; 8];
++    stream.read_exact(&mut received).unwrap();
++    assert_eq!(&received, b"ACTIVE--");
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}
++
++/// Moving an unpolled future into a standalone task must register that
++/// polling task, not the connection task that happened to construct it.
++struct BackpressuredMovedFutureHandler;
++
++impl AsyncEventHandler for BackpressuredMovedFutureHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            if conn
++                .with_data(|data| ParseResult::Consumed(data.len()))
++                .await
++                == 0
++            {
++                return;
++            }
++
++            let mut first = Box::pin(conn.send_backpressured(b"FIRST---"));
++            std::future::poll_fn(|cx| {
++                assert!(first.as_mut().poll(cx).is_pending());
++                std::task::Poll::Ready(())
++            })
++            .await;
++
++            let moved = conn.send_backpressured(b"MOVED---");
++            let moved = ringline::spawn_with_handle(moved).expect("standalone spawn failed");
++            let (first_result, moved_result) = ringline::join(first, moved).await;
++            assert_eq!(first_result.expect("first send failed"), 8);
++            assert_eq!(moved_result.expect("moved send failed"), 8);
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        BackpressuredMovedFutureHandler
++    }
++}
++
++#[test]
++fn backpressured_send_registers_the_first_polling_task_after_move() {
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let config = test_config_builder()
++        .send_pool(1, 8)
++        .build()
++        .expect("valid config");
++    let (shutdown, handles) = RinglineBuilder::new(config)
++        .bind(addr.parse().unwrap())
++        .launch::<BackpressuredMovedFutureHandler>()
++        .expect("launch failed");
++    wait_for_server(&addr);
++
++    let mut stream = TcpStream::connect(&addr).unwrap();
++    stream
++        .set_read_timeout(Some(Duration::from_secs(2)))
++        .unwrap();
++    stream.write_all(b"go").unwrap();
++    let mut received = [0; 16];
++    stream.read_exact(&mut received).unwrap();
++    assert_eq!(&received, b"FIRST---MOVED---");
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}
++
++/// Moving a bounded-send future after its first poll transfers responsibility
++/// for every later capacity/completion wake to the task that most recently
++/// polled it on this worker.
++static REPOLLED_MOVED_SEND_COMPLETED: AtomicU32 = AtomicU32::new(0);
++
++struct BackpressuredRepollMovedFutureHandler;
++
++impl AsyncEventHandler for BackpressuredRepollMovedFutureHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            if conn
++                .with_data(|data| ParseResult::Consumed(data.len()))
++                .await
++                == 0
++            {
++                return;
++            }
++
++            let mut moved = Box::pin(conn.send_backpressured(b"MOVED---"));
++            std::future::poll_fn(|cx| {
++                assert!(moved.as_mut().poll(cx).is_pending());
++                std::task::Poll::Ready(())
++            })
++            .await;
++
++            let moved = ringline::spawn_with_handle(moved).expect("standalone spawn failed");
++            assert_eq!(moved.await.expect("moved send failed"), 8);
++            REPOLLED_MOVED_SEND_COMPLETED.store(1, Ordering::Release);
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        BackpressuredRepollMovedFutureHandler
++    }
++}
++
++#[test]
++fn backpressured_send_refreshes_owner_after_first_poll_move() {
++    REPOLLED_MOVED_SEND_COMPLETED.store(0, Ordering::Release);
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let config = test_config_builder()
++        .send_pool(1, 8)
++        .build()
++        .expect("valid config");
++    let (shutdown, handles) = RinglineBuilder::new(config)
++        .bind(addr.parse().unwrap())
++        .launch::<BackpressuredRepollMovedFutureHandler>()
++        .expect("launch failed");
++    wait_for_server(&addr);
++
++    let mut stream = TcpStream::connect(&addr).unwrap();
++    stream
++        .set_read_timeout(Some(Duration::from_secs(2)))
++        .unwrap();
++    stream.write_all(b"go").unwrap();
++    let mut received = [0; 8];
++    stream.read_exact(&mut received).unwrap();
++    assert_eq!(&received, b"MOVED---");
++
++    let deadline = std::time::Instant::now() + Duration::from_secs(2);
++    while REPOLLED_MOVED_SEND_COMPLETED.load(Ordering::Acquire) == 0
++        && std::time::Instant::now() < deadline
++    {
++        std::thread::sleep(Duration::from_millis(10));
++    }
++    assert_eq!(
++        REPOLLED_MOVED_SEND_COMPLETED.load(Ordering::Acquire),
++        1,
++        "completion woke the task that polled the future before it moved"
++    );
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}
++
++/// A completion belongs to the logical send that submitted it even if that
++/// future is canceled. It must not resolve a newer future on the connection.
++static CANCELED_SUBMISSION_RESULT: AtomicU32 = AtomicU32::new(0);
++
++struct BackpressuredCanceledSubmissionHandler;
++
++impl AsyncEventHandler for BackpressuredCanceledSubmissionHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            if conn
++                .with_data(|data| ParseResult::Consumed(data.len()))
++                .await
++                == 0
++            {
++                return;
++            }
++
++            let mut canceled = Box::pin(conn.send_backpressured(b"CANCELED"));
++            std::future::poll_fn(|cx| {
++                assert!(canceled.as_mut().poll(cx).is_pending());
++                std::task::Poll::Ready(())
++            })
++            .await;
++            drop(canceled);
++
++            let sent = conn
++                .send_backpressured(b"NEXT")
++                .await
++                .expect("next logical send failed");
++            CANCELED_SUBMISSION_RESULT.store(if sent == 4 { 1 } else { 2 }, Ordering::Release);
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        BackpressuredCanceledSubmissionHandler
++    }
++}
++
++#[test]
++fn canceled_submitted_backpressured_send_cannot_complete_the_next_send() {
++    CANCELED_SUBMISSION_RESULT.store(0, Ordering::Release);
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let config = test_config_builder()
++        .send_pool(1, 8)
++        .build()
++        .expect("valid config");
++    let (shutdown, handles) = RinglineBuilder::new(config)
++        .bind(addr.parse().unwrap())
++        .launch::<BackpressuredCanceledSubmissionHandler>()
++        .expect("launch failed");
++    wait_for_server(&addr);
++
++    let mut stream = TcpStream::connect(&addr).unwrap();
++    stream
++        .set_read_timeout(Some(Duration::from_secs(2)))
++        .unwrap();
++    stream.write_all(b"go").unwrap();
++    let mut received = [0; 12];
++    stream.read_exact(&mut received).unwrap();
++    assert_eq!(&received, b"CANCELEDNEXT");
++    let deadline = std::time::Instant::now() + Duration::from_secs(2);
++    while CANCELED_SUBMISSION_RESULT.load(Ordering::Acquire) == 0
++        && std::time::Instant::now() < deadline
++    {
++        std::thread::sleep(Duration::from_millis(10));
++    }
++    assert_eq!(
++        CANCELED_SUBMISSION_RESULT.load(Ordering::Acquire),
++        1,
++        "stale completion resolved the next logical send"
++    );
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}
++
++/// An over-capacity logical response must fail before any prefix reaches the
++/// wire; a subsequent valid send proves that the connection and pool survive.
++struct BackpressuredOversizeHandler;
++
++impl AsyncEventHandler for BackpressuredOversizeHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            let n = conn
++                .with_data(|data| ParseResult::Consumed(data.len()))
++                .await;
++            if n == 0 {
++                return;
++            }
++
++            let error = conn
++                .send_backpressured(b"TOO-LARGE")
++                .await
++                .expect_err("oversize send unexpectedly succeeded");
++            assert_eq!(error.kind(), io::ErrorKind::InvalidInput);
++            conn.send_backpressured(b"SURVIVES")
++                .await
++                .expect("valid send after oversize failed");
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        BackpressuredOversizeHandler
++    }
++}
++
++#[test]
++fn backpressured_send_rejects_oversize_before_writing() {
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let config = test_config_builder()
++        .send_pool(1, 8)
++        .build()
++        .expect("valid config");
++    let (shutdown, handles) = RinglineBuilder::new(config)
++        .bind(addr.parse().unwrap())
++        .launch::<BackpressuredOversizeHandler>()
++        .expect("launch failed");
++    wait_for_server(&addr);
++
++    let mut stream = TcpStream::connect(&addr).unwrap();
++    stream
++        .set_read_timeout(Some(Duration::from_secs(5)))
++        .unwrap();
++    stream.write_all(b"go").unwrap();
++
++    let mut received = [0; 8];
++    stream.read_exact(&mut received).unwrap();
++    assert_eq!(&received, b"SURVIVES");
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}
++
+ /// Handler that joins three futures: send_await + sleep + with_data.
+ struct Join3Handler;
+ 
+@@ -5261,3 +5661,244 @@ fn connection_task_panic_does_not_kill_worker() {
+         let _ = h.join();
+     }
+ }
++
++#[cfg(unix)]
++static TRANSPORT_RECV_RESULT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
++
++#[cfg(unix)]
++struct TransportRecvErrorHandler;
++
++#[cfg(unix)]
++impl AsyncEventHandler for TransportRecvErrorHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            let observed = match conn
++                .with_data_result(|data| ParseResult::Consumed(data.len()))
++                .await
++            {
++                Err(error)
++                    if matches!(
++                        error.kind(),
++                        io::ErrorKind::ConnectionReset | io::ErrorKind::ConnectionAborted
++                    ) =>
++                {
++                    1
++                }
++                Err(_) => 2,
++                Ok(_) => 3,
++            };
++            TRANSPORT_RECV_RESULT.store(observed, Ordering::Release);
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        TransportRecvErrorHandler
++    }
++}
++
++#[cfg(unix)]
++#[test]
++fn with_data_result_surfaces_tcp_reset() {
++    use std::os::fd::AsRawFd;
++
++    TRANSPORT_RECV_RESULT.store(0, Ordering::Release);
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let (shutdown, handles) = RinglineBuilder::new(test_config())
++        .bind(addr.parse().unwrap())
++        .launch::<TransportRecvErrorHandler>()
++        .expect("launch failed");
++
++    let stream = (0..200)
++        .find_map(|_| match TcpStream::connect(&addr) {
++            Ok(stream) => Some(stream),
++            Err(_) => {
++                std::thread::sleep(Duration::from_millis(10));
++                None
++            }
++        })
++        .expect("server did not accept connection");
++    let linger = libc::linger {
++        l_onoff: 1,
++        l_linger: 0,
++    };
++    let result = unsafe {
++        libc::setsockopt(
++            stream.as_raw_fd(),
++            libc::SOL_SOCKET,
++            libc::SO_LINGER,
++            &linger as *const _ as *const libc::c_void,
++            std::mem::size_of_val(&linger) as libc::socklen_t,
++        )
++    };
++    assert_eq!(result, 0, "setsockopt(SO_LINGER) failed");
++    drop(stream);
++
++    let deadline = std::time::Instant::now() + Duration::from_secs(5);
++    while TRANSPORT_RECV_RESULT.load(Ordering::Acquire) == 0 && std::time::Instant::now() < deadline
++    {
++        std::thread::sleep(Duration::from_millis(10));
++    }
++    assert_eq!(TRANSPORT_RECV_RESULT.load(Ordering::Acquire), 1);
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}
++
++static BACKPRESSURE_SHUTDOWN_ARMED: AtomicU32 = AtomicU32::new(0);
++
++#[cfg(not(has_io_uring))]
++static BACKPRESSURE_HALF_CLOSE_STATE: AtomicU32 = AtomicU32::new(0);
++
++#[cfg(not(has_io_uring))]
++struct BackpressureHalfCloseHandler;
++
++#[cfg(not(has_io_uring))]
++impl AsyncEventHandler for BackpressureHalfCloseHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            if conn
++                .with_data(|data| ParseResult::Consumed(data.len()))
++                .await
++                == 0
++            {
++                return;
++            }
++
++            let mut submitted = Box::pin(conn.send_backpressured(b"FIRST---"));
++            std::future::poll_fn(|cx| {
++                assert!(submitted.as_mut().poll(cx).is_pending());
++                std::task::Poll::Ready(())
++            })
++            .await;
++            let mut queued = Box::pin(conn.send_backpressured(b"SECOND--"));
++            std::future::poll_fn(|cx| {
++                assert!(queued.as_mut().poll(cx).is_pending());
++                std::task::Poll::Ready(())
++            })
++            .await;
++            BACKPRESSURE_HALF_CLOSE_STATE.store(1, Ordering::Release);
++
++            conn.shutdown_write();
++            let (submitted, queued) = ringline::join(submitted, queued).await;
++            let correct = matches!(submitted, Ok(8)) && queued.is_err();
++            BACKPRESSURE_HALF_CLOSE_STATE.store(if correct { 2 } else { 3 }, Ordering::Release);
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        BackpressureHalfCloseHandler
++    }
++}
++
++#[test]
++#[cfg(not(has_io_uring))]
++fn mio_half_close_completes_submitted_send_and_cancels_capacity_waiter() {
++    BACKPRESSURE_HALF_CLOSE_STATE.store(0, Ordering::Release);
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let config = test_config_builder()
++        .send_pool(1, 8)
++        .build()
++        .expect("valid config");
++    let (shutdown, handles) = RinglineBuilder::new(config)
++        .bind(addr.parse().unwrap())
++        .launch::<BackpressureHalfCloseHandler>()
++        .expect("launch failed");
++    wait_for_server(&addr);
++
++    let mut stream = TcpStream::connect(&addr).unwrap();
++    stream
++        .set_read_timeout(Some(Duration::from_secs(2)))
++        .unwrap();
++    stream.write_all(b"go").unwrap();
++    let mut received = [0; 8];
++    stream.read_exact(&mut received).unwrap();
++    assert_eq!(&received, b"FIRST---");
++
++    let deadline = std::time::Instant::now() + Duration::from_secs(2);
++    while BACKPRESSURE_HALF_CLOSE_STATE.load(Ordering::Acquire) < 2
++        && std::time::Instant::now() < deadline
++    {
++        std::thread::sleep(Duration::from_millis(10));
++    }
++    assert_eq!(
++        BACKPRESSURE_HALF_CLOSE_STATE.load(Ordering::Acquire),
++        2,
++        "half-close left a submitted or capacity-waiting bounded send stuck"
++    );
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}
++
++struct BackpressureShutdownHandler;
++
++impl AsyncEventHandler for BackpressureShutdownHandler {
++    fn on_accept(&self, conn: ConnCtx) -> impl Future<Output = ()> + 'static {
++        async move {
++            if conn
++                .with_data(|data| ParseResult::Consumed(data.len()))
++                .await
++                == 0
++            {
++                return;
++            }
++            let first_payload = vec![b'A'; 1024 * 1024];
++            let second_payload = vec![b'B'; 1024 * 1024];
++            let mut first = Box::pin(conn.send_backpressured(&first_payload));
++            std::future::poll_fn(|cx| {
++                assert!(first.as_mut().poll(cx).is_pending());
++                std::task::Poll::Ready(())
++            })
++            .await;
++            let mut second = Box::pin(conn.send_backpressured(&second_payload));
++            std::future::poll_fn(|cx| {
++                assert!(second.as_mut().poll(cx).is_pending());
++                std::task::Poll::Ready(())
++            })
++            .await;
++            BACKPRESSURE_SHUTDOWN_ARMED.store(1, Ordering::Release);
++            let _ = ringline::join(first, second).await;
++        }
++    }
++
++    fn create_for_worker(_id: usize) -> Self {
++        BackpressureShutdownHandler
++    }
++}
++
++#[test]
++fn shutdown_drops_parked_backpressured_send_without_hanging() {
++    BACKPRESSURE_SHUTDOWN_ARMED.store(0, Ordering::Release);
++    let port = free_port();
++    let addr = format!("127.0.0.1:{port}");
++    let config = test_config_builder()
++        .send_pool(1, 1024 * 1024)
++        .build()
++        .expect("valid config");
++    let (shutdown, handles) = RinglineBuilder::new(config)
++        .bind(addr.parse().unwrap())
++        .launch::<BackpressureShutdownHandler>()
++        .expect("launch failed");
++    wait_for_server(&addr);
++
++    let mut stream = TcpStream::connect(&addr).unwrap();
++    stream.write_all(b"go").unwrap();
++    let deadline = std::time::Instant::now() + Duration::from_secs(5);
++    while BACKPRESSURE_SHUTDOWN_ARMED.load(Ordering::Acquire) == 0
++        && std::time::Instant::now() < deadline
++    {
++        std::thread::sleep(Duration::from_millis(10));
++    }
++    assert_eq!(BACKPRESSURE_SHUTDOWN_ARMED.load(Ordering::Acquire), 1);
++
++    shutdown.shutdown();
++    for handle in handles {
++        handle.join().unwrap().unwrap();
++    }
++}

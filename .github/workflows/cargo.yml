@@ -29,7 +29,26 @@ jobs:
           shared-key: check-${{ matrix.os }}
       - name: cargo check
         run: |
-          cargo check --all-targets
+          cargo check --workspace --all-targets
+      - name: Ringline facade compile and unit coverage
+        if: runner.os == 'Linux'
+        run: |
+          cargo test -p pelikan-net
+          cargo test -p server
+          cargo test -p pelikan-net --features ringline-force-mio
+          cargo test -p pelikan-net --features ringline
+          cargo test -p server --features ringline
+          cargo test -p pelikan-pingserver --test integration --features ringline
+          cargo test -p pelikan-rds --test integration --features ringline
+          cargo test -p pelikan-rds --test integration_multi --features ringline
+          cargo test -p pelikan-segcache --test integration --features ringline
+          cargo test -p pelikan-segcache --test integration_multi --features ringline
+          cargo test -p server --features ringline-force-mio
+          cargo test -p pelikan-pingserver --test integration --features ringline-force-mio
+          cargo test -p pelikan-rds --test integration --features ringline-force-mio
+          cargo test -p pelikan-rds --test integration_multi --features ringline-force-mio
+          cargo test -p pelikan-segcache --test integration --features ringline-force-mio
+          cargo test -p pelikan-segcache --test integration_multi --features ringline-force-mio
 
   check-powerset:
     runs-on: ubuntu-latest

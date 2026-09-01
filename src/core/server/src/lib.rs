@@ -75,6 +75,7 @@ use logger::{Klog, LogDrain};
 use metriken::*;
 use pelikan_net::event::{Event, Source};
 use pelikan_net::*;
+pub use pelikan_net::{BackendResolution, FallbackReason, IoBackend};
 use protocol_common::{Compose, Execute};
 use queues::{Queues, Waker};
 use session::{Buf, ServerSession, Session};
@@ -84,12 +85,16 @@ use std::sync::Arc;
 
 mod listener;
 mod process;
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+pub mod ringline;
 mod workers;
 
 use listener::ListenerBuilder;
 use workers::WorkersBuilder;
 
-pub use process::{Process, ProcessBuilder};
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+pub use process::RinglineProcessBuilder;
+pub use process::{backend_resolution, MioProcessBuilder, Process, ProcessBuilder};
 
 // TODO(bmartin): this *should* be plenty safe, the queue should rarely ever be
 // full, and a single wakeup should drain at least one message and make room for
@@ -119,6 +124,14 @@ pub static PERCENTILES: &[(&str, f64)] = &[
 // stats
 #[metric(name = "process_req")]
 pub static PROCESS_REQ: Counter = Counter::new();
+
+/// Active cache-server data-plane backend: 0 = mio, 1 = Ringline.
+#[metric(name = "server_io_backend_active")]
+pub static SERVER_IO_BACKEND_ACTIVE: Gauge = Gauge::new();
+
+/// Number of requested backends that resolved to a startup fallback.
+#[metric(name = "server_io_backend_fallback")]
+pub static SERVER_IO_BACKEND_FALLBACK: Counter = Counter::new();
 
 fn map_err(e: std::io::Error) -> Result<()> {
     match e.kind() {

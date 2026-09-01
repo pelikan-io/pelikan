@@ -2,14 +2,19 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
+mod backend;
 mod connector;
 mod listener;
 mod stream;
 mod tcp;
 pub mod waker;
 
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+pub mod ringline;
+
 mod tls_tcp;
 
+pub use backend::*;
 pub use connector::*;
 pub use listener::*;
 pub use stream::*;

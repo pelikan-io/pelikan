@@ -213,6 +213,47 @@ Pelikan is file-first when it comes to configurations, and currently is
 config-file only. You can create a new config file following the examples
 included under the `config` directory.
 
+### Cache-server I/O backend
+
+The Pingserver, Segcache, and RDS plain-TCP data listeners can opt in to Ringline on Linux:
+
+```toml
+[server]
+io_backend = "ringline" # Linux only; defaults and falls back to "mio"
+ringline_max_connections = 16000 # per worker
+```
+
+Ringline's file-descriptor budget scales with `ringline_max_connections`
+times the configured worker count. Lower this value when the process hard
+`RLIMIT_NOFILE` cannot cover that budget.
+
+The binary must also be built with its opt-in Cargo feature, for example
+`cargo build --release -p pelikan-segcache --features ringline` (or the
+equivalent `pelikan-rds` or `pelikan-pingserver` command). Without that
+feature, Linux builds are
+Mio-only and do not include the Ringline or Ringline-only slab dependency.
+
+`mio` remains the default on every platform. The Ringline option uses version
+`0.5.5`, vendored from the published crates.io archive and patched locally.
+Ringline reports Linux 6.0 or newer on x86_64 or ARM64 as its platform
+requirement; the host must also permit the io_uring capabilities that Ringline
+uses. The startup log records the requested and active backends and any
+fallback cause.
+
+Fallback is a startup transaction: on non-Linux systems, with TLS enabled, or
+when Ringline cannot initialize before serving traffic, Pelikan starts the data
+listener on Mio. After Ringline begins serving, a Ringline worker or driver
+failure shuts down the process; live connections are never migrated to Mio.
+TLS data listeners and admin listeners continue to use Mio. Proxy frontends and
+backends are not covered by this option and remain on Mio.
+
+The startup transaction is released in Ringline 0.5.5 after merging upstream as
+`ringline-rs/ringline#309` (commit
+`a04751f0041c0ffc485a706bb124ec40b27823e1`). Pelikan vendors 0.5.5 only for
+generic, unreleased backpressure, send-identity, receive-error, and
+startup-diagnostic follow-ups; see
+[`vendor/README.md`](vendor/README.md) for checksums and exact provenance.
+
 # Community
 
 ## Stay in touch

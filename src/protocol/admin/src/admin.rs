@@ -123,7 +123,7 @@ impl Compose for Version {
 pub enum AdminResponse {
     Hangup,
     Ok,
-    Stats,
+    Stats(Vec<(String, String)>),
     Version(Version),
 }
 
@@ -137,7 +137,11 @@ impl AdminResponse {
     }
 
     pub fn stats() -> Self {
-        Self::Stats
+        Self::Stats(Vec::new())
+    }
+
+    pub fn stats_with_info(info: Vec<(String, String)>) -> Self {
+        Self::Stats(info)
     }
 
     pub fn version(version: String) -> Self {
@@ -153,8 +157,8 @@ impl Compose for AdminResponse {
                 buf.put_slice(b"OK\r\n");
                 4
             }
-            Self::Stats => {
-                let message = memcache_stats();
+            Self::Stats(info) => {
+                let message = memcache_stats_with_info(info);
                 buf.put_slice(message.as_bytes());
                 message.len()
             }
@@ -164,6 +168,10 @@ impl Compose for AdminResponse {
 }
 
 pub fn memcache_stats() -> String {
+    memcache_stats_with_info(&[])
+}
+
+fn memcache_stats_with_info(info: &[(String, String)]) -> String {
     let snapshots = SNAPSHOTS.read();
 
     let mut data = Vec::new();
@@ -189,6 +197,9 @@ pub fn memcache_stats() -> String {
         }
     }
 
+    for (name, value) in info {
+        data.push(format!("STAT {name} {value}\r\n"));
+    }
     data.sort();
     data.concat() + "END\r\n"
 }
@@ -214,6 +225,31 @@ mod tests {
             "stats output must not contain blank lines"
         );
         assert!(stats.ends_with("END\r\n"));
+    }
+
+    #[test]
+    fn stats_response_includes_machine_readable_backend_info() {
+        let response = AdminResponse::stats_with_info(vec![
+            (
+                "server_io_backend_requested".to_string(),
+                "ringline".to_string(),
+            ),
+            (
+                "server_io_backend_active_name".to_string(),
+                "mio".to_string(),
+            ),
+            (
+                "server_io_backend_fallback_cause".to_string(),
+                "unsupported capability: I/O error: Invalid argument (os error 22)".to_string(),
+            ),
+        ]);
+        let mut output = Vec::new();
+        response.compose(&mut output);
+        let output = String::from_utf8(output).unwrap();
+        assert!(output.contains("STAT server_io_backend_requested ringline\r\n"));
+        assert!(output.contains("STAT server_io_backend_active_name mio\r\n"));
+        assert!(output.contains("STAT server_io_backend_fallback_cause unsupported capability: I/O error: Invalid argument (os error 22)\r\n"));
+        assert!(output.ends_with("END\r\n"));
     }
 
     #[test]

@@ -23,7 +23,7 @@ fn threads() -> usize {
 }
 
 // definitions
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Worker {
     #[serde(default = "timeout")]
     timeout: usize,

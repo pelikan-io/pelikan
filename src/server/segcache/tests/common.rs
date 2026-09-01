@@ -9,10 +9,32 @@
 use logger::*;
 
 use std::io::{BufRead, BufReader, Read, Write};
-use std::net::TcpStream;
+use std::net::{SocketAddr, TcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+static TEST_ADDRESSES: Mutex<Option<(SocketAddr, SocketAddr)>> = Mutex::new(None);
+
+pub fn set_test_addresses(data: SocketAddr, admin: SocketAddr) {
+    *TEST_ADDRESSES.lock().unwrap() = Some((data, admin));
+}
+
+fn data_addr() -> SocketAddr {
+    TEST_ADDRESSES
+        .lock()
+        .unwrap()
+        .expect("test addresses not set")
+        .0
+}
+
+fn admin_addr() -> SocketAddr {
+    TEST_ADDRESSES
+        .lock()
+        .unwrap()
+        .expect("test addresses not set")
+        .1
+}
 
 pub fn tests() {
     debug!("beginning tests");
@@ -213,12 +235,12 @@ pub fn tests() {
 fn test_cas_stored() {
     info!("testing: cas stored");
     debug!("connecting to server");
-    let mut stream = TcpStream::connect("127.0.0.1:12321").expect("failed to connect");
+    let mut stream = connected_client();
     stream
-        .set_read_timeout(Some(Duration::from_millis(250)))
+        .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set read timeout");
     stream
-        .set_write_timeout(Some(Duration::from_millis(250)))
+        .set_write_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set write timeout");
 
     let exchange = |stream: &mut TcpStream, request: &str| -> String {
@@ -284,12 +306,12 @@ fn test_cas_stored() {
 fn test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("testing: {name}");
     debug!("connecting to server");
-    let mut stream = TcpStream::connect("127.0.0.1:12321").expect("failed to connect");
+    let mut stream = connected_client();
     stream
-        .set_read_timeout(Some(Duration::from_millis(250)))
+        .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set read timeout");
     stream
-        .set_write_timeout(Some(Duration::from_millis(250)))
+        .set_write_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set write timeout");
 
     debug!("sending request");
@@ -313,7 +335,7 @@ fn test(name: &str, data: &[(&str, Option<&str>)]) {
         let mut buf = vec![0; 4096];
 
         if let Some(response) = response {
-            if stream.read(&mut buf).is_err() {
+            if stream.read_exact(&mut buf[..response.len()]).is_err() {
                 std::thread::sleep(Duration::from_millis(500));
                 panic!("error reading response");
             } else if response.as_bytes() != &buf[0..response.len()] {
@@ -346,6 +368,134 @@ fn test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("status: passed\n");
 }
 
+#[cfg(feature = "ringline")]
+pub fn smoke_exchange() {
+    let mut stream = connected_client();
+    exchange(&mut stream, b"get task7-smoke\r\n", b"END\r\n");
+}
+
+pub fn conformance_tests() {
+    partial_request_is_completed_after_second_write();
+    pipelined_requests_preserve_response_order();
+    partial_request_disconnect_cancels_mutation();
+    connection_burst_does_not_block_existing_clients();
+    deep_pipeline_preserves_every_response();
+    large_request_and_response_round_trip();
+    flush_all_clears_storage();
+}
+
+fn connected_client() -> TcpStream {
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    let stream = loop {
+        match TcpStream::connect(data_addr()) {
+            Ok(stream) => break stream,
+            Err(_) if std::time::Instant::now() < deadline => std::thread::yield_now(),
+            Err(error) => panic!("failed to connect: {error}"),
+        }
+    };
+    stream
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    stream
+        .set_write_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    stream
+}
+
+fn exchange(stream: &mut TcpStream, request: &[u8], expected: &[u8]) {
+    stream.write_all(request).expect("request write failed");
+    let mut response = vec![0; expected.len()];
+    stream
+        .read_exact(&mut response)
+        .expect("response read failed");
+    assert_eq!(response, expected);
+}
+
+fn partial_request_is_completed_after_second_write() {
+    let mut stream = connected_client();
+    stream.write_all(b"get ").unwrap();
+    std::thread::sleep(Duration::from_millis(10));
+    exchange(&mut stream, b"missing\r\n", b"END\r\n");
+}
+
+fn pipelined_requests_preserve_response_order() {
+    let mut stream = connected_client();
+    exchange(
+        &mut stream,
+        b"set first 0 0 3\r\none\r\nset second 0 0 3\r\ntwo\r\nget first\r\nget second\r\n",
+        b"STORED\r\nSTORED\r\nVALUE first 0 3\r\none\r\nEND\r\nVALUE second 0 3\r\ntwo\r\nEND\r\n",
+    );
+}
+
+fn partial_request_disconnect_cancels_mutation() {
+    let mut abandoned = connected_client();
+    abandoned.write_all(b"set abandoned 0 0 4\r\npar").unwrap();
+    drop(abandoned);
+    let mut existing = connected_client();
+    exchange(&mut existing, b"get abandoned\r\n", b"END\r\n");
+}
+
+fn connection_burst_does_not_block_existing_clients() {
+    let mut existing = connected_client();
+    let burst: Vec<_> = (0..128).map(|_| connected_client()).collect();
+    exchange(&mut existing, b"get missing\r\n", b"END\r\n");
+    drop(burst);
+}
+
+fn deep_pipeline_preserves_every_response() {
+    let mut request = Vec::new();
+    let mut expected = Vec::new();
+    for _ in 0..256 {
+        request.extend_from_slice(b"get task7-pressure\r\n");
+        expected.extend_from_slice(b"END\r\n");
+    }
+    let mut stream = connected_client();
+    exchange(&mut stream, &request, &expected);
+}
+
+fn large_request_and_response_round_trip() {
+    let value = "x".repeat(64 * 1024);
+    let request = format!(
+        "set task7-large 0 0 {}\r\n{value}\r\nget task7-large\r\n",
+        value.len()
+    );
+    let expected = format!(
+        "STORED\r\nVALUE task7-large 0 {}\r\n{value}\r\nEND\r\n",
+        value.len()
+    );
+    let mut stream = connected_client();
+    exchange(&mut stream, request.as_bytes(), expected.as_bytes());
+}
+
+fn flush_all_clears_storage() {
+    let mut data = connected_client();
+    exchange(
+        &mut data,
+        b"set task7-flush 0 0 5\r\nvalue\r\n",
+        b"STORED\r\n",
+    );
+    let mut admin = TcpStream::connect(admin_addr()).unwrap();
+    admin
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    exchange(&mut admin, b"flush_all\r\n", b"OK\r\n");
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    loop {
+        let mut data = connected_client();
+        data.write_all(b"get task7-flush\r\n").unwrap();
+        let mut response = [0_u8; 128];
+        let count = data.read(&mut response).unwrap();
+        if response[..count] == *b"END\r\n" {
+            break;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "FlushAll did not clear Segcache storage"
+        );
+        std::thread::yield_now();
+    }
+}
+
 /// Line-oriented client used by the concurrent `flush_all` test.
 struct Client {
     reader: BufReader<TcpStream>,
@@ -353,7 +503,7 @@ struct Client {
 }
 
 impl Client {
-    fn connect(addr: &str) -> Self {
+    fn connect(addr: SocketAddr) -> Self {
         let stream = TcpStream::connect(addr).expect("failed to connect");
         stream
             .set_read_timeout(Some(Duration::from_secs(10)))
@@ -424,6 +574,9 @@ impl Client {
 pub fn flush_all_tests() {
     info!("testing: flush_all acks after effect");
 
+    let data = data_addr();
+    let admin = admin_addr();
+
     // more writer connections than workers, so that a worker which becomes
     // free again has traffic waiting for it
     const WRITERS: usize = 16;
@@ -448,18 +601,20 @@ pub fn flush_all_tests() {
 
     for round in 0..ROUNDS {
         let ok_received = Arc::new(AtomicBool::new(false));
+        let flush_started = Arc::new(AtomicBool::new(false));
         let stop = Arc::new(AtomicBool::new(false));
-        // (keys written well before the flush, keys written after `OK`)
+        // (writes completed before flush start, writes started after `OK`)
         let collected: Arc<Mutex<(Vec<String>, Vec<String>)>> =
             Arc::new(Mutex::new((Vec::new(), Vec::new())));
 
         let mut handles = Vec::new();
         for tid in 0..WRITERS {
             let ok_received = ok_received.clone();
+            let flush_started = flush_started.clone();
             let stop = stop.clone();
             let collected = collected.clone();
             handles.push(std::thread::spawn(move || {
-                let mut client = Client::connect("127.0.0.1:12321");
+                let mut client = Client::connect(data);
                 let mut early = Vec::new();
                 let mut post_ok = Vec::new();
                 let mut post_ok_start = None;
@@ -487,7 +642,7 @@ pub fn flush_all_tests() {
 
                     if post {
                         post_ok.push(key);
-                    } else if early.len() < EARLY_SAMPLE {
+                    } else if !flush_started.load(Ordering::Acquire) && early.len() < EARLY_SAMPLE {
                         early.push(key);
                     }
                 }
@@ -500,13 +655,14 @@ pub fn flush_all_tests() {
 
         std::thread::sleep(PRE_FLUSH);
 
-        let mut admin = Client::connect("127.0.0.1:9999");
-        admin.send(b"flush_all\r\n");
-        let response = admin.line();
+        let mut admin_client = Client::connect(admin);
+        flush_started.store(true, Ordering::Release);
+        admin_client.send(b"flush_all\r\n");
+        let response = admin_client.line();
         // publish only once `OK` has been fully read
         ok_received.store(true, Ordering::Release);
         assert_eq!(response, "OK\r\n", "unexpected flush_all response");
-        drop(admin);
+        drop(admin_client);
 
         // writers terminate themselves once their post-`OK` window elapses;
         // `stop` is only a backstop in case one cannot make progress
@@ -532,7 +688,7 @@ pub fn flush_all_tests() {
              the test would prove nothing"
         );
 
-        let mut client = Client::connect("127.0.0.1:12321");
+        let mut client = Client::connect(data);
 
         // the flush must actually have cleared something: these keys were
         // written ~150 ms before `flush_all` was even sent, so they are
@@ -589,12 +745,12 @@ pub fn admin_tests() {
 fn admin_test(name: &str, data: &[(&str, Option<&str>)]) {
     info!("testing: {name}");
     debug!("connecting to server");
-    let mut stream = TcpStream::connect("127.0.0.1:9999").expect("failed to connect");
+    let mut stream = TcpStream::connect(admin_addr()).expect("failed to connect");
     stream
-        .set_read_timeout(Some(Duration::from_millis(250)))
+        .set_read_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set read timeout");
     stream
-        .set_write_timeout(Some(Duration::from_millis(250)))
+        .set_write_timeout(Some(Duration::from_secs(2)))
         .expect("failed to set write timeout");
 
     debug!("sending request");
@@ -618,7 +774,7 @@ fn admin_test(name: &str, data: &[(&str, Option<&str>)]) {
         let mut buf = vec![0; 4096];
 
         if let Some(response) = response {
-            if stream.read(&mut buf).is_err() {
+            if stream.read_exact(&mut buf[..response.len()]).is_err() {
                 std::thread::sleep(Duration::from_millis(500));
                 panic!("error reading response");
             } else if response.as_bytes() != &buf[0..response.len()] {

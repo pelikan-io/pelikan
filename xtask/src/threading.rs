@@ -1,11 +1,10 @@
 //! The threading architecture chart: the runtime thread model per binary in
-//! two stacked panels (server / proxy). Literal thread names in monospace
-//! matching `top -H`; build-module chips inside each thread bridge this
-//! chart to the architecture chart; heavier edges carry bytes across the
-//! process boundary (wire) vs internal queues (object). Every server worker
-//! carries the storage chips because the workers share one internally
-//! synchronized cache through an `Arc` and execute requests in place — there
-//! is no storage thread. The thread and queue inventory is asserted against
+//! a launch-time backend fork, a backend-neutral shared-storage topology, and
+//! a proxy panel. Named runtime threads are literal names matching `top -H`;
+//! the storage panel deliberately uses neutral execution contexts because Mio
+//! callbacks and Ringline tasks share one ownership model. Heavier edges carry
+//! bytes across the process boundary (wire) vs internal queues (object). The
+//! thread, queue, control, and shared-storage inventory is asserted against
 //! the sources at generation time.
 
 use crate::claims::{verify, Claim};
@@ -15,6 +14,41 @@ use std::fs;
 const OUT: &str = "docs/diagrams/threading.svg";
 
 const CLAIMS: &[Claim] = &[
+    Claim {
+        path: "vendor/ringline-0.5.5/src/worker.rs",
+        pattern: r#"name\(format!\("ringline-worker-\{worker_id\}"\)\)"#,
+        what: "Ringline worker thread spawn",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.5/src/worker.rs",
+        pattern: r#"name\("ringline-acceptor"\.to_string\(\)\)"#,
+        what: "Ringline acceptor thread spawn",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.5/src/worker.rs",
+        pattern: r"crossbeam_channel::bounded::<\(RawFd, SocketAddr\)>",
+        what: "Ringline accepted-fd queues are bounded per worker",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.5/src/acceptor.rs",
+        pattern: r"worker_channels\[worker_idx\]\.try_send\(\(fd, peer_addr\)\)",
+        what: "Ringline acceptor queues accepted fds to workers",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.5/src/acceptor.rs",
+        pattern: r"worker_wake_handles\[worker_idx\]\.wake\(\)",
+        what: "Ringline acceptor wakes the selected worker",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.5/src/backend/uring/event_loop.rs",
+        pattern: r"self\.executor\.task_slab\.spawn\(conn_index, future\);",
+        what: "Ringline io_uring worker schedules the accepted connection task",
+    },
+    Claim {
+        path: "vendor/ringline-0.5.5/src/backend/mio/event_loop.rs",
+        pattern: r"self\.executor\.task_slab\.spawn\(conn_index, future\);",
+        what: "Ringline Mio worker schedules the accepted connection task",
+    },
     Claim {
         path: "src/core/server/src/process.rs",
         pattern: r#"name\(format!\("\{THREAD_PREFIX\}_admin"\)\)"#,
@@ -47,18 +81,58 @@ const CLAIMS: &[Claim] = &[
     },
     Claim {
         path: "src/core/server/src/process.rs",
-        pattern: r"// queues for the `Admin` to send `Signal`s to all sibling threads",
+        pattern: r#"name\(format!\("\{THREAD_PREFIX\}_ringline_control"\)\)"#,
+        what: "Pelikan Ringline control thread spawn",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
+        pattern: r"let \(mut admin_signal_queues, mut bridge_signal_queues\)",
+        what: "admin-to-Ringline-control signal queue",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
+        pattern: r"bridge_signal_tx\.try_send\(Signal::Shutdown\)",
+        what: "Ringline control reports runtime termination to admin",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
+        pattern: r"let \(mut signal_queue_tx, mut signal_queue_rx\)",
         what: "admin signal broadcast queues",
     },
     Claim {
         path: "src/core/server/src/process.rs",
-        pattern: r"// queues for the `Listener` to send `Session`s to the worker threads",
+        pattern: r"let mut thread_wakers = vec!\[listener\.waker\(\)\]",
+        what: "Mio signal broadcast includes the listener waker",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
+        pattern: r"let \(mut listener_session_queues, worker_session_queues\)",
         what: "listener->worker session queues",
     },
     Claim {
         path: "src/core/server/src/process.rs",
-        pattern: r"thread_wakers\.extend_from_slice\(&self\.workers\.wakers\(\)\)",
+        pattern: r"thread_wakers\.extend_from_slice\(&workers\.wakers\(\)\)",
         what: "signal queues include every worker's waker",
+    },
+    Claim {
+        path: "src/core/server/src/process.rs",
+        pattern: r"spawn_signal_handler\(signal_tx\.clone\(\)\);",
+        what: "Mio signal thread feeds the admin signal channel",
+    },
+    Claim {
+        path: "src/core/admin/src/lib.rs",
+        pattern: r"self\.signal_queue_tx\.try_send_all\(Signal::Shutdown\)",
+        what: "admin broadcasts Mio shutdown to sibling threads",
+    },
+    Claim {
+        path: "src/core/admin/src/lib.rs",
+        pattern: r"self\.signal_queue_tx\.wake\(\)",
+        what: "admin wakes threads after a signal broadcast",
+    },
+    Claim {
+        path: "src/core/server/src/ringline/single.rs",
+        pattern: r"storage: Arc::clone\(&storage\),",
+        what: "Ringline workers clone the process's shared storage Arc",
     },
     Claim {
         path: "src/core/server/src/process.rs",
@@ -146,6 +220,12 @@ const EXT_H: f64 = 68.0;
 const GAP: f64 = 40.0; // minimum arrow length between columns
 const ELBOW: f64 = 130.0; // elbow verticals route outside the queue labels
 const PANEL_W: f64 = 2190.0;
+const CAPTION_GAP: f64 = 40.0;
+const CAPTION_W: f64 = 460.0;
+const OUTER_PAD: f64 = 24.0;
+const CANVAS_W: f64 = X0 + PANEL_W + CAPTION_GAP + CAPTION_W + OUTER_PAD;
+const TEXT_CLEARANCE: f64 = 14.0;
+const TEXT_LINE_GAP: f64 = 6.0;
 
 const TS: TypeScale = TYPE_SCALE;
 
@@ -154,6 +234,22 @@ fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {
     crate::svg::text(x, y, s).size(TS.body)
 }
 const X0: f64 = 24.0;
+
+fn caption_center() -> f64 {
+    X0 + PANEL_W + CAPTION_GAP + CAPTION_W / 2.0
+}
+
+fn label_above(edge_y: f64) -> f64 {
+    edge_y - TS.body as f64 / 2.0 - TEXT_CLEARANCE
+}
+
+fn label_below(edge_y: f64) -> f64 {
+    edge_y + TS.body as f64 / 2.0 + TEXT_CLEARANCE
+}
+
+fn label_left(edge_x: f64, label: &str) -> f64 {
+    edge_x - label_w_at(label, TS.body as f64) / 2.0 - TEXT_CLEARANCE - 1.0
+}
 
 fn gap_for(label: &str) -> f64 {
     (label_w_at(label, TS.body as f64) + 10.0).max(GAP)
@@ -176,7 +272,21 @@ fn thread_box(
     chips: &[Chip],
     external: bool,
 ) {
-    parts.push(rect(x, y, TB_W, TB_H, "#FFFFFF").rx(10.0).build());
+    thread_box_w(parts, x, y, TB_W, name, sub, chips, external);
+}
+
+#[allow(clippy::too_many_arguments)]
+fn thread_box_w(
+    parts: &mut Vec<String>,
+    x: f64,
+    y: f64,
+    width: f64,
+    name: &str,
+    sub: Option<&str>,
+    chips: &[Chip],
+    external: bool,
+) {
+    parts.push(rect(x, y, width, TB_H, "#FFFFFF").rx(10.0).build());
     // name row, optional sub row, and the one-column bar stack (the
     // architecture chart's composition-bar idiom) vertically centered as
     // one block
@@ -190,25 +300,25 @@ fn thread_box(
     };
     let top = y + (TB_H - name_h - sub_h - bars_h) / 2.0;
     parts.push(
-        text(x + TB_W / 2.0, top + name_h / 2.0, name)
+        text(x + width / 2.0, top + name_h / 2.0, name)
             .size(TS.h2)
             .bold()
             .mono()
             .build(),
     );
     if let Some(sub) = sub {
-        let mut t = text(x + TB_W / 2.0, top + name_h + sub_h / 2.0, sub).fill("#333");
+        let mut t = text(x + width / 2.0, top + name_h + sub_h / 2.0, sub).fill("#333");
         if external {
             t = t.italic();
         }
         parts.push(t.build());
     }
     if !chips.is_empty() {
-        let bw = TB_W - 40.0;
+        let bw = width - 40.0;
         let mut cy = top + name_h + sub_h + 18.0;
         for (label, cfill) in chips {
             parts.push(rect(x + 20.0, cy, bw, bh, cfill).sw(1.0).build());
-            parts.push(text(x + TB_W / 2.0, cy + bh / 2.0, label).build());
+            parts.push(text(x + width / 2.0, cy + bh / 2.0, label).build());
             cy += bh + 6.0;
         }
     }
@@ -224,15 +334,17 @@ fn queue_glyph(parts: &mut Vec<String>, x: f64, y: f64, w: f64, h: f64, label: &
                 .build(),
         );
     }
+    let near_y = label_above(y);
     if let Some((first, rest)) = label.split_once(" (") {
-        parts.push(text(x + w / 2.0, y - 42.0, first).fill("#555").build());
+        let far_y = near_y - TS.body as f64 - TEXT_LINE_GAP;
+        parts.push(text(x + w / 2.0, far_y, first).fill("#555").build());
         parts.push(
-            text(x + w / 2.0, y - 16.0, &format!("({rest}"))
+            text(x + w / 2.0, near_y, &format!("({rest}"))
                 .fill("#555")
                 .build(),
         );
     } else {
-        parts.push(text(x + w / 2.0, y - 16.0, label).fill("#555").build());
+        parts.push(text(x + w / 2.0, near_y, label).fill("#555").build());
     }
 }
 
@@ -288,148 +400,387 @@ fn margin_block(parts: &mut Vec<String>, cx: f64, cy: f64, title: &str, rows: &[
 
 fn server_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64) {
     let mut parts = Vec::new();
-    let h = 792.0;
+    let h = 560.0;
     parts.push(
         rect(X0, y0, PANEL_W, h, PANEL_FILL)
             .stroke(PANEL_BORDER)
             .sw(2.0)
             .build(),
     );
-    margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
+    margin_block(&mut parts, caption_center(), y0 + h / 2.0, title, rows);
 
-    let row_a = y0 + 80.0;
-    let mid_a = row_a + TB_H / 2.0;
-
-    let cl_x = X0 + 26.0;
-    ext_box(&mut parts, cl_x, row_a, "clients");
-
-    let li_x = cl_x + EXT_W + gap_for("accept").max(TB_W + GAP - EXT_W);
-    thread_box(
+    let context_x = X0 + 120.0;
+    let context_w = 390.0;
+    let context_0_y = y0 + 45.0;
+    let context_n_y = y0 + h - TB_H - 45.0;
+    thread_box_w(
         &mut parts,
-        li_x,
-        row_a,
-        "pelikan_listener",
-        Some(":12321"),
-        &[],
+        context_x,
+        context_0_y,
+        context_w,
+        "execution context 0",
+        Some("Mio callback / Ringline task"),
+        &[CHIP_PROTOCOL],
         false,
     );
-    parts.push(
-        ortho(&[(cl_x + EXT_W, mid_a), (li_x, mid_a)])
-            .network()
-            .build(),
-    );
-    parts.push(
-        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 15.0, "accept")
-            .fill("#555")
-            .build(),
-    );
-
-    let q_w = 50.0;
-    let qg = queue_gap("sessions");
-    let q_x = li_x + TB_W + qg;
-    queue_glyph(&mut parts, q_x, mid_a - 11.0, q_w, 22.0, "sessions");
-    parts.push(ortho(&[(li_x + TB_W, mid_a), (q_x, mid_a)]).build());
-
-    let wk_x = q_x + q_w + qg;
-    let top_y = y0 + 40.0;
-    let row_b = y0 + h - 212.0;
-
-    // one worker column: every worker carries the protocol and storage chips
-    // because each executes requests in place against the one Arc-shared,
-    // internally synchronized cache — there is no storage thread
-    let wk0_y = row_a;
-    let wk1_y = worker_column(
+    thread_box_w(
         &mut parts,
-        wk_x,
-        wk0_y,
-        ("pelikan_work_0", "pelikan_work_n-1"),
-        &[CHIP_PROTOCOL, CHIP_ENTRYSTORE, CHIP_SEGCACHE],
+        context_x,
+        context_n_y,
+        context_w,
+        "execution context n-1",
+        Some("Mio callback / Ringline task"),
+        &[CHIP_PROTOCOL],
+        false,
     );
-    parts.push(
-        ortho(&[
-            (q_x + q_w, mid_a),
-            (wk_x - 22.0, mid_a),
-            (wk_x - 22.0, wk0_y + TB_H / 2.0),
-            (wk_x, wk0_y + TB_H / 2.0),
-        ])
-        .build(),
-    );
-    parts.push(
-        ortho(&[
-            (q_x + q_w, mid_a),
-            (wk_x - 22.0, mid_a),
-            (wk_x - 22.0, wk1_y + TB_H / 2.0),
-            (wk_x, wk1_y + TB_H / 2.0),
-        ])
-        .build(),
-    );
-    let wk_bottom = wk1_y + TB_H;
+    let dots_cy = y0 + h / 2.0;
+    for dy in [-8.0, 0.0, 8.0] {
+        parts.push(format!(
+            "<circle cx=\"{:.0}\" cy=\"{:.0}\" r=\"2\" fill=\"#777\"/>",
+            context_x + context_w / 2.0,
+            dots_cy + dy
+        ));
+    }
 
-    // requests/responses between clients and workers, over the top
-    parts.push(
-        ortho(&[
-            (cl_x + EXT_W / 2.0, row_a + (TB_H - EXT_H) / 2.0),
-            (cl_x + EXT_W / 2.0, top_y),
-            (wk_x + TB_W / 2.0, top_y),
-            (wk_x + TB_W / 2.0, row_a),
-        ])
-        .both()
-        .network()
-        .build(),
+    let storage_x = context_x + 720.0;
+    let storage_w = 390.0;
+    let storage_y = y0 + (h - TB_H) / 2.0;
+    thread_box_w(
+        &mut parts,
+        storage_x,
+        storage_y,
+        storage_w,
+        "one Arc-shared engine",
+        Some("process-owned; not a thread"),
+        &[CHIP_ENTRYSTORE, CHIP_SEGCACHE],
+        false,
     );
+
+    let storage_mid = storage_y + TB_H / 2.0;
+    let elbow_x = storage_x - 180.0;
+    for (context_y, storage_offset) in [(context_0_y, -42.0), (context_n_y, 42.0)] {
+        parts.push(
+            ortho(&[
+                (context_x + context_w, context_y + TB_H / 2.0),
+                (elbow_x, context_y + TB_H / 2.0),
+                (elbow_x, storage_mid + storage_offset),
+                (storage_x, storage_mid + storage_offset),
+            ])
+            .both()
+            .build(),
+        );
+    }
     parts.push(
         text(
-            (cl_x + wk_x + TB_W) / 2.0,
-            top_y - 15.0,
-            "requests / responses (wire)",
+            (context_x + context_w + storage_x) / 2.0,
+            y0 + h / 2.0,
+            "direct execute / response",
         )
         .fill("#555")
         .build(),
     );
 
-    // control plane: signal left of admin, admin aligned under listener
-    let sg_x = X0 + 26.0;
+    let admin_x = storage_x + 720.0;
+    let admin_w = 390.0;
+    thread_box_w(
+        &mut parts,
+        admin_x,
+        storage_y,
+        admin_w,
+        "pelikan_admin",
+        Some("FlushHandle clones same Arc"),
+        &[CHIP_PROTOCOL_ADMIN],
+        false,
+    );
+    parts.push(
+        ortho(&[(admin_x, storage_mid), (storage_x + storage_w, storage_mid)])
+            .signal()
+            .build(),
+    );
+    parts.push(
+        text(
+            (storage_x + storage_w + admin_x) / 2.0,
+            label_above(storage_mid),
+            "synchronous clear",
+        )
+        .fill("#777")
+        .build(),
+    );
+    (parts, h)
+}
+
+fn backend_choice_panel(y0: f64) -> (Vec<String>, f64) {
+    let mut parts = Vec::new();
+    let h = 1000.0;
+    parts.push(
+        rect(X0, y0, PANEL_W, h, PANEL_FILL)
+            .stroke(PANEL_BORDER)
+            .sw(2.0)
+            .build(),
+    );
+    margin_block(
+        &mut parts,
+        caption_center(),
+        y0 + h / 2.0,
+        "launch-time backend fork",
+        &[("cache servers", "plain TCP")],
+    );
+
+    let cfg_x = X0 + 40.0;
+    let mio_x = cfg_x + 430.0;
+    let dispatch_x = mio_x + 430.0;
+    let worker_x = dispatch_x + 430.0;
+    let mio_y = y0 + 55.0;
+    let ring_y = y0 + 380.0;
     thread_box(
         &mut parts,
-        sg_x,
-        row_b,
-        "pelikan_signal",
-        Some("SIGINT/TERM/QUIT"),
+        cfg_x,
+        y0 + 164.0,
+        "server.io_backend",
+        Some("resolved once"),
         &[],
         true,
     );
     thread_box(
         &mut parts,
-        li_x,
-        row_b,
+        mio_x,
+        mio_y,
+        "pelikan_listener",
+        Some("Mio accept/readiness"),
+        &[],
+        false,
+    );
+    queue_glyph(
+        &mut parts,
+        dispatch_x,
+        mio_y + TB_H / 2.0 - 11.0,
+        50.0,
+        22.0,
+        "session queue",
+    );
+    thread_box(
+        &mut parts,
+        worker_x,
+        mio_y,
+        "pelikan_work_i",
+        Some("callback state machine"),
+        &[CHIP_PROTOCOL],
+        false,
+    );
+    thread_box(
+        &mut parts,
+        mio_x,
+        ring_y,
+        "ringline-acceptor",
+        Some("Ringline accept"),
+        &[],
+        false,
+    );
+    queue_glyph(
+        &mut parts,
+        dispatch_x,
+        ring_y + TB_H / 2.0 - 11.0,
+        50.0,
+        22.0,
+        "accepted fd queue / wake",
+    );
+    thread_box(
+        &mut parts,
+        worker_x,
+        ring_y,
+        "ringline-worker-i",
+        Some("schedules async tasks"),
+        &[CHIP_PROTOCOL],
+        false,
+    );
+
+    let control_y = y0 + 675.0;
+    let control_mid = control_y + TB_H / 2.0;
+    thread_box(
+        &mut parts,
+        cfg_x,
+        control_y,
+        "pelikan_signal",
+        Some("SIGINT/TERM/QUIT"),
+        &[],
+        false,
+    );
+    thread_box(
+        &mut parts,
+        mio_x,
+        control_y,
         "pelikan_admin",
-        Some(":9999"),
+        Some(":9999 (Mio)"),
         &[CHIP_PROTOCOL_ADMIN],
         false,
     );
-    let mid_b = row_b + TB_H / 2.0;
+    queue_glyph(
+        &mut parts,
+        dispatch_x,
+        control_mid - 11.0,
+        50.0,
+        22.0,
+        "signal queue / wake",
+    );
+    let control_w = 430.0;
+    thread_box_w(
+        &mut parts,
+        worker_x,
+        control_y,
+        control_w,
+        "pelikan_ringline_control",
+        Some("shutdown + monitor"),
+        &[],
+        false,
+    );
+
+    let broadcast_q_x = dispatch_x + 120.0;
+    let broadcast_q_y = y0 + 300.0;
+    let broadcast_q_mid = broadcast_q_y + 11.0;
+    queue_glyph(
+        &mut parts,
+        broadcast_q_x,
+        broadcast_q_y,
+        50.0,
+        22.0,
+        "Mio broadcast queue / wake",
+    );
+
+    let cfg_mid = y0 + 164.0 + TB_H / 2.0;
     parts.push(
-        ortho(&[(sg_x + TB_W, mid_b), (li_x, mid_b)])
-            .signal()
-            .build(),
+        ortho(&[
+            (cfg_x + TB_W, cfg_mid),
+            (mio_x - 40.0, cfg_mid),
+            (mio_x - 40.0, mio_y + TB_H / 2.0),
+            (mio_x, mio_y + TB_H / 2.0),
+        ])
+        .build(),
     );
     parts.push(
-        ortho(&[(li_x + 48.0, row_b), (li_x + 48.0, row_a + TB_H)])
-            .signal()
-            .build(),
-    );
-    parts.push(
-        text(li_x + 16.0, (row_b + row_a + TB_H) / 2.0, "signals")
-            .fill("#777")
-            .build(),
+        text(
+            (cfg_x + TB_W + mio_x) / 2.0,
+            label_above(mio_y + TB_H / 2.0),
+            "mio (default)",
+        )
+        .fill("#555")
+        .build(),
     );
     parts.push(
         ortho(&[
-            (li_x + TB_W, mid_b),
-            (wk_x + TB_W / 2.0, mid_b),
-            (wk_x + TB_W / 2.0, wk_bottom),
+            (cfg_x + TB_W, cfg_mid),
+            (mio_x - 40.0, cfg_mid),
+            (mio_x - 40.0, ring_y + TB_H / 2.0),
+            (mio_x, ring_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        text(
+            (cfg_x + TB_W + mio_x) / 2.0,
+            label_below(ring_y + TB_H / 2.0),
+            "ringline (Linux)",
+        )
+        .fill("#555")
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (mio_x + TB_W, mio_y + TB_H / 2.0),
+            (dispatch_x, mio_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (dispatch_x + 50.0, mio_y + TB_H / 2.0),
+            (worker_x, mio_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (mio_x + TB_W, ring_y + TB_H / 2.0),
+            (dispatch_x, ring_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (dispatch_x + 50.0, ring_y + TB_H / 2.0),
+            (worker_x, ring_y + TB_H / 2.0),
+        ])
+        .build(),
+    );
+    parts.push(
+        ortho(&[(cfg_x + TB_W, control_mid), (mio_x, control_mid)])
+            .signal()
+            .build(),
+    );
+    parts.push(
+        text(
+            (cfg_x + TB_W + mio_x) / 2.0,
+            label_above(control_mid),
+            "OS signals",
+        )
+        .fill("#777")
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (mio_x + TB_W / 2.0, control_y),
+            (mio_x + TB_W / 2.0, control_y - 40.0),
+            (broadcast_q_x + 25.0, control_y - 40.0),
+            (broadcast_q_x + 25.0, broadcast_q_y + 22.0),
         ])
         .signal()
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (broadcast_q_x, broadcast_q_mid),
+            (mio_x + TB_W / 2.0, broadcast_q_mid),
+            (mio_x + TB_W / 2.0, mio_y + TB_H),
+        ])
+        .signal()
+        .build(),
+    );
+    parts.push(
+        ortho(&[
+            (broadcast_q_x + 50.0, broadcast_q_mid),
+            (worker_x + TB_W / 2.0, broadcast_q_mid),
+            (worker_x + TB_W / 2.0, mio_y + TB_H),
+        ])
+        .signal()
+        .build(),
+    );
+    parts.push(
+        ortho(&[(mio_x + TB_W, control_mid), (dispatch_x, control_mid)])
+            .signal()
+            .build(),
+    );
+    parts.push(
+        ortho(&[(dispatch_x + 50.0, control_mid), (worker_x, control_mid)])
+            .signal()
+            .build(),
+    );
+    let report_y = control_y + TB_H + 28.0;
+    parts.push(
+        ortho(&[
+            (worker_x + control_w / 2.0, control_y + TB_H),
+            (worker_x + control_w / 2.0, report_y),
+            (mio_x + TB_W / 2.0, report_y),
+            (mio_x + TB_W / 2.0, control_y + TB_H),
+        ])
+        .signal()
+        .build(),
+    );
+    parts.push(
+        text(
+            (mio_x + TB_W / 2.0 + worker_x + control_w / 2.0) / 2.0,
+            label_below(report_y),
+            "runtime termination report",
+        )
+        .fill("#777")
         .build(),
     );
     (parts, h)
@@ -444,7 +795,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .sw(2.0)
             .build(),
     );
-    margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
+    margin_block(&mut parts, caption_center(), y0 + h / 2.0, title, rows);
 
     let row_a = y0 + 80.0;
     let mid_a = row_a + TB_H / 2.0;
@@ -468,7 +819,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text((cl_x + EXT_W + li_x) / 2.0, mid_a - 15.0, "accept")
+        text((cl_x + EXT_W + li_x) / 2.0, label_above(mid_a), "accept")
             .fill("#555")
             .build(),
     );
@@ -522,7 +873,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
     parts.push(
         text(
             (cl_x + fe_x + TB_W) / 2.0,
-            top_y - 15.0,
+            label_above(top_y),
             "requests / responses (wire)",
         )
         .fill("#555")
@@ -600,7 +951,7 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text((be_x + TB_W + sv_x) / 2.0, mid_a - 15.0, "connect")
+        text((be_x + TB_W + sv_x) / 2.0, label_above(mid_a), "connect")
             .fill("#555")
             .build(),
     );
@@ -638,9 +989,13 @@ fn proxy_panel(y0: f64, title: &str, rows: &[(&str, &str)]) -> (Vec<String>, f64
             .build(),
     );
     parts.push(
-        text(li_x + 16.0, (row_b + row_a + TB_H) / 2.0, "signals")
-            .fill("#777")
-            .build(),
+        text(
+            label_left(li_x + 48.0, "signals"),
+            (row_b + row_a + TB_H) / 2.0,
+            "signals",
+        )
+        .fill("#777")
+        .build(),
     );
     parts.push(
         ortho(&[
@@ -674,13 +1029,165 @@ pub fn generate() {
 
     let mut parts = vec![ARROW_DEFS.to_string()];
     let mut y = 24.0;
-    let (p1, h1) = server_panel(y, "server", &server_rows);
+    let (fork, fork_h) = backend_choice_panel(y);
+    parts.extend(fork);
+    y += fork_h + 20.0;
+    let (p1, h1) = server_panel(y, "common Arc-shared storage", &server_rows);
     parts.extend(p1);
     y += h1 + 20.0;
     let (p2, h2) = proxy_panel(y, "proxy", &proxy_rows);
     parts.extend(p2);
 
-    let (w, h) = (24.0 + PANEL_W + 260.0 + 24.0, y + h2 + 24.0);
+    let (w, h) = (CANVAS_W, y + h2 + OUTER_PAD);
     fs::write(OUT, svg_document(w, h, "cargo xtask diagrams", &parts)).unwrap();
     println!("generated: {OUT}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn text_x(svg: &str, label: &str) -> f64 {
+        let needle = format!(">{label}</text>");
+        let end = svg.find(&needle).expect("label is rendered");
+        let start = svg[..end].rfind("<text ").expect("text element starts");
+        let tag = &svg[start..end];
+        let x_start = tag.find(" x=\"").expect("text has x") + 4;
+        let x_end = tag[x_start..].find('"').expect("text x closes") + x_start;
+        tag[x_start..x_end].parse().expect("numeric text x")
+    }
+
+    const MIN_TEXT_CLEARANCE: f64 = 14.0;
+
+    fn text_y(svg: &str, label: &str) -> f64 {
+        let needle = format!(">{label}</text>");
+        let end = svg.find(&needle).expect("label is rendered");
+        let start = svg[..end].rfind("<text ").expect("text element starts");
+        let tag = &svg[start..end];
+        let y_start = tag.find(" y=\"").expect("text has y") + 4;
+        let y_end = tag[y_start..].find('"').expect("text y closes") + y_start;
+        tag[y_start..y_end].parse().expect("numeric text y")
+    }
+
+    fn assert_above(svg: &str, label: &str, edge_y: f64) {
+        let clearance = edge_y - (text_y(svg, label) + TS.body as f64 / 2.0);
+        assert!(
+            clearance >= MIN_TEXT_CLEARANCE,
+            "{label:?} has only {clearance}px above its edge"
+        );
+    }
+
+    fn assert_below(svg: &str, label: &str, edge_y: f64) {
+        let clearance = text_y(svg, label) - TS.body as f64 / 2.0 - edge_y;
+        assert!(
+            clearance >= MIN_TEXT_CLEARANCE,
+            "{label:?} has only {clearance}px below its edge"
+        );
+    }
+
+    #[test]
+    fn right_caption_titles_clear_the_panel_and_viewport() {
+        const MIN_GAP: f64 = 32.0;
+        let panel_right = X0 + PANEL_W;
+        let viewport_right = CANVAS_W;
+
+        for (title, parts) in [
+            ("launch-time backend fork", backend_choice_panel(0.0).0),
+            (
+                "common Arc-shared storage",
+                server_panel(0.0, "common Arc-shared storage", &[]).0,
+            ),
+        ] {
+            let svg = parts.concat();
+            let center = text_x(&svg, title);
+            let half_width = label_w_at(title, TS.h1 as f64) / 2.0;
+            assert!(
+                center - half_width >= panel_right + MIN_GAP,
+                "{title:?} overlaps the drawing"
+            );
+            assert!(
+                center + half_width <= viewport_right,
+                "{title:?} exceeds the viewport"
+            );
+        }
+    }
+
+    #[test]
+    fn queue_labels_clear_the_queue_border() {
+        let mut parts = Vec::new();
+        queue_glyph(&mut parts, 0.0, 100.0, 50.0, 22.0, "sessions");
+        let svg = parts.concat();
+
+        assert_above(&svg, "sessions", 100.0);
+    }
+
+    #[test]
+    fn backend_arrow_labels_clear_their_edges() {
+        let (parts, _) = backend_choice_panel(0.0);
+        let svg = parts.concat();
+
+        assert_above(&svg, "mio (default)", 55.0 + TB_H / 2.0);
+        assert_below(&svg, "ringline (Linux)", 380.0 + TB_H / 2.0);
+        assert_above(&svg, "OS signals", 675.0 + TB_H / 2.0);
+        assert_below(&svg, "runtime termination report", 675.0 + TB_H + 28.0);
+    }
+
+    #[test]
+    fn proxy_arrow_labels_clear_their_edges() {
+        let rows = [("pingproxy", "ping")];
+        let (parts, _) = proxy_panel(0.0, "proxy", &rows);
+        let svg = parts.concat();
+        let edge_y = 80.0 + TB_H / 2.0;
+
+        assert_above(&svg, "accept", edge_y);
+        assert_above(&svg, "connect", edge_y);
+
+        let listener_x = X0 + 26.0 + EXT_W + gap_for("accept").max(TB_W + GAP - EXT_W);
+        let signal_edge_x = listener_x + 48.0;
+        let label_right = text_x(&svg, "signals") + label_w_at("signals", TS.body as f64) / 2.0;
+        let clearance = signal_edge_x - label_right;
+        assert!(
+            clearance >= MIN_TEXT_CLEARANCE,
+            "signals has only {clearance}px beside its edge"
+        );
+    }
+
+    #[test]
+    fn backend_panel_shows_real_ringline_queue_workers_and_control_thread() {
+        let (parts, _) = backend_choice_panel(0.0);
+        let svg = parts.concat();
+
+        assert!(svg.contains("accepted fd queue / wake"));
+        assert!(svg.contains("pelikan_ringline_control"));
+        assert!(svg.contains("schedules async tasks"));
+        assert!(!svg.contains("runtime task dispatch"));
+    }
+
+    #[test]
+    fn backend_panel_inventories_server_signal_thread_and_mio_broadcast() {
+        let (parts, _) = backend_choice_panel(0.0);
+        let svg = parts.concat();
+
+        assert!(svg.contains("pelikan_signal"));
+        assert!(svg.contains("OS signals"));
+        assert!(svg.contains("Mio broadcast queue / wake"));
+    }
+
+    #[test]
+    fn shared_storage_panel_is_backend_neutral() {
+        let rows = [("segcache", "memcache")];
+        let (parts, _) = server_panel(0.0, "common Arc-shared storage", &rows);
+        let svg = parts.concat();
+
+        assert!(svg.contains("execution context 0"));
+        assert!(svg.contains("one Arc-shared engine"));
+        for backend_specific in [
+            "pelikan_listener",
+            "pelikan_work",
+            "ringline-acceptor",
+            "ringline-worker",
+        ] {
+            assert!(!svg.contains(backend_specific));
+        }
+    }
 }

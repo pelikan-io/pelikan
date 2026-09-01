@@ -45,6 +45,16 @@ impl Rds {
         Ok(Self { process })
     }
 
+    /// Returns the bound cache data-listener address.
+    pub fn data_addr(&self) -> std::net::SocketAddr {
+        self.process.data_addr()
+    }
+
+    /// Returns the bound administrative-listener address.
+    pub fn admin_addr(&self) -> std::net::SocketAddr {
+        self.process.admin_addr()
+    }
+
     /// Wait for all threads to complete. Blocks until the process has fully
     /// terminated. Under normal conditions, this will block indefinitely.
     pub fn wait(self) {
