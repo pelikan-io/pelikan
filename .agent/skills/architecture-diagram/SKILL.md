@@ -26,11 +26,12 @@ the claims, then bind the halves visually (see "Chips bridge the halves").
 
 This is the `dataflow-diagram` skill's principles carried into a domain it
 was not written for. The principles survived the trip; the duo-specific
-conventions are younger — tested against exactly one system, a multi-binary
-cache framework — so treat this skill as **beta**. Adopt the conventions
-wholesale, and when one fights your system, the override with its stated
-reason is the most valuable thing the effort can produce: record it in the
-charter and bring it back here. Where the two skills deliberately disagree
+conventions are younger — derived against a multi-binary cache framework,
+then carried to a second system, an io_uring runtime library, whose reader
+supplied the layout rules below — so treat this skill as **beta**. Adopt the
+conventions wholesale, and when one fights your system, the override with its
+stated reason is the most valuable thing the effort can produce: record it in
+the charter and bring it back here. Where the two skills deliberately disagree
 (arrows dropped from the build chart, provenance demoted from a channel,
 geometry emitted directly rather than through a layout engine), the reason
 appears in the section that overrides it. For a pipeline or DAG chart of
@@ -113,12 +114,17 @@ migration.
 its panel (exclude intentional margin elements explicitly — don't loosen
 the check). After refactoring the generator, byte-compare the output;
 "looks the same" is not a check. Renderers silently ignore attributes they
-don't support: confirm geometry actually moved.
+don't support: confirm geometry actually moved. A bounds check proves
+containment and nothing beyond it — see "Bounds are not balance".
 
 **Human review gates every chart.** Layout quality and whether the chart
 communicates are perceptual judgments no assertion covers. Every new chart
 and visual change goes through the project's designated reviewer; approval
-of an earlier revision does not cover a later one.
+of an earlier revision does not cover a later one. When the raster preview a
+review depends on is unavailable, say so and name what stood in for it —
+markup validity, deterministic regeneration compared by hash, bounds and
+collision checks, a reviewer reading the committed artifact. A gate skipped
+without that record reads afterwards as a gate passed.
 
 ## The build-time chart
 
@@ -193,7 +199,19 @@ Request flow:
   so numbering is honest.
 - **Stage verbs are the code's verbs** (`receive`, `execute`, `send`,
   `flush`), noting what each bundles. Invented vocabulary drifts; the
-  code's vocabulary is asserted.
+  code's vocabulary is asserted. The exception is a verb the code spends on
+  two different things: `poll` for readiness and `poll` for task execution,
+  set side by side in one label, name neither. Use the lifecycle word —
+  `schedule` — and leave the mechanism to the prose, unless the mechanism is
+  the distinction the chart exists to draw. This is `technical-prose`'s
+  one-name-one-thing rule, and a label is where it hides best.
+- **Variants that differ in vocabulary get their own panels.** Interleaving
+  two backends' operation names inside one flow makes the stages they
+  genuinely share look like shared mechanism. Draw a panel per variant on an
+  obvious comparison axis — top and bottom — and repeat the portable stages
+  in each. Repetition costs a reader less than one node carrying two
+  vocabularies, and what the variants really share belongs in the prose
+  beside the chart.
 - **Uniform stage pitch across panels**, lane switch or not, so panels
   column-align and the only visual difference between variants is the real
   one.
@@ -217,8 +235,61 @@ starting from it beats assembling from scratch.
   rasterizers).
 - **Edges**: heavy (2.4) crossing the process boundary, thin (1.4)
   internal; orthogonal only; labels above arrows.
-- **Panels**: one per variant, stacked vertically, right-margin annotations
-  vertically centered.
+- **Panels**: right-margin annotations vertically centered; the runtime-chart
+  rule above sets one per variant, stacked.
+
+## Bounds are not balance
+
+Every element inside its panel is the weakest layout claim available, and it
+is the one a bounds check makes. A two-line label centered on its first
+baseline, three arrows attached to a box at points chosen one at a time, a
+child crossing its parent's border, a pair of arrows whose labels both sit
+above their lines — each of those passes bounds, and each is what a reader
+notices first. Emitting geometry directly is what buys the rigid alignment
+this skill asks for; it also means the generator inherits every placement
+decision a layout engine would have made, so each one below becomes a check
+standing beside the bounds check.
+
+**A label is placed against a resolved shape, not a nominal coordinate.**
+Anchor explicitly, center on the box or the segment the label names, and hold
+a minimum padding from borders, arrow paths, and neighboring text. Then
+collision-check text bounds against shapes and connectors: text that clears
+the panel can still cross the connector running past it.
+
+**A multiline label is one layout object.** Measure the line group, center
+the group in the shape, then place each baseline within it. Centered line by
+line, a two-line block sits visibly high while the arithmetic reports it
+centered.
+
+**Connectors on one shape are placed as a group.** One belongs at the
+midpoint of its edge; two take equal offsets either side of it; more
+distribute evenly and symmetrically, holding corner padding and enough
+separation for arrowheads and labels. Chosen one at a time, the first arrow
+keeps the midpoint and the rest are pushed aside, and the asymmetry reads as
+though it meant something.
+
+**Route against resolved bounds, not the column a shape nominally sits in.**
+Siblings that differ in width let a connector that was correct for the narrow
+box penetrate the wide one. Give equivalent steps one geometry, and test each
+endpoint against the border it actually lands on.
+
+**Label the connector group, not the connector.** For a pair, place the
+labels outward — the upper label above the upper line, the lower below the
+lower. On the same side, the inner label sits nearer the arrow it does not
+describe. Larger groups need collision-aware placement rather than a rule.
+
+**Containment is checked at every semantic layer.** Children stay inside the
+parent's content area, siblings do not collide, and a parent's header owns a
+band outside its children's visual block. A hierarchy whose parent and child
+labels share one text rhythm reads flat, however legal each string is on its
+own.
+
+**A visual fix that is not a test recurs.** Every rule above is a defect a
+reader reported, and every one would have returned at the next layout change
+had the fix been coordinates. Convert the report into a generator assertion —
+the line group is centered, equivalent boxes share a width, endpoints land on
+borders, paired labels face outward, children stay in their lane — so the fix
+survives the edit that would otherwise undo it.
 
 ## Single-use charts
 
@@ -228,10 +299,9 @@ core — derive from the program's real structures, classify through
 fail-loud tables, use the default visual language — and keeps the generator
 script with the artifact, wherever the work lives. What it loses is
 freshness: nothing will catch drift, so stamp the chart with the commit it
-was derived from and present it as a dated snapshot. Skip the charter and
-the review gate; keep derivation and fail-loudly, which cost nothing and
-make even a one-off chart trustworthy. A chart worth keeping makes the
-script the seed of the installed generator.
+was derived from and present it as a dated snapshot. Skip the charter and the
+review gate. A chart worth keeping makes the script the seed of the installed
+generator.
 
 ## Workflow
 
@@ -273,8 +343,32 @@ Recorded so they are not re-attempted:
   the top chart plus a textual table. Prove a companion chart adds claims
   the main chart cannot carry before building it.
 
+## Prose in the chart
+
+Prose in and around a chart — node labels, the key, the caption, the charter —
+follows `technical-prose`, including its default of American spelling. A
+convention the user or the project states overrides that default; a mixture of
+both overrides nothing and reads as several authors.
+
+## Draw the state, do not bury it
+
+A stateful component folded into the label of the thing that reads or writes it
+is invisible: a ring named inside a process box, a queue mentioned in an edge
+label, a store that exists only as a verb. Draw it as its own node.
+
+In a structure chart this decides what a unit *is*. A process that owns a
+buffer and a process that borrows one look identical until the buffer is drawn
+and the ownership edge has somewhere to land. In a runtime chart it decides
+where the interesting failures live: a thread cannot lose a record, but the
+queue between two threads can, and a chart with no queue has nowhere to put
+the loss.
+
+The test: **if a box names both a unit and something that outlives it, split
+it.**
+
 ## Red flags
 
+- A stateful component named inside another node's label rather than drawn.
 - A node or edge list maintained by hand beside the code it describes.
 - A generator that skips an element it cannot classify.
 - A curated order or whitelist with no validity check against derived facts.
@@ -287,6 +381,16 @@ Recorded so they are not re-attempted:
 - Variant panels whose spacing differs for reasons other than a real
   difference.
 - A bounds check loosened to admit an overflowing label.
+- A label centered by its first baseline rather than by its line group.
+- Arrows attached to one shape at points chosen one at a time.
+- A connector routed to a column coordinate rather than a resolved border.
+- Paired labels on the same side of two parallel arrows.
+- A child shape crossing its parent's border, or a parent's label sharing the
+  text rhythm of its children.
+- A stage label carrying a verb the code spends on two different things.
+- A reported visual defect fixed in coordinates rather than in an assertion.
+- A review gate skipped for an unavailable preview, with no record of what
+  stood in for it.
 - A generator refactor merged without byte-comparing its output.
 - A chart shipped without human review, or re-shipped under a stale
   approval.
