@@ -34,6 +34,24 @@ harness; record CPU, kernel, Rust version, background load, and build profile
 with results. Measurements belong to the PR assessment with their environment
 and limitations, not to a portable performance guarantee.
 
+To assess the usual collection cadence, set the request interval separately
+from the collector's 10 ms queue-drain cadence. These runs use four workers,
+three repetitions, and enough recording time for two periodic requests per
+case (plus a final drain):
+
+```sh
+HIST_INTERVAL_MS=1000 HIST_WORKERS=4 HIST_COLLECTION=on \
+  target/release/examples/histogram_scaling 2200 3 > histogram-1s.csv
+HIST_INTERVAL_MS=5000 HIST_WORKERS=4 HIST_COLLECTION=on \
+  target/release/examples/histogram_scaling 10200 3 > histogram-5s.csv
+cargo run --release -p session --example histogram_windows > histogram-windows.csv
+```
+
+`HIST_WORKERS` is a comma-separated worker-count matrix. `HIST_COLLECTION=on`
+selects enabled collection only; otherwise both settings run. Defaults retain
+the original 1/2/4-worker, 10 ms matrix. For longer intervals, recording must
+last longer than the requested interval; prefer multiple intervals per case.
+
 The matrix uses 1, 2, and 4 workers; concentrated values (10,000–10,007, in one
 bucket); and a broader deterministic sequence spanning powers of two. Inputs
 are generated before timing. The two collection settings are disabled and a
@@ -51,7 +69,9 @@ duplicated, or incorrectly merged samples abort the run.
   recording duration. `worker_ns_per_record` is the mean of each worker's
   duration divided by its sample count. These are different denominators.
 - `mean_collection_us` includes bucket loading/merging, buffer recycling, and
-  p50/p99/p999 calculation. It excludes sleeping. Collection-disabled runs
+  p50/p99/p999 calculation on sweeps that load or receive data. Local replies
+  can arrive on separate sweeps, so this is not necessarily cost per complete
+  global snapshot. It excludes sleeping. Collection-disabled runs
   still perform a final correctness collection; use enabled runs for periodic
   collection comparisons.
 - `collector_cpu_ms` is thread CPU time over the run, including loop overhead
@@ -59,6 +79,10 @@ duplicated, or incorrectly merged samples abort the run.
 - `max_publication_age_us` measures elapsed time from a local buffer's handoff
   to its consumption. It is not end-to-end metric freshness: samples may have
   accumulated for a whole publication interval before handoff.
+- `max_cutoff_lag_us` measures how long a worker takes to cut and publish a
+  buffer after the collector requests it. It excludes the collector's own
+  timer lateness relative to an ideal wall-clock schedule and excludes final
+  shutdown publications. `requests` counts actual periodic requests.
 - `resident_histogram_bytes` estimates algorithmic histogram storage: shared
   or sharded atomic state plus a merged result and one temporary load; or two
   local buffers per worker plus a merged result. It excludes allocator and
@@ -82,8 +106,10 @@ never reads buckets being modified by a worker.
 
 If no spare is available, the worker continues accumulating without waiting.
 Requests coalesce until the spare returns. No samples are dropped, but the
-observation interval can grow. The collector polls every 10 ms, so a
-publication may wait another interval before it is consumed. No exact global
+observation interval can grow. The collector polls every 10 ms independently
+of the configured publication-request interval, so a publication can wait for
+the next poll before it is consumed. Slowing the request interval to five
+seconds does not deliberately make queue draining wait five seconds. No exact global
 window is promised. All variants calculate cumulative quantiles in this
 experiment; production interval-delta semantics remain a separate decision.
 
@@ -92,6 +118,33 @@ publication may wait after timing ends to validate and retain all samples.
 Worker shutdown, stalled workers, queue latency, and stale-snapshot reporting
 still require a production lifecycle design. Non-waiting channel operations
 also do not establish that the queue implementation itself is lock-free.
+
+## Burst-boundary sensitivity
+
+`histogram_windows` is a deterministic replay, not a measured runtime latency
+distribution. Four workers each record 100,000 samples/second: ordinary values
+are 100 µs, with a 20 ms burst of 10,000 µs values. Burst starts range from
+20 ms before to 20 ms after a collection boundary. Windows are 1 or 5 seconds.
+
+The control merges exact-window buckets. The alternative shifts each worker's
+window by an evenly staggered offset between zero and a chosen maximum
+(1, 5, or 20 ms). Both window ends shift together, preserving duration and
+sample count. The replay compares p50, p99, and p999 after merging buckets.
+Histogram bucket upper bounds are reported, including 10,047 µs for the
+10,000 µs sample value. Tests verify the boundary-crossing behavior.
+
+A separate zero-cutoff-skew row represents delivering the same snapshot 20 ms
+later: every percentile is unchanged. Delivery age and window-cutoff skew are
+different quantities. The chosen cutoff offsets are sensitivity scenarios,
+not claims that the live prototype incurred that skew. A burst constructed
+right at a percentile threshold can move that percentile substantially even
+with a small cutoff shift; this does not estimate how often that occurs in
+production.
+
+An exporter should expose the sampled window/cutoff timestamp. Until all
+required publications arrive, it must not label a previous or partial window
+as a newly completed global snapshot. Slowing collection reduces relative
+delivery delay, but does not remove this requirement.
 
 ## Decision gates
 

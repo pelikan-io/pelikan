@@ -64,6 +64,7 @@ enum Mode {
 struct Publication {
     histogram: Histogram,
     at: Instant,
+    epoch: u64,
 }
 
 fn run(
@@ -75,6 +76,12 @@ fn run(
     collect: bool,
     repetition: usize,
 ) {
+    let interval_ms: u64 = std::env::var("HIST_INTERVAL_MS")
+        .unwrap_or("10".into())
+        .parse()
+        .unwrap();
+    assert!(interval_ms > 0);
+    let interval = Duration::from_millis(interval_ms);
     let n = cpus.len();
     let shards: Arc<Vec<_>> = Arc::new(
         (0..if matches!(mode, Mode::Shared) { 1 } else { n })
@@ -131,6 +138,7 @@ fn run(
                             .try_send(Publication {
                                 histogram: next,
                                 at: Instant::now(),
+                                epoch: requested,
                             })
                             .unwrap();
                         seen = requested;
@@ -152,6 +160,7 @@ fn run(
                     .send(Publication {
                         histogram: active,
                         at: Instant::now(),
+                        epoch: 0,
                     })
                     .unwrap();
             }
@@ -168,33 +177,49 @@ fn run(
             let mut collection_ns = 0_u64;
             let mut max_age_us = 0_u128;
             let mut publications = 0_u64;
+            let mut max_cutoff_lag_us = 0_u128;
+            let mut requests = Vec::new();
             start.wait();
             let cpu_start = cpu_ns();
+            let mut next_request = Instant::now() + interval;
             loop {
                 // Even with collection disabled, local final handoffs must drain.
                 std::thread::sleep(Duration::from_millis(10));
                 let done = stop.load(Ordering::Acquire);
                 let begin = Instant::now();
-                if collect {
+                let due = collect && begin >= next_request;
+                if due {
+                    requests.push(begin);
                     epoch.fetch_add(1, Ordering::Relaxed);
+                    next_request += interval;
                 }
+                let mut changed = false;
                 if matches!(mode, Mode::Local) {
                     for (receive, recycle) in &collector_endpoints {
                         while let Ok(mut item) = receive.try_recv() {
                             max_age_us = max_age_us.max(item.at.elapsed().as_micros());
+                            if item.epoch != 0 {
+                                max_cutoff_lag_us = max_cutoff_lag_us.max(
+                                    item.at
+                                        .duration_since(requests[item.epoch as usize - 1])
+                                        .as_micros(),
+                                );
+                            }
+                            changed = true;
                             merge(&mut total, &item.histogram);
                             publications += 1;
                             item.histogram.as_mut_slice().fill(0);
                             let _ = recycle.try_send(item.histogram);
                         }
                     }
-                } else if collect || done {
+                } else if due || done {
+                    changed = true;
                     total.as_mut_slice().fill(0);
                     for shard in shards.iter() {
                         merge(&mut total, &shard.load().unwrap_or_else(empty));
                     }
                 }
-                if collect || done {
+                if changed || done {
                     black_box(total.quantiles(&[0.5, 0.99, 0.999]).unwrap());
                     collection_ns += begin.elapsed().as_nanos() as u64;
                     sweeps += 1;
@@ -210,13 +235,23 @@ fn run(
                 cpu_ns() - cpu_start,
                 max_age_us,
                 publications,
+                max_cutoff_lag_us,
+                requests.len(),
             )
         })
     };
     let results: Vec<_> = workers.into_iter().map(|w| w.join().unwrap()).collect();
     stop.store(true, Ordering::Release);
-    let (total, sweeps, collection_ns, collector_cpu_ns, max_age_us, publications) =
-        collector.join().unwrap();
+    let (
+        total,
+        sweeps,
+        collection_ns,
+        collector_cpu_ns,
+        max_age_us,
+        publications,
+        max_cutoff_lag_us,
+        requests,
+    ) = collector.join().unwrap();
     let recorded: u64 = results.iter().map(|r| r.0).sum();
     assert_eq!(
         total.as_slice().iter().sum::<u64>(),
@@ -249,7 +284,7 @@ fn run(
         Mode::Sharded => n * atomic_bytes + 2 * histogram_bytes,
         Mode::Local => (2 * n + 1) * histogram_bytes,
     };
-    println!("{mode:?},{},{n},{collect},{repetition},{recorded},{:.3},{ns_per_record:.3},{sweeps},{:.3},{:.3},{max_age_us},{publications},{histogram_bytes},{resident}",
+    println!("{mode:?},{},{n},{collect},{repetition},{recorded},{:.3},{ns_per_record:.3},{sweeps},{:.3},{:.3},{max_age_us},{publications},{histogram_bytes},{resident},{interval_ms},{max_cutoff_lag_us},{requests}",
         if broad { "broad" } else { "concentrated" }, recorded as f64 / seconds / 1e6,
         collection_ns as f64 / sweeps as f64 / 1000.0, collector_cpu_ns as f64 / 1e6);
 }
@@ -270,11 +305,22 @@ fn main() {
         .parse()
         .unwrap();
     assert!(!cpus.contains(&collector));
-    println!("mode,distribution,workers,collect,repetition,records,mrecords_per_s,worker_ns_per_record,sweeps,mean_collection_us,collector_cpu_ms,max_publication_age_us,publications,histogram_bytes,resident_histogram_bytes");
+    let workers: Vec<usize> = std::env::var("HIST_WORKERS")
+        .unwrap_or("1,2,4".into())
+        .split(',')
+        .map(|v| v.parse().unwrap())
+        .collect();
+    assert!(workers.iter().all(|n| *n > 0 && *n <= cpus.len()));
+    let collection = if std::env::var("HIST_COLLECTION").as_deref() == Ok("on") {
+        vec![true]
+    } else {
+        vec![false, true]
+    };
+    println!("mode,distribution,workers,collect,repetition,records,mrecords_per_s,worker_ns_per_record,sweeps,mean_collection_us,collector_cpu_ms,max_publication_age_us,publications,histogram_bytes,resident_histogram_bytes,interval_ms,max_cutoff_lag_us,requests");
     for repetition in 0..repetitions {
-        for n in [1, 2, 4] {
+        for &n in &workers {
             for broad in [false, true] {
-                for collect in [false, true] {
+                for &collect in &collection {
                     // Rotate variant order to reduce systematic ordering bias.
                     let modes = [Mode::Shared, Mode::Sharded, Mode::Local];
                     for offset in 0..3 {

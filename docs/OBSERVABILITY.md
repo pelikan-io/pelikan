@@ -33,6 +33,9 @@ the chart, and its textual explanation together.
   Validate all bucket counts against expected samples. See
   [methodology and decision gates](HISTOGRAM_ASSESSMENT.md); host-specific
   measurements are reported in the PR.
+- [x] Assess 1-second and 5-second publication intervals separately from
+  queue-drain cadence. Report handoff age and worker cutoff lag, and add a
+  deterministic burst-boundary replay comparing merged p50/p99/p999.
 - [ ] Complete the end-to-end per-worker histogram assessment. Compare the
   current shared atomic histogram, per-worker atomic shards, and non-atomic
   local recording with
