@@ -7,13 +7,94 @@ use libc::c_int;
 use protocol_common::Protocol;
 use signal_hook::consts::signal::*;
 use signal_hook::iterator::Signals;
+use std::any::Any;
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+use std::io;
+use std::marker::PhantomData;
 use std::thread::JoinHandle;
 
-pub struct ProcessBuilder<Parser, Request, Response, Storage> {
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+use crate::ringline::SingleHandler;
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+use pelikan_net::ringline::{launch_with_bootstraps, RinglineRuntimeConfig};
+
+#[derive(Debug, Eq, PartialEq)]
+enum ProcessKind {
+    Mio,
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    Ringline,
+}
+
+fn process_kind(resolution: pelikan_net::BackendResolution) -> ProcessKind {
+    match resolution.active {
+        pelikan_net::IoBackend::Mio => ProcessKind::Mio,
+        #[cfg(all(feature = "ringline", target_os = "linux"))]
+        pelikan_net::IoBackend::Ringline => ProcessKind::Ringline,
+        #[cfg(not(all(feature = "ringline", target_os = "linux")))]
+        pelikan_net::IoBackend::Ringline => ProcessKind::Mio,
+    }
+}
+
+#[derive(Clone)]
+struct CacheConfig {
+    server: config::Server,
+    tls: config::Tls,
+    worker: config::Worker,
+}
+
+impl ServerConfig for CacheConfig {
+    fn server(&self) -> &config::Server {
+        &self.server
+    }
+
+    fn server_mut(&mut self) -> &mut config::Server {
+        &mut self.server
+    }
+}
+
+impl TlsConfig for CacheConfig {
+    fn tls(&self) -> &config::Tls {
+        &self.tls
+    }
+}
+
+impl WorkerConfig for CacheConfig {
+    fn worker(&self) -> &config::Worker {
+        &self.worker
+    }
+
+    fn worker_mut(&mut self) -> &mut config::Worker {
+        &mut self.worker
+    }
+}
+
+pub enum ProcessBuilder<Parser, Request, Response, Storage> {
+    Mio(MioProcessBuilder<Parser, Request, Response, Storage>),
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    Ringline(RinglineProcessBuilder<Parser, Request, Response, Storage>),
+}
+
+pub struct MioProcessBuilder<Parser, Request, Response, Storage> {
     admin: AdminBuilder,
-    listener: ListenerBuilder,
+    config: CacheConfig,
     log_drain: LogDrain,
-    workers: WorkersBuilder<Parser, Request, Response, Storage>,
+    protocol: Parser,
+    storage: Arc<Storage>,
+    _request: PhantomData<Request>,
+    _response: PhantomData<Response>,
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+pub struct RinglineProcessBuilder<Parser, Request, Response, Storage> {
+    mio: MioProcessBuilder<Parser, Request, Response, Storage>,
+}
+
+pub(crate) fn storage_flush_handle<Storage>(storage: &Arc<Storage>) -> admin::FlushHandle
+where
+    Storage: EntryStore + Send + Sync + 'static,
+{
+    let storage = Arc::clone(storage);
+    Arc::new(move || storage.clear())
 }
 
 impl<P, Request, Response, Storage> ProcessBuilder<P, Request, Response, Storage>
@@ -29,149 +110,806 @@ where
         protocol: P,
         storage: Storage,
     ) -> Result<Self> {
-        // the workers share one storage instance; the admin thread gets a
-        // type-erased handle to it so that it can apply `flush_all` itself,
-        // exactly once, before acking
         let storage = Arc::new(storage);
-        let flush_handle = {
-            let storage = storage.clone();
-            Arc::new(move || storage.clear()) as admin::FlushHandle
-        };
+        let flush_handle = storage_flush_handle(&storage);
+        let requested = pelikan_net::IoBackend::parse(config.server().io_backend())
+            .map_err(|error| Error::new(ErrorKind::InvalidInput, error))?;
+        let available = cfg!(all(feature = "ringline", target_os = "linux"));
+        let resolution = pelikan_net::resolve_backend(requested, available);
+        let mut mio = MioProcessBuilder::new(config, log_drain, protocol, storage)?;
+        mio.admin.flush_handle(flush_handle);
 
-        let mut admin = AdminBuilder::new(config)?;
-        admin.flush_handle(flush_handle);
-
-        let listener = ListenerBuilder::new(config)?;
-        let workers = WorkersBuilder::new(config, protocol, storage)?;
-
-        Ok(Self {
-            admin,
-            listener,
-            log_drain,
-            workers,
-        })
+        match process_kind(resolution.clone()) {
+            ProcessKind::Mio => {
+                log_resolution(&resolution);
+                Ok(Self::Mio(mio))
+            }
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
+            ProcessKind::Ringline => match ringline_preflight(&mio) {
+                Ok(()) => {
+                    info!("cache server I/O backend requested=ringline active=pending");
+                    Ok(Self::Ringline(RinglineProcessBuilder::single(mio)?))
+                }
+                Err(error) => {
+                    log_ringline_fallback(&error);
+                    Ok(Self::Mio(mio))
+                }
+            },
+        }
     }
 
     pub fn version(mut self, version: &str) -> Self {
-        self.admin.version(version);
+        match &mut self {
+            Self::Mio(builder) => builder.admin.version(version),
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
+            Self::Ringline(builder) => builder.mio.admin.version(version),
+        }
         self
     }
 
     pub fn spawn(self) -> Process {
-        let mut thread_wakers = vec![self.listener.waker()];
-        thread_wakers.extend_from_slice(&self.workers.wakers());
-
-        // channel for the parent `Process` to send `Signal`s to the admin thread
-        let (signal_tx, signal_rx) = bounded(QUEUE_CAPACITY);
-
-        // queues for the `Admin` to send `Signal`s to all sibling threads
-        let (mut signal_queue_tx, mut signal_queue_rx) =
-            Queues::new(vec![self.admin.waker()], thread_wakers, QUEUE_CAPACITY).unwrap();
-
-        // queues for the `Listener` to send `Session`s to the worker threads
-        let (mut listener_session_queues, worker_session_queues) = Queues::new(
-            vec![self.listener.waker()],
-            self.workers.worker_wakers(),
-            QUEUE_CAPACITY,
-        )
-        .unwrap();
-
-        let mut admin = self
-            .admin
-            .build(self.log_drain, signal_rx, signal_queue_tx.remove(0));
-
-        let mut listener = self
-            .listener
-            .build(signal_queue_rx.remove(0), listener_session_queues.remove(0));
-
-        let workers = self.workers.build(worker_session_queues, signal_queue_rx);
-
-        let admin = std::thread::Builder::new()
-            .name(format!("{THREAD_PREFIX}_admin"))
-            .spawn(move || admin.run())
-            .unwrap();
-
-        let listener = std::thread::Builder::new()
-            .name(format!("{THREAD_PREFIX}_listener"))
-            .spawn(move || listener.run())
-            .unwrap();
-
-        let workers = workers.spawn();
-        let cloned_signal_tx = signal_tx.clone();
-
-        // NOTE: Signal handler join handle is not taken ownership of by [Process] as it's
-        // considered something that has the same lifetime as the actual OS process as a whole
-        // and there aren't any current use cases for blocking on join()'ing the thread
-        // if we want to dynamically rebind signal handlers in the future we should reconsider this
-        let _signal_handler = std::thread::Builder::new()
-            .name(format!("{THREAD_PREFIX}_signal"))
-            .spawn(move || Process::signal_handler(&cloned_signal_tx));
-
-        Process {
-            admin,
-            listener,
-            signal_tx,
-            workers,
+        match self {
+            Self::Mio(builder) => Process::Mio(builder.spawn()),
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
+            Self::Ringline(builder) => builder.spawn(),
         }
     }
 }
 
-pub struct Process {
+static BACKEND_RESOLUTION: std::sync::Mutex<pelikan_net::BackendResolution> =
+    std::sync::Mutex::new(pelikan_net::BackendResolution {
+        requested: pelikan_net::IoBackend::Mio,
+        active: pelikan_net::IoBackend::Mio,
+        fallback: None,
+    });
+
+/// Returns the last terminal cache-server backend resolution, including cause.
+pub fn backend_resolution() -> pelikan_net::BackendResolution {
+    BACKEND_RESOLUTION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+}
+
+fn record_resolution(resolution: &pelikan_net::BackendResolution) {
+    *BACKEND_RESOLUTION
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = resolution.clone();
+    SERVER_IO_BACKEND_ACTIVE.set(match resolution.active {
+        pelikan_net::IoBackend::Mio => 0,
+        pelikan_net::IoBackend::Ringline => 1,
+    });
+    if resolution.fallback.is_some() {
+        SERVER_IO_BACKEND_FALLBACK.increment();
+    }
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn log_ringline_active() {
+    log_resolution(&pelikan_net::BackendResolution {
+        requested: pelikan_net::IoBackend::Ringline,
+        active: pelikan_net::IoBackend::Ringline,
+        fallback: None,
+    });
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn ringline_fallback_reason(
+    error: &pelikan_net::ringline::StartupError,
+) -> pelikan_net::FallbackReason {
+    match error {
+        pelikan_net::ringline::StartupError::Runtime(pelikan_net::ringline::Error::RingSetup(
+            _,
+        )) => pelikan_net::FallbackReason::UnsupportedCapability(error.to_string()),
+        pelikan_net::ringline::StartupError::Runtime(pelikan_net::ringline::Error::Io(
+            io_error,
+        )) if matches!(
+            io_error.raw_os_error(),
+            Some(libc::EINVAL | libc::EPERM | libc::ENOSYS | libc::EOPNOTSUPP)
+        ) =>
+        {
+            pelikan_net::FallbackReason::UnsupportedCapability(error.to_string())
+        }
+        _ => pelikan_net::FallbackReason::Initialization(error.to_string()),
+    }
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn log_ringline_runtime_fallback(error: &pelikan_net::ringline::StartupError) {
+    log_resolution(&pelikan_net::BackendResolution {
+        requested: pelikan_net::IoBackend::Ringline,
+        active: pelikan_net::IoBackend::Mio,
+        fallback: Some(ringline_fallback_reason(error)),
+    });
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn log_ringline_fallback(cause: impl std::fmt::Display) {
+    log_resolution(&pelikan_net::BackendResolution {
+        requested: pelikan_net::IoBackend::Ringline,
+        active: pelikan_net::IoBackend::Mio,
+        fallback: Some(pelikan_net::FallbackReason::Initialization(
+            cause.to_string(),
+        )),
+    });
+}
+
+fn log_resolution(resolution: &pelikan_net::BackendResolution) {
+    record_resolution(resolution);
+    match &resolution.fallback {
+        Some(reason) => info!(
+            "cache server I/O backend requested_backend={} active_backend={} fallback_cause={reason}",
+            resolution.requested, resolution.active
+        ),
+        None => info!(
+            "cache server I/O backend requested_backend={} active_backend={}",
+            resolution.requested, resolution.active
+        ),
+    }
+}
+fn set_admin_backend_info(admin: &mut AdminBuilder, resolution: &pelikan_net::BackendResolution) {
+    let fallback = resolution
+        .fallback
+        .as_ref()
+        .map(ToString::to_string)
+        .unwrap_or_else(|| "none".to_string());
+    admin.backend_info(
+        &resolution.requested.to_string(),
+        &resolution.active.to_string(),
+        &fallback,
+    );
+}
+
+impl<P, Request, Response, Storage> MioProcessBuilder<P, Request, Response, Storage>
+where
+    P: 'static + Protocol<Request, Response> + Clone + Send,
+    Request: 'static + Klog + Klog<Response = Response> + Send,
+    Response: 'static + Compose + Send,
+    Storage: 'static + Execute<Request, Response> + EntryStore + Send + Sync,
+{
+    fn new<T: AdminConfig + ServerConfig + TlsConfig + WorkerConfig>(
+        config: &T,
+        log_drain: LogDrain,
+        protocol: P,
+        storage: Arc<Storage>,
+    ) -> Result<Self> {
+        let admin = AdminBuilder::new(config)?;
+
+        config.server().socket_addr().map_err(|error| {
+            error!("{error}");
+            Error::other("Bad listen address")
+        })?;
+        let _ = tls_acceptor(config.tls())?;
+
+        Ok(Self {
+            admin,
+            config: CacheConfig {
+                server: config.server().clone(),
+                tls: config.tls().clone(),
+                worker: config.worker().clone(),
+            },
+            log_drain,
+            protocol,
+            storage,
+            _request: PhantomData,
+            _response: PhantomData,
+        })
+    }
+
+    fn spawn(self) -> MioProcess {
+        let listener = ListenerBuilder::new(&self.config)
+            .unwrap_or_else(|error| panic!("failed to initialize mio listener: {error}"));
+        let workers = WorkersBuilder::new(&self.config, self.protocol, self.storage)
+            .unwrap_or_else(|error| panic!("failed to initialize mio workers: {error}"));
+
+        spawn_mio(self.admin, listener, workers, self.log_drain)
+    }
+}
+
+fn spawn_mio<P, Request, Response, Storage>(
+    mut admin: AdminBuilder,
+    listener: ListenerBuilder,
+    workers: WorkersBuilder<P, Request, Response, Storage>,
+    log_drain: LogDrain,
+) -> MioProcess
+where
+    P: 'static + Protocol<Request, Response> + Clone + Send,
+    Request: 'static + Klog + Klog<Response = Response> + Send,
+    Response: 'static + Compose + Send,
+    Storage: 'static + Execute<Request, Response> + EntryStore + Send + Sync,
+{
+    set_admin_backend_info(&mut admin, &backend_resolution());
+    let admin_addr = admin
+        .local_addr()
+        .expect("bound admin listener has no address");
+    let data_addr = listener
+        .local_addr()
+        .expect("bound data listener has no address");
+    let mut thread_wakers = vec![listener.waker()];
+    thread_wakers.extend_from_slice(&workers.wakers());
+
+    let (signal_tx, signal_rx) = bounded(QUEUE_CAPACITY);
+    let (mut signal_queue_tx, mut signal_queue_rx) =
+        Queues::new(vec![admin.waker()], thread_wakers, QUEUE_CAPACITY).unwrap();
+    let (mut listener_session_queues, worker_session_queues) = Queues::new(
+        vec![listener.waker()],
+        workers.worker_wakers(),
+        QUEUE_CAPACITY,
+    )
+    .unwrap();
+
+    let mut admin = admin.build(log_drain, signal_rx, signal_queue_tx.remove(0));
+    let mut listener = listener.build(signal_queue_rx.remove(0), listener_session_queues.remove(0));
+    let workers = workers.build(worker_session_queues, signal_queue_rx);
+
+    let admin = std::thread::Builder::new()
+        .name(format!("{THREAD_PREFIX}_admin"))
+        .spawn(move || admin.run())
+        .unwrap();
+    let listener = std::thread::Builder::new()
+        .name(format!("{THREAD_PREFIX}_listener"))
+        .spawn(move || listener.run())
+        .unwrap();
+    let workers = workers.spawn();
+
+    spawn_signal_handler(signal_tx.clone());
+
+    MioProcess {
+        admin_addr,
+        data_addr,
+        admin,
+        listener,
+        signal_tx,
+        workers,
+    }
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn ringline_preflight<P, Request, Response, Storage>(
+    mio: &MioProcessBuilder<P, Request, Response, Storage>,
+) -> Result<()> {
+    if tls_acceptor(&mio.config.tls)?.is_some() {
+        return Err(Error::new(
+            ErrorKind::Unsupported,
+            "Ringline cache-server data listener supports plain TCP only",
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+impl<P, Request, Response, Storage> RinglineProcessBuilder<P, Request, Response, Storage>
+where
+    P: 'static + Protocol<Request, Response> + Clone + Send,
+    Request: 'static + Klog + Klog<Response = Response> + Send,
+    Response: 'static + Compose + Send,
+    Storage: 'static + Execute<Request, Response> + EntryStore + Send + Sync,
+{
+    pub fn single(mio: MioProcessBuilder<P, Request, Response, Storage>) -> Result<Self> {
+        ringline_preflight(&mio)?;
+        Ok(Self { mio })
+    }
+
+    fn spawn(self) -> Process {
+        let MioProcessBuilder {
+            admin,
+            config,
+            log_drain,
+            protocol,
+            storage,
+            ..
+        } = self.mio;
+        let addr = config
+            .server
+            .socket_addr()
+            .expect("Ringline listen address was validated at builder creation");
+        let max_connections = config.server.ringline_max_connections();
+        let workers = config.worker.threads();
+        let runtime_config = RinglineRuntimeConfig {
+            workers,
+            max_connections,
+            recv_buffers: 64,
+            recv_buffer_size: 4096,
+            pin_to_core: false,
+        };
+        let bootstraps = SingleHandler::<P, Request, Response, Storage>::bootstraps(
+            protocol.clone(),
+            Arc::clone(&storage),
+            workers,
+        );
+        match launch_with_bootstraps::<SingleHandler<P, Request, Response, Storage>, _>(
+            addr,
+            runtime_config,
+            bootstraps,
+        ) {
+            Ok(runtime) => {
+                let process = spawn_ringline(admin, log_drain, runtime).unwrap_or_else(|error| {
+                    error!("Ringline control-plane initialization failed: {error}");
+                    panic!("Ringline control-plane initialization failed: {error}")
+                });
+                log_ringline_active();
+                Process::Ringline(process)
+            }
+            Err(ringline_error) => {
+                log_ringline_runtime_fallback(&ringline_error);
+                Process::Mio(
+                    MioProcessBuilder {
+                        admin,
+                        config,
+                        log_drain,
+                        protocol,
+                        storage,
+                        _request: PhantomData,
+                        _response: PhantomData,
+                    }
+                    .spawn(),
+                )
+            }
+        }
+    }
+}
+
+pub enum Process {
+    Mio(MioProcess),
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    Ringline(RinglineProcess),
+}
+
+pub struct MioProcess {
+    admin_addr: std::net::SocketAddr,
+    data_addr: std::net::SocketAddr,
     admin: JoinHandle<()>,
     listener: JoinHandle<()>,
     signal_tx: Sender<Signal>,
     workers: Vec<JoinHandle<()>>,
 }
 
-impl Process {
-    /// Attempts to gracefully shutdown the `Process` by sending a shutdown to
-    /// each thread and then waiting to join those threads.
-    ///
-    /// Will terminate ungracefully if it encounters an error in sending a
-    /// shutdown to any of the threads.
-    ///
-    /// This function will block until all threads have terminated.
-    pub fn shutdown(self) {
-        // this sends a shutdown to the admin thread, which will broadcast the
-        // signal to all sibling threads in the process
-        Process::shutdown_signal(&self.signal_tx);
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+pub struct RinglineProcess {
+    admin_addr: std::net::SocketAddr,
+    data_addr: std::net::SocketAddr,
+    admin: JoinHandle<()>,
+    bridge: JoinHandle<()>,
+    signal_tx: Sender<Signal>,
+}
 
-        // wait and join all threads
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn spawn_ringline(
+    mut admin: AdminBuilder,
+    log_drain: LogDrain,
+    runtime: pelikan_net::ringline::RinglineRuntime,
+) -> io::Result<RinglineProcess> {
+    set_admin_backend_info(
+        &mut admin,
+        &pelikan_net::BackendResolution {
+            requested: pelikan_net::IoBackend::Ringline,
+            active: pelikan_net::IoBackend::Ringline,
+            fallback: None,
+        },
+    );
+    let admin_addr = admin.local_addr()?;
+    let data_addr = runtime
+        .bound_addr()
+        .ok_or_else(|| io::Error::other("Ringline runtime has no bound address"))?;
+    let mut bridge_poll = match Poll::new() {
+        Ok(poll) => poll,
+        Err(error) => return rollback_live_runtime(runtime, error),
+    };
+    let bridge_waker = match pelikan_net::Waker::new(bridge_poll.registry(), WAKER_TOKEN) {
+        Ok(waker) => Arc::new(Waker::from(waker)),
+        Err(error) => return rollback_live_runtime(runtime, error),
+    };
+
+    let (signal_tx, signal_rx) = bounded(QUEUE_CAPACITY);
+    let (mut admin_signal_queues, mut bridge_signal_queues) = match Queues::new(
+        vec![admin.waker()],
+        vec![Arc::clone(&bridge_waker)],
+        QUEUE_CAPACITY,
+    ) {
+        Ok(queues) => queues,
+        Err(error) => return rollback_live_runtime(runtime, io::Error::other(error)),
+    };
+    let mut admin = admin.build(log_drain, signal_rx, admin_signal_queues.remove(0));
+
+    let admin = match std::thread::Builder::new()
+        .name(format!("{THREAD_PREFIX}_admin"))
+        .spawn(move || admin.run())
+    {
+        Ok(admin) => admin,
+        Err(error) => return rollback_live_runtime(runtime, error),
+    };
+
+    let bridge_signals = bridge_signal_queues.remove(0);
+    let (runtime_tx, runtime_rx) = std::sync::mpsc::sync_channel::<(
+        pelikan_net::ringline::RinglineShutdown,
+        JoinHandle<io::Result<()>>,
+    )>(1);
+    let bridge_signal_tx = signal_tx.clone();
+    let bridge = match std::thread::Builder::new()
+        .name(format!("{THREAD_PREFIX}_ringline_control"))
+        .spawn(move || {
+            let Ok((control, worker_monitor)) = runtime_rx.recv() else {
+                return;
+            };
+            let mut worker_monitor = Some(worker_monitor);
+            loop {
+                if worker_monitor.as_ref().is_some_and(JoinHandle::is_finished) {
+                    if let Some(monitor) = worker_monitor.take() {
+                        log_ringline_monitor(monitor);
+                    } else {
+                        error!("Ringline worker monitor missing during termination");
+                    }
+                    if let Err(error) = bridge_signal_tx.try_send(Signal::Shutdown) {
+                        error!("failed to report Ringline termination to admin: {error}");
+                    }
+                    return;
+                }
+                if let Err(error) = bridge_poll.poll(
+                    &mut Events::with_capacity(1),
+                    Some(Duration::from_millis(100)),
+                ) {
+                    error!("Ringline admin bridge poll failed: {error}");
+                    control.shutdown();
+                    if let Some(monitor) = worker_monitor.take() {
+                        log_ringline_monitor(monitor);
+                    } else {
+                        error!("Ringline worker monitor missing during shutdown");
+                    }
+                    if let Err(report_error) = bridge_signal_tx.try_send(Signal::Shutdown) {
+                        error!("failed to report Ringline bridge failure to admin: {report_error}");
+                    }
+                    return;
+                }
+                bridge_waker.reset();
+
+                while let Some(signal) = bridge_signals.try_recv().map(|item| item.into_inner()) {
+                    match signal {
+                        // Cache servers install an admin flush handle which
+                        // clears the process-owned Arc synchronously. This arm
+                        // remains for the shared Signal type, but no cache
+                        // server flush is routed through the data plane.
+                        Signal::FlushAll => {}
+                        Signal::Shutdown => {
+                            control.shutdown();
+                            if let Some(monitor) = worker_monitor.take() {
+                                log_ringline_monitor(monitor);
+                            } else {
+                                error!("Ringline worker monitor missing during shutdown");
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+        }) {
+        Ok(bridge) => bridge,
+        Err(error) => {
+            shutdown_signal(&signal_tx);
+            let _ = admin.join();
+            return rollback_live_runtime(runtime, error);
+        }
+    };
+
+    let monitored = match runtime.monitor() {
+        Ok(monitored) => monitored,
+        Err(error) => {
+            drop(runtime_tx);
+            shutdown_signal(&signal_tx);
+            let _ = bridge.join();
+            let _ = admin.join();
+            return Err(error);
+        }
+    };
+    if let Err(error) = runtime_tx.send(monitored) {
+        let (control, monitor) = error.0;
+        control.shutdown();
+        log_ringline_monitor(monitor);
+        shutdown_signal(&signal_tx);
+        let bridge_error = match bridge.join() {
+            Ok(()) => io::Error::other("Ringline control bridge exited during startup"),
+            Err(payload) => io::Error::other(format!(
+                "Ringline control bridge panicked during startup: {}",
+                panic_payload(payload)
+            )),
+        };
+        if let Err(payload) = admin.join() {
+            error!(
+                "Ringline admin panicked during rollback: {}",
+                panic_payload(payload)
+            );
+        }
+        return Err(bridge_error);
+    }
+
+    if let Err(error) = try_spawn_signal_handler(signal_tx.clone()) {
+        shutdown_signal(&signal_tx);
+        let _ = bridge.join();
+        let _ = admin.join();
+        return Err(error);
+    }
+
+    Ok(RinglineProcess {
+        admin_addr,
+        data_addr,
+        admin,
+        bridge,
+        signal_tx,
+    })
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn fail_after_live<T>(error: io::Error, rollback: impl FnOnce()) -> io::Result<T> {
+    rollback();
+    Err(error)
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn rollback_live_runtime(
+    runtime: pelikan_net::ringline::RinglineRuntime,
+    error: io::Error,
+) -> io::Result<RinglineProcess> {
+    fail_after_live(error, || {
+        if let Err(cleanup_error) = runtime.join() {
+            error!("Ringline rollback after control-plane failure also failed: {cleanup_error}");
+        }
+    })
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn log_ringline_monitor(worker_monitor: JoinHandle<io::Result<()>>) {
+    match worker_monitor.join() {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => {
+            error!("Ringline runtime terminated: {error}");
+        }
+        Err(payload) => {
+            let payload = panic_payload(payload);
+            error!("Ringline monitor panicked: {payload}");
+        }
+    }
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+fn try_spawn_signal_handler(signal_tx: Sender<Signal>) -> io::Result<()> {
+    std::thread::Builder::new()
+        .name(format!("{THREAD_PREFIX}_signal"))
+        .spawn(move || signal_handler(&signal_tx))
+        .map(drop)
+}
+
+fn spawn_signal_handler(signal_tx: Sender<Signal>) {
+    if let Err(error) = std::thread::Builder::new()
+        .name(format!("{THREAD_PREFIX}_signal"))
+        .spawn(move || signal_handler(&signal_tx))
+    {
+        error!("failed to spawn signal handler: {error}");
+    }
+}
+
+fn shutdown_signal(signal_tx: &Sender<Signal>) {
+    if let Err(error) = signal_tx.try_send(Signal::Shutdown) {
+        fatal!("error sending shutdown signal to thread: {error}");
+    }
+}
+
+fn signal_handler(signal_tx: &Sender<Signal>) {
+    const SIGNALS: &[c_int] = &[SIGHUP, SIGINT, SIGTERM, SIGQUIT];
+    let mut signals = Signals::new(SIGNALS).expect("Couldn't instantiate Signals");
+
+    for signal in &mut signals {
+        match signal {
+            SIGTERM | SIGINT | SIGQUIT => {
+                shutdown_signal(signal_tx);
+                break;
+            }
+            _ => (),
+        }
+    }
+}
+
+fn panic_payload(payload: Box<dyn Any + Send + 'static>) -> String {
+    let payload = match payload.downcast::<String>() {
+        Ok(message) => return *message,
+        Err(payload) => payload,
+    };
+    payload
+        .downcast::<&'static str>()
+        .map(|message| (*message).to_string())
+        .unwrap_or_else(|_| "non-string panic payload".to_string())
+}
+
+impl Process {
+    /// Returns the bound administrative-listener address.
+    pub fn admin_addr(&self) -> std::net::SocketAddr {
+        match self {
+            Self::Mio(process) => process.admin_addr,
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
+            Self::Ringline(process) => process.admin_addr,
+        }
+    }
+
+    /// Returns the bound cache data-listener address.
+    pub fn data_addr(&self) -> std::net::SocketAddr {
+        match self {
+            Self::Mio(process) => process.data_addr,
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
+            Self::Ringline(process) => process.data_addr,
+        }
+    }
+
+    pub fn shutdown(self) {
+        match &self {
+            Self::Mio(process) => shutdown_signal(&process.signal_tx),
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
+            Self::Ringline(process) => shutdown_signal(&process.signal_tx),
+        }
         self.wait()
     }
 
-    /// Communicates to the admin thread that shutdown should occur
-    fn shutdown_signal(signal_tx: &Sender<Signal>) {
-        if signal_tx.try_send(Signal::Shutdown).is_err() {
-            fatal!("error sending shutdown signal to thread");
+    pub fn wait(self) {
+        match self {
+            Self::Mio(process) => process.wait(),
+            #[cfg(all(feature = "ringline", target_os = "linux"))]
+            Self::Ringline(process) => process.wait(),
         }
     }
+}
 
-    /// Registers Process to listen to relevant signals
-    /// and depending on the signal, may relay Pelikan [Signal] messages to admin channel
-    fn signal_handler(signal_tx: &Sender<Signal>) {
-        const SIGNALS: &[c_int] = &[SIGHUP, SIGINT, SIGTERM, SIGQUIT];
-        let mut signals = Signals::new(SIGNALS).expect("Couldn't instantiate Signals");
-
-        //Infinite iterator of signals
-        for signal in &mut signals {
-            match signal {
-                SIGTERM | SIGINT | SIGQUIT => {
-                    Process::shutdown_signal(signal_tx);
-                    break;
-                }
-                _ => (),
+impl MioProcess {
+    fn wait(self) {
+        for thread in self.workers {
+            if let Err(payload) = thread.join() {
+                error!("mio worker panicked: {}", panic_payload(payload));
             }
         }
+        if let Err(payload) = self.listener.join() {
+            error!("mio listener panicked: {}", panic_payload(payload));
+        }
+        if let Err(payload) = self.admin.join() {
+            error!("mio admin panicked: {}", panic_payload(payload));
+        }
+    }
+}
+
+#[cfg(all(feature = "ringline", target_os = "linux"))]
+impl RinglineProcess {
+    fn wait(self) {
+        if let Err(payload) = self.bridge.join() {
+            error!("Ringline admin bridge panicked: {}", panic_payload(payload));
+        }
+        if let Err(payload) = self.admin.join() {
+            error!("Ringline admin panicked: {}", panic_payload(payload));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    use super::ringline_fallback_reason;
+    use super::{backend_resolution, process_kind, record_resolution, ProcessKind};
+    use crate::{SERVER_IO_BACKEND_ACTIVE, SERVER_IO_BACKEND_FALLBACK};
+    use pelikan_net::{resolve_backend, BackendResolution, FallbackReason, IoBackend};
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    use std::cell::Cell;
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    use std::io;
+
+    #[test]
+    fn resolved_mio_builds_existing_process() {
+        assert_eq!(
+            process_kind(resolve_backend(IoBackend::Mio, false)),
+            ProcessKind::Mio
+        );
     }
 
-    /// Will block until all threads terminate. This should be used to keep the
-    /// process alive while the child threads run.
-    pub fn wait(self) {
-        for thread in self.workers {
-            let _ = thread.join();
-        }
-        let _ = self.listener.join();
-        let _ = self.admin.join();
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    #[test]
+    fn resolved_ringline_builds_ringline_process() {
+        assert_eq!(
+            process_kind(resolve_backend(IoBackend::Ringline, true)),
+            ProcessKind::Ringline
+        );
+    }
+
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    #[test]
+    fn post_live_construction_failure_runs_rollback_and_preserves_cause() {
+        let rolled_back = Cell::new(false);
+        let error =
+            super::fail_after_live::<()>(io::Error::other("injected bridge spawn failure"), || {
+                rolled_back.set(true)
+            })
+            .unwrap_err();
+
+        assert!(rolled_back.get());
+        assert_eq!(error.to_string(), "injected bridge spawn failure");
+    }
+
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    #[test]
+    fn configuration_ring_setup_is_initialization_with_exact_cause() {
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Configuration(
+            pelikan_net::ringline::Error::RingSetup(
+                "Operation not permitted (os error 1)".to_string(),
+            ),
+        ));
+        assert_eq!(
+            reason,
+            FallbackReason::Initialization(
+                "ring setup: Operation not permitted (os error 1)".to_string()
+            )
+        );
+    }
+
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    #[test]
+    fn runtime_ring_setup_is_classified_as_unsupported_with_exact_cause() {
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Runtime(
+            pelikan_net::ringline::Error::RingSetup("failed to submit initial receive".to_string()),
+        ));
+        assert_eq!(
+            reason,
+            FallbackReason::UnsupportedCapability(
+                "ring setup: failed to submit initial receive".to_string()
+            )
+        );
+    }
+
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    #[test]
+    fn kernel_einval_is_classified_as_unsupported_with_exact_cause() {
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Runtime(
+            pelikan_net::ringline::Error::Io(io::Error::from_raw_os_error(libc::EINVAL)),
+        ));
+        assert_eq!(
+            reason,
+            FallbackReason::UnsupportedCapability(
+                "I/O error: Invalid argument (os error 22)".to_string()
+            )
+        );
+    }
+
+    #[cfg(all(feature = "ringline", target_os = "linux"))]
+    #[test]
+    fn unrelated_initialization_error_is_not_an_unsupported_capability() {
+        let reason = ringline_fallback_reason(&pelikan_net::ringline::StartupError::Runtime(
+            pelikan_net::ringline::Error::Io(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "broken bootstrap",
+            )),
+        ));
+        assert_eq!(
+            reason,
+            FallbackReason::Initialization("I/O error: broken bootstrap".to_string())
+        );
+    }
+
+    #[test]
+    fn fallback_records_mio_active_and_increments_counter() {
+        let before = SERVER_IO_BACKEND_FALLBACK.value();
+        record_resolution(&BackendResolution {
+            requested: IoBackend::Ringline,
+            active: IoBackend::Mio,
+            fallback: Some(FallbackReason::Unavailable),
+        });
+        assert_eq!(SERVER_IO_BACKEND_ACTIVE.value(), 0);
+        assert_eq!(SERVER_IO_BACKEND_FALLBACK.value(), before + 1);
+        assert_eq!(
+            backend_resolution(),
+            BackendResolution {
+                requested: IoBackend::Ringline,
+                active: IoBackend::Mio,
+                fallback: Some(FallbackReason::Unavailable),
+            }
+        );
+    }
+
+    #[test]
+    fn unsupported_ringline_resolution_builds_mio_process() {
+        assert_eq!(
+            process_kind(resolve_backend(IoBackend::Ringline, false)),
+            ProcessKind::Mio
+        );
     }
 }

@@ -14,6 +14,16 @@ name = "pelikan-pingserver"
 path = "src/main.rs"
 doc = false
 
+[[test]]
+name = "integration"
+path = "tests/integration.rs"
+harness = false
+
+[features]
+default = []
+ringline = ["server/ringline"]
+ringline-force-mio = ["ringline", "server/ringline-force-mio"]
+
 [dependencies]
 backtrace = { workspace = true }
 clap = { workspace = true }

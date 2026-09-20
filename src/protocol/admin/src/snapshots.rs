@@ -101,12 +101,13 @@ impl Snapshots {
 
         let percentiles: Vec<f64> = PERCENTILES
             .iter()
-            .map(|(_, percentile)| *percentile)
+            .map(|(_, percentile)| percentile / 100.0)
             .collect();
 
         if let Some(snapshot) = self.deltas.get(metric) {
-            if let Ok(Some(percentiles)) = snapshot.percentiles(&percentiles) {
-                for ((label, _), (percentile, bucket)) in PERCENTILES.iter().zip(percentiles.iter())
+            if let Ok(Some(quantiles)) = snapshot.quantiles(&percentiles) {
+                for ((label, percentile), bucket) in
+                    PERCENTILES.iter().zip(quantiles.entries().values())
                 {
                     result.push((label.to_string(), *percentile, bucket.end()));
                 }
@@ -118,5 +119,41 @@ impl Snapshots {
 
     pub fn timestamp(&self) -> SystemTime {
         self.timestamp
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn histogram_percentile_snapshot_preserves_labels_and_percentage_values() {
+        let mut histogram = metriken::histogram::Histogram::new(7, 16).unwrap();
+        for value in [10, 20, 30, 40] {
+            histogram.increment(value).unwrap();
+        }
+
+        let mut deltas = HashMap::new();
+        deltas.insert("request_latency".to_string(), histogram);
+        let snapshots = Snapshots {
+            timestamp: SystemTime::now(),
+            previous: HashMap::new(),
+            deltas,
+        };
+
+        let percentiles = snapshots.percentiles("request_latency");
+        assert_eq!(percentiles.len(), PERCENTILES.len());
+        assert_eq!(
+            percentiles
+                .iter()
+                .map(|(label, percentile, _)| (label.as_str(), *percentile))
+                .collect::<Vec<_>>(),
+            PERCENTILES
+        );
+        assert_eq!(percentiles[0].2, 10);
+        assert_eq!(percentiles[1].2, 20);
+        assert_eq!(percentiles[2].2, 30);
+        assert_eq!(percentiles[3].2, 40);
+        assert_eq!(percentiles[4].2, 40);
     }
 }

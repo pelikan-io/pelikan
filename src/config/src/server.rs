@@ -11,6 +11,8 @@ const SERVER_HOST: &str = "0.0.0.0";
 const SERVER_PORT: &str = "12321";
 const SERVER_TIMEOUT: usize = 100;
 const SERVER_NEVENT: usize = 1024;
+const SERVER_IO_BACKEND: &str = "mio";
+const SERVER_RINGLINE_MAX_CONNECTIONS: u32 = 16_000;
 
 // helper functions
 fn host() -> String {
@@ -29,8 +31,16 @@ fn nevent() -> usize {
     SERVER_NEVENT
 }
 
+fn io_backend() -> String {
+    SERVER_IO_BACKEND.to_string()
+}
+
+fn ringline_max_connections() -> u32 {
+    SERVER_RINGLINE_MAX_CONNECTIONS
+}
+
 // definitions
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Server {
     #[serde(default = "host")]
     host: String,
@@ -40,6 +50,10 @@ pub struct Server {
     timeout: usize,
     #[serde(default = "nevent")]
     nevent: usize,
+    #[serde(default = "io_backend")]
+    io_backend: String,
+    #[serde(default = "ringline_max_connections")]
+    ringline_max_connections: u32,
 }
 
 // implementation
@@ -52,6 +66,14 @@ impl Server {
     /// Port to listen on
     pub fn port(&self) -> String {
         self.port.clone()
+    }
+
+    pub fn set_host(&mut self, host: impl Into<String>) {
+        self.host = host.into();
+    }
+
+    pub fn set_port(&mut self, port: impl Into<String>) {
+        self.port = port.into();
     }
 
     /// Return the result of parsing the host and port
@@ -68,6 +90,26 @@ impl Server {
     pub fn nevent(&self) -> usize {
         self.nevent
     }
+
+    /// I/O backend requested for the cache server
+    pub fn io_backend(&self) -> &str {
+        &self.io_backend
+    }
+
+    /// Select the cache-server I/O backend before startup.
+    pub fn set_io_backend(&mut self, backend: impl Into<String>) {
+        self.io_backend = backend.into();
+    }
+
+    /// Maximum number of connections per Ringline worker.
+    pub fn ringline_max_connections(&self) -> u32 {
+        self.ringline_max_connections
+    }
+
+    /// Set the maximum number of connections per Ringline worker.
+    pub fn set_ringline_max_connections(&mut self, max_connections: u32) {
+        self.ringline_max_connections = max_connections;
+    }
 }
 
 // trait implementations
@@ -78,6 +120,8 @@ impl Default for Server {
             port: port(),
             timeout: timeout(),
             nevent: nevent(),
+            io_backend: io_backend(),
+            ringline_max_connections: ringline_max_connections(),
         }
     }
 }
@@ -85,4 +129,60 @@ impl Default for Server {
 // trait definitions
 pub trait ServerConfig {
     fn server(&self) -> &Server;
+
+    fn server_mut(&mut self) -> &mut Server;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn io_backend_defaults_to_mio() {
+        let server: Server = toml::from_str("").unwrap();
+        assert_eq!(server.io_backend(), "mio");
+    }
+
+    #[test]
+    fn io_backend_reads_ringline() {
+        let server: Server = toml::from_str("io_backend = 'ringline'").unwrap();
+        assert_eq!(server.io_backend(), "ringline");
+    }
+
+    #[test]
+    fn io_backend_retains_unknown_value_for_network_validation() {
+        let server: Server = toml::from_str("io_backend = 'other'").unwrap();
+        assert_eq!(server.io_backend(), "other");
+    }
+
+    #[test]
+    fn io_backend_can_be_selected_programmatically() {
+        let mut server = Server::default();
+        server.set_io_backend("ringline");
+        assert_eq!(server.io_backend(), "ringline");
+    }
+
+    #[test]
+    fn ringline_max_connections_defaults_to_production_capacity() {
+        let server: Server = toml::from_str("").unwrap();
+        assert_eq!(server.ringline_max_connections(), 16_000);
+    }
+
+    #[test]
+    fn ringline_max_connections_can_be_bounded_for_a_runtime_harness() {
+        let mut server = Server::default();
+        server.set_ringline_max_connections(128);
+        assert_eq!(server.ringline_max_connections(), 128);
+    }
+
+    #[test]
+    fn listener_address_can_be_reserved_programmatically() {
+        let mut server = Server::default();
+        server.set_host("127.0.0.1");
+        server.set_port("43210");
+        assert_eq!(
+            server.socket_addr().unwrap(),
+            "127.0.0.1:43210".parse().unwrap()
+        );
+    }
 }

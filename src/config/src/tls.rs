@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 // definitions
-#[derive(Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, Serialize, Deserialize, Debug, Default)]
 pub struct Tls {
     #[serde(default)]
     certificate_chain: Option<String>,
@@ -18,6 +18,16 @@ pub struct Tls {
 }
 
 // implementation
+impl Tls {
+    pub fn set_private_key(&mut self, path: impl Into<String>) {
+        self.private_key = Some(path.into());
+    }
+
+    pub fn set_certificate(&mut self, path: impl Into<String>) {
+        self.certificate = Some(path.into());
+    }
+}
+
 impl common::ssl::TlsConfig for Tls {
     fn certificate_chain(&self) -> Option<String> {
         self.certificate_chain.clone()
@@ -39,4 +49,19 @@ impl common::ssl::TlsConfig for Tls {
 // trait definitions
 pub trait TlsConfig {
     fn tls(&self) -> &Tls;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use common::ssl::TlsConfig as _;
+
+    #[test]
+    fn tls_files_can_be_selected_programmatically() {
+        let mut tls = Tls::default();
+        tls.set_private_key("key.pem");
+        tls.set_certificate("cert.pem");
+        assert_eq!(tls.private_key().as_deref(), Some("key.pem"));
+        assert_eq!(tls.certificate().as_deref(), Some("cert.pem"));
+    }
 }

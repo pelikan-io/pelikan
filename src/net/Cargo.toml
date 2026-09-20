@@ -17,5 +17,12 @@ rustls = { workspace = true }
 rustls-pki-types = { workspace = true }
 webpki-roots = { workspace = true }
 
+[target.'cfg(target_os = "linux")'.dependencies]
+ringline = { workspace = true, optional = true }
+slab = { workspace = true, optional = true }
+
 [features]
+default = []
 metrics = ["metriken"]
+ringline = ["dep:ringline", "dep:slab"]
+ringline-force-mio = ["ringline", "ringline/force-mio"]

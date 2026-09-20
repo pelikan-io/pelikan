@@ -116,6 +116,10 @@ impl ListenerBuilder {
         })
     }
 
+    pub fn local_addr(&self) -> std::io::Result<std::net::SocketAddr> {
+        self.listener.local_addr()
+    }
+
     pub fn waker(&self) -> Arc<Waker> {
         self.waker.clone()
     }

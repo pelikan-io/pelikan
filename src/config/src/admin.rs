@@ -108,6 +108,14 @@ impl Admin {
         self.port.clone()
     }
 
+    pub fn set_host(&mut self, host: impl Into<String>) {
+        self.host = host.into();
+    }
+
+    pub fn set_port(&mut self, port: impl Into<String>) {
+        self.port = port.into();
+    }
+
     pub fn http_enabled(&self) -> bool {
         self.http_enabled
     }
@@ -168,4 +176,20 @@ impl Default for Admin {
 
 pub trait AdminConfig {
     fn admin(&self) -> &Admin;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn listener_address_can_be_reserved_programmatically() {
+        let mut admin = Admin::default();
+        admin.set_host("127.0.0.1");
+        admin.set_port("43211");
+        assert_eq!(
+            admin.socket_addr().unwrap(),
+            "127.0.0.1:43211".parse().unwrap()
+        );
+    }
 }

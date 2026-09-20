@@ -213,6 +213,47 @@ Pelikan is file-first when it comes to configurations, and currently is
 config-file only. You can create a new config file following the examples
 included under the `config` directory.
 
+### Cache-server I/O backend
+
+The Pingserver, Segcache, and RDS plain-TCP data listeners can opt in to Ringline on Linux:
+
+```toml
+[server]
+io_backend = "ringline" # Linux only; defaults and falls back to "mio"
+ringline_max_connections = 16000 # per worker
+```
+
+Ringline's file-descriptor budget scales with `ringline_max_connections`
+times the configured worker count. Lower this value when the process hard
+`RLIMIT_NOFILE` cannot cover that budget.
+
+The binary must also be built with its opt-in Cargo feature, for example
+`cargo build --release -p pelikan-segcache --features ringline` (or the
+equivalent `pelikan-rds` or `pelikan-pingserver` command). Without that
+feature, Linux builds are
+Mio-only and do not include the Ringline or Ringline-only slab dependency.
+
+`mio` remains the default on every platform. The Ringline option uses upstream
+commit `87a599d9b29ec33854c6024bf9d967df6e53d33b` (0.6.4 development),
+pinned in Cargo without local runtime patches. Ringline requires Rust 1.88
+and reports Linux 6.1 or newer on x86_64 or ARM64 as its io_uring platform
+requirement; the host must also permit the io_uring capabilities that Ringline
+uses. The startup log records the requested and active backends and any
+fallback cause.
+
+Fallback is a startup transaction: on non-Linux systems, with TLS enabled, or
+when Ringline cannot initialize before serving traffic, Pelikan starts the data
+listener on Mio. After Ringline begins serving, a Ringline worker or driver
+failure shuts down the process; live connections are never migrated to Mio.
+TLS data listeners and admin listeners continue to use Mio. Proxy frontends and
+backends are not covered by this option and remain on Mio.
+
+The latest tagged release, 0.6.3, predates the result-aware receive and
+backpressured-send APIs used here. The pinned upstream commit includes their
+replacement implementation from the series ending in
+[Ringline #388](https://github.com/ringline-rs/ringline/pull/388), plus worker
+startup diagnostics. Switch to a published release once it includes these APIs.
+
 # Community
 
 ## Stay in touch

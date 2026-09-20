@@ -91,6 +91,10 @@ impl ServerConfig for PingserverConfig {
     fn server(&self) -> &Server {
         &self.server
     }
+
+    fn server_mut(&mut self) -> &mut Server {
+        &mut self.server
+    }
 }
 
 impl SockioConfig for PingserverConfig {
@@ -129,6 +133,10 @@ impl WorkerConfig for PingserverConfig {
 
 // implementation
 impl PingserverConfig {
+    pub fn admin_mut(&mut self) -> &mut Admin {
+        &mut self.admin
+    }
+
     pub fn load(file: &str) -> Result<PingserverConfig, std::io::Error> {
         let mut file = std::fs::File::open(file)?;
         let mut content = String::new();
@@ -176,5 +184,17 @@ impl Default for PingserverConfig {
 
             tls: Default::default(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::PingserverConfig;
+
+    #[test]
+    fn it_should_render_the_config_with_the_default_io_backend() {
+        let config: PingserverConfig = Default::default();
+        let rendered_config = toml::to_string_pretty(&config).unwrap();
+        assert!(rendered_config.contains("io_backend = \"mio\""));
     }
 }

@@ -1,10 +1,10 @@
-//! The "life of a request" chart: one request traced through the threads of
-//! each binary as numbered stages on thread swimlanes, using the code's own
-//! verbs (receive/execute/send/flush). One uniform gap between stage columns
-//! whether or not the path switches lanes (same-lane labels float above the
-//! stage line; the gap is sized for the elbow-and-queue run of a crossing).
-//! Stage claims are asserted against the event-loop sources, and panel
-//! content is bounds-checked, at generation time. Control plane is
+//! The "life of a request" chart: one request traced through the execution
+//! contexts of each binary as numbered stages on swimlanes, using the code's
+//! own verbs (receive/execute/send/flush). One uniform gap between stage
+//! columns whether or not the path switches lanes (same-lane labels float
+//! above the stage line; the gap is sized for the elbow-and-queue run of a
+//! crossing). Stage claims are asserted against the event-loop sources, and
+//! panel content is bounds-checked, at generation time. Control plane is
 //! intentionally out of scope.
 
 use crate::claims::{verify, Claim};
@@ -15,6 +15,11 @@ use std::fs;
 const OUT: &str = "docs/diagrams/dataflow.svg";
 
 const CLAIMS: &[Claim] = &[
+    Claim {
+        path: "src/core/server/src/ringline/single.rs",
+        pattern: r"state\.bootstrap\.storage\.execute\(&request\)",
+        what: "Ringline task executes in place on the Arc-shared storage",
+    },
     Claim {
         path: "src/core/server/src/workers/worker.rs",
         pattern: r"session\.receive\(\)",
@@ -75,6 +80,10 @@ const GAP: f64 = 240.0;
 const LANE_H: f64 = 190.0;
 const LANE_LABEL_W: f64 = 240.0;
 const PANEL_W: f64 = 2705.0;
+const CAPTION_GAP: f64 = 40.0;
+const CAPTION_W: f64 = 680.0;
+const OUTER_PAD: f64 = 24.0;
+const CANVAS_W: f64 = X0 + PANEL_W + CAPTION_GAP + CAPTION_W + OUTER_PAD;
 
 const TS: TypeScale = TYPE_SCALE;
 
@@ -83,6 +92,9 @@ fn text(x: f64, y: f64, s: &str) -> crate::svg::Text {
     crate::svg::text(x, y, s).size(TS.body)
 }
 const X0: f64 = 24.0;
+fn caption_center() -> f64 {
+    X0 + PANEL_W + CAPTION_GAP + CAPTION_W / 2.0
+}
 
 fn stage(parts: &mut Vec<String>, x: f64, y: f64, num: u32, name: &str, chips: &[Chip]) {
     parts.push(rect(x, y, ST_W, ST_H, "#FFFFFF").rx(10.0).build());
@@ -201,7 +213,7 @@ enum Kind {
 fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String>, f64) {
     let mut parts: Vec<String> = Vec::new();
     let lanes: Vec<&str> = match kind {
-        Kind::Server => vec!["clients", "pelikan_work_i"],
+        Kind::Server => vec!["clients", "request context"],
         Kind::Proxy => vec!["clients", "pelikan_fe_i", "pelikan_be_i", "servers"],
     };
     let h = 44.0 + LANE_H * lanes.len() as f64 + 28.0;
@@ -211,7 +223,7 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
             .sw(2.0)
             .build(),
     );
-    margin_block(&mut parts, X0 + PANEL_W + 130.0, y0 + h / 2.0, title, rows);
+    margin_block(&mut parts, caption_center(), y0 + h / 2.0, title, rows);
     let n_margin = parts.len();
 
     let mut lane_y: Vec<(&str, f64)> = Vec::new();
@@ -310,8 +322,8 @@ fn panel(y0: f64, title: &str, rows: &[(&str, &str)], kind: Kind) -> (Vec<String
         Kind::Server => {
             // all four stages run on whichever worker owns the session; the
             // execute stage calls into the Arc-shared cache in place, so the
-            // path crosses no queue after the listener hand-off
-            let wl = "pelikan_work_i";
+            // path crosses no queue after the backend's connection hand-off
+            let wl = "request context";
             let xs = columns(4);
             stage(
                 &mut parts,
@@ -460,13 +472,76 @@ pub fn generate() {
 
     let mut parts = vec![ARROW_DEFS.to_string()];
     let mut y = 24.0;
-    let (p1, h1) = panel(y, "server", &server_rows, Kind::Server);
+    let (p1, h1) = panel(
+        y,
+        "server · Mio callback or Ringline task",
+        &server_rows,
+        Kind::Server,
+    );
     parts.extend(p1);
     y += h1 + 20.0;
     let (p2, h2) = panel(y, "proxy", &proxy_rows, Kind::Proxy);
     parts.extend(p2);
 
-    let (w, h) = (X0 + PANEL_W + 260.0 + 24.0, y + h2 + 24.0);
+    let (w, h) = (CANVAS_W, y + h2 + OUTER_PAD);
     fs::write(OUT, svg_document(w, h, "cargo xtask diagrams", &parts)).unwrap();
     println!("generated: {OUT}");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn text_x(svg: &str, label: &str) -> f64 {
+        let needle = format!(">{label}</text>");
+        let end = svg.find(&needle).expect("label is rendered");
+        let start = svg[..end].rfind("<text ").expect("text element starts");
+        let tag = &svg[start..end];
+        let x_start = tag.find(" x=\"").expect("text has x") + 4;
+        let x_end = tag[x_start..].find('"').expect("text x closes") + x_start;
+        tag[x_start..x_end].parse().expect("numeric text x")
+    }
+
+    #[test]
+    fn right_caption_titles_clear_the_panel_and_viewport() {
+        const MIN_GAP: f64 = 32.0;
+        let viewport_right = CANVAS_W;
+        let panel_right = X0 + PANEL_W;
+
+        for (title, parts) in [
+            (
+                "server · Mio callback or Ringline task",
+                panel(
+                    0.0,
+                    "server · Mio callback or Ringline task",
+                    &[],
+                    Kind::Server,
+                )
+                .0,
+            ),
+            ("proxy", panel(0.0, "proxy", &[], Kind::Proxy).0),
+        ] {
+            let svg = parts.concat();
+            let center = text_x(&svg, title);
+            let half_width = label_w_at(title, TS.h1 as f64) / 2.0;
+            assert!(
+                center - half_width >= panel_right + MIN_GAP,
+                "{title:?} overlaps the drawing"
+            );
+            assert!(
+                center + half_width <= viewport_right,
+                "{title:?} exceeds the viewport"
+            );
+        }
+    }
+    #[test]
+    fn server_lane_names_a_backend_neutral_execution_context() {
+        let rows = [("segcache", "memcache")];
+        let (parts, _) = panel(0.0, "server", &rows, Kind::Server);
+        let svg = parts.concat();
+
+        assert!(svg.contains("request context"));
+        assert!(!svg.contains("pelikan_work_i"));
+        assert!(!svg.contains("ringline-worker-i"));
+    }
 }

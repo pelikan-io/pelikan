@@ -171,6 +171,7 @@ pub struct Admin {
     timeout: Duration,
     /// The version of the service
     version: String,
+    backend_info: Vec<(String, String)>,
     /// The waker for this thread
     waker: Arc<Waker>,
 }
@@ -185,6 +186,7 @@ pub struct AdminBuilder {
     sessions: Slab<ServerSession<AdminProtocol, AdminResponse, AdminRequest>>,
     timeout: Duration,
     version: String,
+    backend_info: Vec<(String, String)>,
     waker: Arc<Waker>,
 }
 
@@ -218,6 +220,7 @@ impl AdminBuilder {
         let sessions = Slab::new();
 
         let version = "unknown".to_string();
+        let backend_info = Vec::new();
 
         let backlog = VecDeque::new();
 
@@ -242,6 +245,7 @@ impl AdminBuilder {
             sessions,
             timeout,
             version,
+            backend_info,
             waker,
         })
     }
@@ -255,6 +259,26 @@ impl AdminBuilder {
 
     pub fn version(&mut self, version: &str) {
         self.version = version.to_string();
+    }
+    pub fn backend_info(&mut self, requested: &str, active: &str, fallback: &str) {
+        self.backend_info = vec![
+            (
+                "server_io_backend_requested".to_string(),
+                requested.to_string(),
+            ),
+            (
+                "server_io_backend_active_name".to_string(),
+                active.to_string(),
+            ),
+            (
+                "server_io_backend_fallback_cause".to_string(),
+                fallback.to_string(),
+            ),
+        ];
+    }
+
+    pub fn local_addr(&self) -> std::io::Result<std::net::SocketAddr> {
+        self.listener.local_addr()
     }
 
     pub fn waker(&self) -> Arc<Waker> {
@@ -280,6 +304,7 @@ impl AdminBuilder {
             signal_queue_tx,
             timeout: self.timeout,
             version: self.version,
+            backend_info: self.backend_info,
             waker: self.waker,
         }
     }
@@ -428,7 +453,7 @@ impl Admin {
                         return Err(Error::other("should hangup"));
                     }
                     AdminRequest::Stats => {
-                        session.send(AdminResponse::Stats)?;
+                        session.send(AdminResponse::stats_with_info(self.backend_info.clone()))?;
                     }
                     AdminRequest::Version => {
                         session.send(AdminResponse::version(self.version.clone()))?;
@@ -826,3 +851,105 @@ fn human_formatted_stats() -> Vec<String> {
 }
 
 common::metrics::test_no_duplicates!();
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{Read, Write};
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct TestConfig {
+        admin: config::Admin,
+        tls: config::Tls,
+        debug: config::Debug,
+        klog: config::Klog,
+    }
+
+    impl TestConfig {
+        fn ephemeral() -> Self {
+            let mut admin = config::Admin::default();
+            admin.set_host("127.0.0.1");
+            admin.set_port("0");
+            Self {
+                admin,
+                tls: config::Tls::default(),
+                debug: config::Debug::default(),
+                klog: config::Klog::default(),
+            }
+        }
+    }
+
+    impl config::AdminConfig for TestConfig {
+        fn admin(&self) -> &config::Admin {
+            &self.admin
+        }
+    }
+
+    impl config::TlsConfig for TestConfig {
+        fn tls(&self) -> &config::Tls {
+            &self.tls
+        }
+    }
+
+    impl config::DebugConfig for TestConfig {
+        fn debug(&self) -> &config::Debug {
+            &self.debug
+        }
+    }
+
+    impl config::KlogConfig for TestConfig {
+        fn klog(&self) -> &config::Klog {
+            &self.klog
+        }
+    }
+
+    #[test]
+    fn flush_all_waits_for_flush_handle_before_sending_ok() {
+        let config = TestConfig::ephemeral();
+        let mut builder = AdminBuilder::new(&config).unwrap();
+        let addr = builder.local_addr().unwrap();
+        let (flush_started_tx, flush_started_rx) = crossbeam_channel::bounded(1);
+        let (release_flush_tx, release_flush_rx) = crossbeam_channel::bounded(1);
+        let flush_complete = Arc::new(AtomicBool::new(false));
+        let flush_complete_for_handle = Arc::clone(&flush_complete);
+        builder.flush_handle(Arc::new(move || {
+            flush_started_tx.send(()).unwrap();
+            release_flush_rx.recv().unwrap();
+            flush_complete_for_handle.store(true, Ordering::Release);
+        }));
+
+        let (signal_tx, signal_rx) = crossbeam_channel::bounded(4);
+        let waker = builder.waker();
+        let (mut admin_queues, _peer_queues) =
+            Queues::<Signal, ()>::new(vec![Arc::clone(&waker)], vec![waker], 4).unwrap();
+        let log_drain = logger::configure_logging(&config);
+        let mut admin = builder.build(log_drain, signal_rx, admin_queues.remove(0));
+        let admin_thread = std::thread::spawn(move || admin.run());
+
+        let mut client = std::net::TcpStream::connect(addr).unwrap();
+        client
+            .set_read_timeout(Some(Duration::from_millis(100)))
+            .unwrap();
+        client.write_all(b"flush_all\r\n").unwrap();
+        flush_started_rx
+            .recv_timeout(Duration::from_secs(2))
+            .expect("admin did not invoke the flush handle");
+
+        let error = client
+            .read(&mut [0_u8; 1])
+            .expect_err("admin sent a response before the flush completed");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::WouldBlock | ErrorKind::TimedOut
+        ));
+
+        release_flush_tx.send(()).unwrap();
+        let mut response = [0_u8; 4];
+        client.read_exact(&mut response).unwrap();
+        assert_eq!(&response, b"OK\r\n");
+        assert!(flush_complete.load(Ordering::Acquire));
+
+        signal_tx.send(Signal::Shutdown).unwrap();
+        admin_thread.join().unwrap();
+    }
+}

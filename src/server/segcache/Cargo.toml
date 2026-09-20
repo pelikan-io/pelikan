@@ -35,7 +35,10 @@ path = "benches/benchmark.rs"
 harness = false
 
 [features]
+default = []
 debug = ["entrystore/debug"]
+ringline = ["server/ringline"]
+ringline-force-mio = ["ringline", "server/ringline-force-mio"]
 
 [dependencies]
 backtrace = { workspace = true }

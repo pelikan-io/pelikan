@@ -92,6 +92,14 @@ impl SegcacheConfig {
         self.dlog_interval
     }
 
+    pub fn admin_mut(&mut self) -> &mut Admin {
+        &mut self.admin
+    }
+
+    pub fn tls_mut(&mut self) -> &mut Tls {
+        &mut self.tls
+    }
+
     /// Prints the configuration
     pub fn print(&self) {
         let config_toml = self.render_config();
@@ -137,6 +145,10 @@ impl SegConfig for SegcacheConfig {
 impl ServerConfig for SegcacheConfig {
     fn server(&self) -> &Server {
         &self.server
+    }
+
+    fn server_mut(&mut self) -> &mut Server {
+        &mut self.server
     }
 }
 
@@ -201,7 +213,16 @@ impl Default for SegcacheConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::SegcacheConfig;
+    use crate::{SegcacheConfig, ServerConfig};
+
+    #[test]
+    fn server_configuration_can_be_mutated_for_a_runtime_harness() {
+        let mut config = SegcacheConfig::default();
+        config.server_mut().set_io_backend("ringline");
+        config.admin_mut().set_port("43211");
+        assert_eq!(config.server().io_backend(), "ringline");
+        assert_eq!(config.admin_mut().port(), "43211");
+    }
 
     #[test]
     fn it_should_render_the_config_with_some_expected_keys() {
@@ -216,6 +237,7 @@ mod test {
             "merge_target",
             "merge_max",
             "compact_target",
+            "io_backend = \"mio\"",
         ];
         for key in expected_keys {
             assert!(rendered_config.contains(key));
