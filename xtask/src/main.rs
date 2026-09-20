@@ -4,6 +4,7 @@
 mod arch;
 mod claims;
 mod dataflow;
+mod observability;
 mod svg;
 mod threading;
 
@@ -22,6 +23,7 @@ fn main() {
             arch::generate();
             threading::generate();
             dataflow::generate();
+            observability::generate();
         }
         _ => {
             eprintln!("usage: cargo xtask diagrams");
