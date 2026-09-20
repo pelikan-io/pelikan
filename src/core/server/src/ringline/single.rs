@@ -221,6 +221,12 @@ where
                 let mut terminal_error = None;
                 let receive_result = conn
                     .with_data_result(|data| {
+                        // Upstream calls the closure with an empty slice before
+                        // distinguishing EOF from a receive error. Account for
+                        // that terminal event once, after awaiting the result.
+                        if data.is_empty() {
+                            return ParseResult::NeedMore;
+                        }
                         record_receive(data.len(), &mut buffered_bytes);
                         match Self::process_with_session(&mut session, data) {
                             Ok(ProcessOutcome::Complete {
@@ -254,6 +260,7 @@ where
                     break;
                 }
                 if consumed == 0 {
+                    record_receive(0, &mut buffered_bytes);
                     break;
                 }
 
@@ -704,6 +711,22 @@ mod tests {
             assert_eq!(SESSION_RECV.value() - recv_before, 1);
             assert_eq!(SESSION_RECV_EX.value() - recv_ex_before, 1);
             runtime.join().unwrap();
+        }
+
+        #[test]
+        fn live_clean_eof_counts_one_receive_without_error() {
+            let _guard = LIVE_METRIC_TEST_LOCK
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let recv_before = SESSION_RECV.value();
+            let recv_ex_before = SESSION_RECV_EX.value();
+            let runtime = launch_live_handler();
+            let stream = std::net::TcpStream::connect(runtime.bound_addr().unwrap()).unwrap();
+            stream.shutdown(std::net::Shutdown::Write).unwrap();
+            wait_for_counter(&SESSION_RECV, recv_before);
+            runtime.join().unwrap();
+            assert_eq!(SESSION_RECV.value() - recv_before, 1);
+            assert_eq!(SESSION_RECV_EX.value(), recv_ex_before);
         }
 
         #[test]

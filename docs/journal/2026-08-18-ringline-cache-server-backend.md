@@ -122,13 +122,27 @@ from 0.5.3 to the exact 0.5.5 crates.io archive and the duplicate startup patch
 was removed.
 
 The remaining generic result-aware receive, bounded-send, and startup-diagnostic
-changes are proposed upstream in ringline-rs/ringline#318.
+changes were proposed upstream in ringline-rs/ringline#318.
 
-The vendored runtime also contains follow-up send and receive lifecycle work:
+The vendored runtime also contained follow-up send and receive lifecycle work:
 bounded FIFO send reservation, oversize rejection before writing bytes, permit
 retention through Mio flush, operation IDs that reject stale completions, and
 generation-tagged receive errors. It also preserves exact worker bootstrap panic
 payloads so the Pelikan facade can report type-erasure and initialization faults.
+
+### September 20: replace the vendor copy with current upstream
+
+Upstream closed #318 in favor of a replacement series, completed by #388.
+The series includes result-aware receives (#369), startup diagnostics (#375),
+and bounded sends on both backends. The latest tagged release, 0.6.3, predates
+these changes. PR #187 now pins upstream commit
+`87a599d9b29ec33854c6024bf9d967df6e53d33b` (0.6.4 development) directly and
+removes the vendored source and patch artifacts. The Pelikan handler uses the
+upstream APIs without a compatibility shim. Thread-diagram assertions resolve
+the dependency source through locked Cargo metadata, so removing the vendor
+directory does not weaken the code checks. The io_uring kernel floor is now
+Linux 6.1. Rustls is raised to 0.23.45 to address the CI audit finding
+RUSTSEC-2026-0285.
 
 ### Metrics dependency convergence
 
@@ -163,7 +177,7 @@ PR #187 remains open pending review and merge, so this journal entry remains
 - `docs/ARCHITECTURE.md` documents the backend fork and shared cache engine.
 - `docs/diagrams/dataflow.svg` and `docs/diagrams/threading.svg` are generated
   from source-checked topology claims.
-- `vendor/README.md` records Ringline archive provenance and patch checksums.
+- `Cargo.toml` and `Cargo.lock` record the exact upstream Ringline revision.
 
 The temporary Ringline plans and specification were absorbed into this entry
 and removed in the same PR update.
@@ -171,8 +185,8 @@ and removed in the same PR update.
 ## Deferred or Reopen Items
 
 - Mark this entry `shipped` after PR #187 merges and record the merge commit.
-- Replace the vendored Ringline source when a release contains the remaining
-  bounded-send and receive-error APIs.
+- Replace the upstream git pin with a release containing the bounded-send and
+  receive-error APIs.
 - Add Ringline TLS support as a separate design and implementation.
 - Evaluate proxy support separately; proxy behavior did not change here.
 - Run native io_uring conformance on a capable Linux host in addition to the

@@ -233,9 +233,10 @@ equivalent `pelikan-rds` or `pelikan-pingserver` command). Without that
 feature, Linux builds are
 Mio-only and do not include the Ringline or Ringline-only slab dependency.
 
-`mio` remains the default on every platform. The Ringline option uses version
-`0.5.5`, vendored from the published crates.io archive and patched locally.
-Ringline reports Linux 6.0 or newer on x86_64 or ARM64 as its platform
+`mio` remains the default on every platform. The Ringline option uses upstream
+commit `87a599d9b29ec33854c6024bf9d967df6e53d33b` (0.6.4 development),
+pinned in Cargo without local runtime patches. Ringline requires Rust 1.88
+and reports Linux 6.1 or newer on x86_64 or ARM64 as its io_uring platform
 requirement; the host must also permit the io_uring capabilities that Ringline
 uses. The startup log records the requested and active backends and any
 fallback cause.
@@ -247,12 +248,11 @@ failure shuts down the process; live connections are never migrated to Mio.
 TLS data listeners and admin listeners continue to use Mio. Proxy frontends and
 backends are not covered by this option and remain on Mio.
 
-The startup transaction is released in Ringline 0.5.5 after merging upstream as
-`ringline-rs/ringline#309` (commit
-`a04751f0041c0ffc485a706bb124ec40b27823e1`). Pelikan vendors 0.5.5 only for
-generic, unreleased backpressure, send-identity, receive-error, and
-startup-diagnostic follow-ups; see
-[`vendor/README.md`](vendor/README.md) for checksums and exact provenance.
+The latest tagged release, 0.6.3, predates the result-aware receive and
+backpressured-send APIs used here. The pinned upstream commit includes their
+replacement implementation from the series ending in
+[Ringline #388](https://github.com/ringline-rs/ringline/pull/388), plus worker
+startup diagnostics. Switch to a published release once it includes these APIs.
 
 # Community
 
