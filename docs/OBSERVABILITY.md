@@ -27,8 +27,15 @@ the chart, and its textual explanation together.
   counter-group interface, preserve entry metadata, and define consistent
   names and aggregation across ASCII, JSON, and Prometheus output. Verify
   values from multiple worker shards and prevent duplicate metric identities.
-- [ ] Evaluate per-worker histograms. Compare the current shared atomic
-  histogram, per-worker atomic shards, and non-atomic local recording with
+- [x] Add and run a primitive per-worker histogram benchmark. Compare shared
+  atomics, worker-owned atomics, and local recording with bounded buffer
+  publication at 1, 2, and 4 P cores, with collection disabled and enabled.
+  Validate all bucket counts against expected samples. See
+  [methodology and decision gates](HISTOGRAM_ASSESSMENT.md); host-specific
+  measurements are reported in the PR.
+- [ ] Complete the end-to-end per-worker histogram assessment. Compare the
+  current shared atomic histogram, per-worker atomic shards, and non-atomic
+  local recording with
   safe snapshot publication. Include concentrated and broad sample
   distributions, worker-count scaling, recording cost, memory, collection
   cost, and request throughput/tail latency. Record benchmark environment and
