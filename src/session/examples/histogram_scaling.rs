@@ -54,10 +54,51 @@ fn merge(to: &mut Histogram, from: &Histogram) {
     }
 }
 
+// Benchmark-only single-writer handle; never clone or share a writer.
+struct RelaxedWriter {
+    buckets: Arc<[AtomicU64]>,
+}
+impl RelaxedWriter {
+    fn new() -> Self {
+        Self {
+            buckets: (0..empty().as_slice().len())
+                .map(|_| AtomicU64::new(0))
+                .collect(),
+        }
+    }
+
+    fn increment(&mut self, value: u64) {
+        // histogram 1.5's value_to_index is private. Specialize its mapping
+        // for this benchmark's (7, 32) geometry, retaining per-record work.
+        assert!(value <= u32::MAX as u64);
+        let index = if value < 256 {
+            value as usize
+        } else {
+            let power = 63 - value.leading_zeros();
+            let offset = (value - (1 << power)) >> (power - 7);
+            (256 + (power - 8) * 128 + offset as u32) as usize
+        };
+        let bucket = &self.buckets[index];
+        bucket.store(
+            bucket.load(Ordering::Relaxed).wrapping_add(1),
+            Ordering::Relaxed,
+        );
+    }
+}
+
+fn relaxed_snapshot(buckets: &[AtomicU64]) -> Histogram {
+    let mut result = empty();
+    for (out, bucket) in result.as_mut_slice().iter_mut().zip(buckets) {
+        *out = bucket.load(Ordering::Relaxed);
+    }
+    result
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Mode {
     Shared,
     Sharded,
+    Relaxed,
     Local,
 }
 #[derive(Debug)]
@@ -83,6 +124,10 @@ fn run(
     assert!(interval_ms > 0);
     let interval = Duration::from_millis(interval_ms);
     let n = cpus.len();
+    let relaxed_writers: Vec<_> = (0..n).map(|_| RelaxedWriter::new()).collect();
+    // The collector receives read-only access by convention within this
+    // benchmark. Only the unique worker handle ever writes its shard.
+    let relaxed_shards: Vec<_> = relaxed_writers.iter().map(|w| w.buckets.clone()).collect();
     let shards: Arc<Vec<_>> = Arc::new(
         (0..if matches!(mode, Mode::Shared) { 1 } else { n })
             .map(|_| AtomicHistogram::new(7, 32))
@@ -115,7 +160,9 @@ fn run(
             .collect(),
     );
     let mut workers = Vec::new();
-    for (id, (publish, spare)) in endpoints.into_iter().enumerate() {
+    for (id, ((publish, spare), mut relaxed)) in
+        endpoints.into_iter().zip(relaxed_writers).enumerate()
+    {
         let (shards, epoch, start, values) =
             (shards.clone(), epoch.clone(), start.clone(), values.clone());
         let cpu = cpus[id];
@@ -129,7 +176,7 @@ fn run(
             let began = Instant::now();
             let deadline = began + duration;
             while Instant::now() < deadline {
-                // Same batch/epoch-check frequency for all three variants.
+                // Same batch/epoch-check frequency for all variants.
                 let requested = epoch.load(Ordering::Relaxed);
                 if matches!(mode, Mode::Local) && requested != seen {
                     if let Ok(mut next) = spare.try_recv() {
@@ -148,6 +195,7 @@ fn run(
                     let value = black_box(values[(count as usize + j) & 4095]);
                     match mode {
                         Mode::Local => active.increment(value).unwrap(),
+                        Mode::Relaxed => relaxed.increment(value),
                         _ => shard.increment(value).unwrap(),
                     }
                 }
@@ -215,8 +263,14 @@ fn run(
                 } else if due || done {
                     changed = true;
                     total.as_mut_slice().fill(0);
-                    for shard in shards.iter() {
-                        merge(&mut total, &shard.load().unwrap_or_else(empty));
+                    if matches!(mode, Mode::Relaxed) {
+                        for shard in &relaxed_shards {
+                            merge(&mut total, &relaxed_snapshot(shard));
+                        }
+                    } else {
+                        for shard in shards.iter() {
+                            merge(&mut total, &shard.load().unwrap_or_else(empty));
+                        }
                     }
                 }
                 if changed || done {
@@ -282,6 +336,13 @@ fn run(
     let resident = match mode {
         Mode::Shared => atomic_bytes + 2 * histogram_bytes,
         Mode::Sharded => n * atomic_bytes + 2 * histogram_bytes,
+        Mode::Relaxed => {
+            n * (total.as_slice().len() * 8
+                + std::mem::size_of::<RelaxedWriter>()
+                + std::mem::size_of::<Arc<[AtomicU64]>>()
+                + 2 * std::mem::size_of::<usize>())
+                + 2 * histogram_bytes
+        }
         Mode::Local => (2 * n + 1) * histogram_bytes,
     };
     println!("{mode:?},{},{n},{collect},{repetition},{recorded},{:.3},{ns_per_record:.3},{sweeps},{:.3},{:.3},{max_age_us},{publications},{histogram_bytes},{resident},{interval_ms},{max_cutoff_lag_us},{requests}",
@@ -322,10 +383,10 @@ fn main() {
             for broad in [false, true] {
                 for &collect in &collection {
                     // Rotate variant order to reduce systematic ordering bias.
-                    let modes = [Mode::Shared, Mode::Sharded, Mode::Local];
-                    for offset in 0..3 {
+                    let modes = [Mode::Shared, Mode::Sharded, Mode::Relaxed, Mode::Local];
+                    for offset in 0..modes.len() {
                         run(
-                            modes[(offset + repetition) % 3],
+                            modes[(offset + repetition) % modes.len()],
                             broad,
                             &cpus[..n],
                             collector,
@@ -337,5 +398,75 @@ fn main() {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn relaxed_recording_matches_bucket_boundaries() {
+        let mut writer = RelaxedWriter::new();
+        let mut expected = empty();
+        // Both ends of every bucket catch off-by-one and logarithmic mapping bugs.
+        for bucket in empty().iter() {
+            for value in [bucket.start(), bucket.end()] {
+                writer.increment(value);
+                expected.increment(value).unwrap();
+                // Check each prefix so a permutation of equally populated
+                // buckets cannot hide behind equal final counts.
+                assert_eq!(
+                    relaxed_snapshot(&writer.buckets).as_slice(),
+                    expected.as_slice()
+                );
+            }
+        }
+        assert_eq!(
+            relaxed_snapshot(&writer.buckets).as_slice(),
+            expected.as_slice()
+        );
+    }
+
+    #[test]
+    fn relaxed_collection_does_not_lose_or_reset_counts() {
+        let mut writer = RelaxedWriter::new();
+        let buckets = writer.buckets.clone();
+        let start = Arc::new(Barrier::new(2));
+        let worker_start = start.clone();
+        let (halfway_tx, halfway_rx) = mpsc::sync_channel(0);
+        let (resume_tx, resume_rx) = mpsc::sync_channel(0);
+        let worker = std::thread::spawn(move || {
+            worker_start.wait();
+            for i in 0..100_000 {
+                if i == 50_000 {
+                    halfway_tx.send(()).unwrap();
+                    resume_rx.recv().unwrap();
+                }
+                writer.increment(0);
+                writer.increment(1);
+            }
+        });
+        start.wait();
+        let mut previous = [0, 0];
+        for _ in 0..100 {
+            let snapshot = relaxed_snapshot(&buckets);
+            for i in 0..2 {
+                let count = snapshot.as_slice()[i];
+                assert!(count >= previous[i] && count <= 100_000);
+                previous[i] = count;
+            }
+        }
+        halfway_rx.recv().unwrap();
+        // Require a real intermediate observation regardless of scheduling.
+        assert_eq!(
+            &relaxed_snapshot(&buckets).as_slice()[..2],
+            &[50_000, 50_000]
+        );
+        resume_tx.send(()).unwrap();
+        worker.join().unwrap();
+        let snapshot = relaxed_snapshot(&buckets);
+        assert_eq!(&snapshot.as_slice()[..2], &[100_000, 100_000]);
+        assert_eq!(snapshot.as_slice().iter().sum::<u64>(), 200_000);
     }
 }

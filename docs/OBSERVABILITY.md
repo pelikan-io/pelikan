@@ -36,8 +36,13 @@ the chart, and its textual explanation together.
 - [x] Assess 1-second and 5-second publication intervals separately from
   queue-drain cadence. Report handoff age and worker cutoff lag, and add a
   deterministic burst-boundary replay comparing merged p50/p99/p999.
+- [x] Compare single-writer relaxed load/store shards with sharded relaxed
+  read-modify-write increments and buffer handoff at 1-second and 5-second
+  collection cadences. Prefer the simpler relaxed-shard candidate for the
+  next server experiment; keep production adoption behind the gates below.
 - [ ] Complete the end-to-end per-worker histogram assessment. Compare the
-  current shared atomic histogram, per-worker atomic shards, and non-atomic
+  current shared atomic histogram, per-worker atomic shards (including
+  single-writer relaxed load/store), and non-atomic
   local recording with
   safe snapshot publication. Include concentrated and broad sample
   distributions, worker-count scaling, recording cost, memory, collection

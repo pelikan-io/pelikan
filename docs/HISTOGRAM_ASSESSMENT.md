@@ -1,19 +1,46 @@
 # Per-worker histogram assessment
 
-The experiment in `src/session/examples/histogram_scaling.rs` compares three
+The experiment in `src/session/examples/histogram_scaling.rs` compares four
 recording and collection designs. It does not change production metrics.
 
 | Variant | Recording | Collection |
 | --- | --- | --- |
 | Shared | All workers increment one `metriken::AtomicHistogram` | Load its buckets and calculate aggregate quantiles |
 | Sharded | Each worker increments its own `metriken::AtomicHistogram` | Load each shard, merge bucket counts, calculate aggregate quantiles |
+| Relaxed | One writer per shard uses `AtomicU64::load/store(Relaxed)` | Read cumulative buckets with relaxed loads; never reset live buckets |
 | Local | Each worker exclusively owns a non-atomic `Histogram` | Transfer completed buffers to the collector; merge and recycle them |
 
 All variants use the `(7, 32)` geometry of Pelikan's `REQUEST_LATENCY`.
-The atomic variants retain metriken's initialization/access wrapper. Local
+Shared and Sharded use relaxed atomic **read-modify-write** increments and
+retain metriken's initialization/access wrapper. Relaxed avoids that wrapper
+and the read-modify-write operation. It specializes histogram 1.5's private
+bucket-index calculation for `(7, 32)`; tests compare both ends of every bucket
+against the library. Mapping remains inside the timed loop. This is a design
+comparison, not an isolated measurement of instruction costs. Local
 recording holds its histogram directly in worker state, without a thread-local
 lookup per observation. A production implementation must account for any
 additional lookup or registry overhead.
+
+## Sidecar synchronization default
+
+Prefer relaxed atomic access for independent observational values that do not
+publish application state. The Relaxed variant has exactly one writer per
+shard; concurrent collection only reads. A load followed by a store is not a
+multi-writer increment. Multiple writers still require `fetch_add` or another
+correct update protocol. Initialization, ownership transfer, and shutdown
+retain the synchronization their lifecycle requires.
+
+Each relaxed bucket read is atomic, but a sweep is not one simultaneous
+histogram snapshot. Cross-bucket timing differences are tolerated here. A
+production interval exporter should subtract successive cumulative snapshots,
+not reset buckets while the worker is updating them. Counter wrap, worker
+replacement, and snapshot timestamps need explicit handling. Tests exercise
+nondecreasing reads (without wrap) and exact final counts after writer join.
+
+This is the preferred baseline candidate before accepting buffer handoff's
+additional lifecycle machinery, not a production implementation selection.
+Hardware/cache-coherence and compiler costs remain; relaxed does not mean
+zero-cost. Plain concurrent non-atomic reads/writes are not a substitute.
 
 ## Reproduction
 
@@ -83,6 +110,8 @@ duplicated, or incorrectly merged samples abort the run.
   buffer after the collector requests it. It excludes the collector's own
   timer lateness relative to an ideal wall-clock schedule and excludes final
   shutdown publications. `requests` counts actual periodic requests.
+  Both publication timing fields apply only to Local; zeros for directly
+  loaded atomic variants mean not applicable, not zero end-to-end age.
 - `resident_histogram_bytes` estimates algorithmic histogram storage: shared
   or sharded atomic state plus a merged result and one temporary load; or two
   local buffers per worker plus a merged result. It excludes allocator and
@@ -150,9 +179,10 @@ delivery delay, but does not remove this requirement.
 
 1. Determine whether worker sharding materially improves recording cost over
    shared atomics for concentrated and broad distributions.
-2. Measure the further improvement from non-atomic recording against sharded
-   atomics, including publication work and memory, before accepting its added
-   lifecycle complexity.
+2. Compare single-writer relaxed load/store against sharded read-modify-write
+   atomics first. Measure any further improvement from non-atomic recording,
+   including publication work and memory, before accepting its added lifecycle
+   complexity.
 3. Prototype the strongest candidate in a separate, opt-in server experiment;
    measure request throughput and tail latency with realistic sampling rates
    and scraper load. Keep the shared implementation as the control.
