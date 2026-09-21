@@ -16,3 +16,6 @@ log = { workspace = true }
 metriken = { workspace = true }
 pelikan-net = { workspace = true }
 protocol-common = { path = "../protocol/common", default-features = false }
+
+[dev-dependencies]
+libc = { workspace = true }

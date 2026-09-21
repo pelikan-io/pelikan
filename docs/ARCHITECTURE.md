@@ -1,7 +1,7 @@
 # Pelikan Architecture
 
 Pelikan is a Cargo workspace that builds several cache services out of shared
-libraries. This document explains the architecture in three views, each with a
+libraries. This document explains the architecture in four views, each with a
 generated chart:
 
 1. [**What the code is**](#the-big-picture) — the layers, and how each shipped
@@ -10,6 +10,8 @@ generated chart:
    the queues that connect them.
 3. [**What happens to a request**](#life-of-a-request) — one request traced
    through those threads, in the code's own verbs.
+4. [**How the process is observed**](#observability-across-threads) — shared
+   metric state, admin exports, and logging queues.
 
 The charts are generated from the build manifest and source assertions by
 `cargo xtask diagrams` and are wider than this page — click any chart to open
@@ -116,6 +118,43 @@ by column and the differences that remain are the real ones:
 The control plane is intentionally out of scope here; the threading chart
 carries it.
 
+## Observability Across Threads
+
+[![Metrics and logging across threads](diagrams/observability.svg)](diagrams/observability.svg?raw=1)
+
+The chart shows two different paths. Metric writers update shared state, and
+the admin thread reads it when an operator asks for stats. Log callers format
+records and enqueue bytes for appender workers to write. The repeated
+`pelikan_admin` boxes show the roles of one thread, not additional threads.
+
+Mio session handlers and Ringline connection handlers update the same
+process-global session counters and latency histogram. Protocol and storage
+code register their own metrics in the same `metriken` registry. Ordinary
+counters and gauges use atomic values; Ringline runtime counter groups use
+worker-local shards. The registry makes metrics discoverable; it is not a
+queue that receives a message for each request. The admin thread renders
+ASCII `stats`, Prometheus `/metrics`, JSON, or `/vars` responses. It reads
+counters individually, so an export is not an atomic snapshot of all threads.
+
+Two current limitations are visible in the chart. Histogram percentiles come
+from the shared `SNAPSHOTS` object, initialized lazily and protected by an
+`RwLock`. `Snapshots::update` exists, but there is no refresh caller in the
+current application source, so these percentiles become stale after the first
+snapshot. Also, the ASCII and HTTP exporters handle counters, gauges, and
+histograms but do not handle `ShardedCounterGroup`. Ringline's grouped runtime
+counters are registered but are not exported by these paths; its ordinary
+active-connection gauge is handled. These gaps predate the upstream Ringline
+dependency update and are not repaired by this documentation change.
+
+Logging uses a process-wide tracing subscriber. The calling thread performs
+filtering, callsite sampling for `klog`, and formatting, then sends bytes through
+bounded `tracing-appender` queues. Appender workers perform output I/O. The
+default queue behavior is lossy under overload. Debug output goes to stdout
+or a configured file; a configured klog file adds another writer and worker.
+Sampled klog events also reach the debug layer when its level filter permits.
+The admin object retains `LogDrain`, whose worker guards keep those appenders
+alive. File rotation and compression are delegated to the configured writer.
+
 ## Layer by Layer
 
 **Runtime foundation** (`src/`)
@@ -170,7 +209,7 @@ carries it.
 
 ## Keeping This Document Honest
 
-The three charts are generated — never hand-edited — by `cargo xtask
+The four charts are generated — never hand-edited — by `cargo xtask
 diagrams`:
 
 - the build chart derives from `cargo metadata`, plus source greps for the
@@ -180,6 +219,10 @@ diagrams`:
   queue wiring, signal sets, ports, event-loop verbs — and absence
   assertions when a chart relies on something not existing) that abort
   generation when the code drifts.
+
+Observability claims also check the admin exporters, snapshot access, logging
+configuration, and the locked dependency sources resolved by Cargo. Negative
+claims flag the documented gaps when export or snapshot-refresh code changes.
 
 CI regenerates all charts on every PR and fails on any diff against the
 committed SVGs, so a refactor that changes the dependency structure or the

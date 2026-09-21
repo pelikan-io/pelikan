@@ -16,8 +16,9 @@ This copy is filled for Pelikan.
 | Layered architecture | build | `docs/diagrams/architecture.svg` | `xtask/src/arch.rs` | classification tables + `verify_topo_rows` + engine grep |
 | Thread model | runtime | `docs/diagrams/threading.svg` | `xtask/src/threading.rs` | source claims (`CLAIMS`/`NEG_CLAIMS`) |
 | Life of a request | runtime | `docs/diagrams/dataflow.svg` | `xtask/src/dataflow.rs` | source claims + panel bounds check |
+| Observability | runtime | `docs/diagrams/observability.svg` | `xtask/src/observability.rs` | source claims, exporter omissions, snapshot-refresh absence, label and connector geometry |
 
-All three are embedded in `docs/ARCHITECTURE.md` with textual equivalents
+All four are embedded in `docs/ARCHITECTURE.md` with textual equivalents
 (layer breakdown, thread table, binary:protocol table) adjacent to each.
 
 ### Generator
@@ -28,6 +29,8 @@ All three are embedded in `docs/ARCHITECTURE.md` with textual equivalents
 - Shared visual-language module: `xtask/src/svg.rs`
 - Source-claim helper: `xtask/src/claims.rs` (positive and negative regex
   assertions; exits nonzero on drift)
+- External source claims use `crate-name:relative/path`; locked Cargo metadata
+  resolves the exact dependency source, including git pins.
 
 ### Ground Truth
 
